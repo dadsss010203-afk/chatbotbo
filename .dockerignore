@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────
+#  .dockerignore — CHATBOTBO
+# ─────────────────────────────────────────────
+
+# Entorno virtual Python
+.venv/
+venv/
+env/
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ChromaDB (se monta como volumen)
+chroma_db/
+
+# Variables de entorno
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Datos temporales del scraper (opcionales, se regeneran)
+# data/         ← comenta esta línea si quieres incluir los datos pre-generados

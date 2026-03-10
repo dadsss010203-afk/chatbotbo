@@ -1,0 +1,84 @@
+services:
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: chatbotbo_ollama
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+  ollama-setup:
+    image: ollama/ollama:latest
+    container_name: chatbotbo_setup
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ./backend/app/core/Modelfile:/Modelfile:ro
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Esperando Ollama...' &&
+        sleep 5 &&
+        ollama pull llama3.2:3b &&
+        ollama create correos-bot -f /Modelfile &&
+        echo 'Modelo listo!'
+      "
+    restart: "no"
+
+  chatbot:
+    build:
+      context: ./backend/app
+      dockerfile: ../../Dockerfile
+    container_name: chatbotbo_app
+    restart: unless-stopped
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    volumes:
+      - chroma_data:/app/chroma_db
+      - ./backend/app/data:/app/data
+      - ./frontend:/frontend
+      - ./backend/app:/app
+    environment:
+      - OLLAMA_URL=http://ollama:11434/api/chat
+      - OLLAMA_TIMEOUT=600
+      - LLM_MODEL=correos-bot
+      - EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+      - CHROMA_PATH=/app/chroma_db
+      - CHUNK_SIZE=600
+      - BATCH_SIZE=500
+      - N_RESULTADOS=3
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  ollama_data:
+  chroma_data:

@@ -1,0 +1,57 @@
+[
+  {
+    "nombre": "TrackingBO (Rastreo de Paquetes)",
+    "url": "https://trackingbo.correos.gob.bo:8100/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "SIRECO (Sistema de Reclamos y Sugerencias)",
+    "url": "https://sireco.correos.gob.bo:8102/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "UNIENVIO (Sistema de ECA)",
+    "url": "https://unienvio.correos.gob.bo:8103/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "POSTAR (Calculadora Postal)",
+    "url": "https://postar.correos.gob.bo:8104/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "GESDO (Sistema de Carteros)",
+    "url": "https://gesdo.correos.gob.bo:8106/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "SIREN (Sistema de Encomiendas)",
+    "url": "https://siren.correos.gob.bo:8107/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "ULTRAPOST (Sistema de EMS)",
+    "url": "https://ultrapost.correos.gob.bo:8108/login",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "GESCON(Sistema de contratos)",
+    "url": "http://gescon.correos.gob.bo:3005/",
+    "fuente": "https://correos.gob.bo/leyes-y-decretos"
+  },
+  {
+    "nombre": "Ver Correspondencia Internacional",
+    "url": "https://ips.correos.gob.bo/ipswebtracking/",
+    "fuente": "https://correos.gob.bo/"
+  },
+  {
+    "nombre": "Seguimiento de Correspondencia",
+    "url": "https://trackingbo.correos.gob.bo:8100/",
+    "fuente": "https://correos.gob.bo/"
+  },
+  {
+    "nombre": "RASTREA ACA",
+    "url": "https://trackingbo.correos.gob.bo:8100/",
+    "fuente": "https://correos.gob.bo/"
+  }
+]

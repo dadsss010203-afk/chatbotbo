@@ -1,0 +1,15 @@
+{
+  "inicio": "2026-03-07T21:39:51.901295",
+  "fin": "2026-03-07T22:03:12.441985",
+  "duracion_segundos": 1400.54069,
+  "paginas_exitosas": 63,
+  "paginas_fallidas": 37,
+  "caracteres_extraidos": 88455,
+  "sucursales_encontradas": 9,
+  "aplicativos_encontrados": 16,
+  "servicios_encontrados": 163,
+  "noticias_encontradas": 66,
+  "pdfs_descargados": 100,
+  "historia_encontrada": true,
+  "errores": []
+}
