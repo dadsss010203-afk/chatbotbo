@@ -36,7 +36,11 @@ services:
       /bin/sh -c "
         echo 'Esperando Ollama...' &&
         sleep 5 &&
+<<<<<<< HEAD
         ollama pull llama3.2:3b &&
+=======
+        ollama pull llama3.2:1b &&
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
         ollama create correos-bot -f /Modelfile &&
         echo 'Modelo listo!'
       "
@@ -81,4 +85,8 @@ services:
 
 volumes:
   ollama_data:
+<<<<<<< HEAD
   chroma_data:
+=======
+  chroma_data:
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)

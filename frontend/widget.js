@@ -114,6 +114,16 @@ let translating = false;
 let ctrl        = null;
 let mapInst     = null;
 
+<<<<<<< HEAD
+=======
+const QUICK_ACTIONS = {
+  generar: 'Genera un resumen breve de tus capacidades actuales en este bot.',
+  mcps: 'Muestra los MCPs configurados en este bot.',
+  skills: 'Muestra las skills configuradas en este bot.',
+  rag: 'Analiza el estado del RAG de este bot.'
+};
+
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 // ─── TEXTOS POR IDIOMA ─────────────────────────────
 const TX = {
   es: {
@@ -387,6 +397,15 @@ function showTyping() {
 
 function removeTyping() { document.getElementById('tyEl')?.remove(); }
 
+<<<<<<< HEAD
+=======
+function quickAction(action) {
+  const prompt = QUICK_ACTIONS[action];
+  if (!prompt) return;
+  sendMsg(prompt);
+}
+
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 // ─── ENVIAR MENSAJE ────────────────────────────────
 async function sendMsg(msg) {
   if (busy || translating || !msg.trim()) return;
@@ -530,4 +549,8 @@ function closeMap() { document.getElementById('mapa-modal').classList.remove('op
 // Cerrar con Escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeMap(); if (chatOpen) minimize(); }
+<<<<<<< HEAD
 });
+=======
+});
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)

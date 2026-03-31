@@ -1,0 +1,20 @@
+[
+  {
+    "id": "rag_local",
+    "nombre": "RAG local",
+    "descripcion": "Inspecciona el estado de la base vectorial y del motor de embeddings.",
+    "accion": "inspect_rag"
+  },
+  {
+    "id": "system_status",
+    "nombre": "Estado del sistema",
+    "descripcion": "Reporta sesiones, modelo, Ollama y estado del actualizador.",
+    "accion": "inspect_system"
+  },
+  {
+    "id": "branches_summary",
+    "nombre": "Resumen de sucursales",
+    "descripcion": "Resume la cantidad de sucursales cargadas y cuantas tienen coordenadas.",
+    "accion": "inspect_branches"
+  }
+]

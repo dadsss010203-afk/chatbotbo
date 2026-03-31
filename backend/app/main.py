@@ -107,6 +107,13 @@ def inicializar():
     print("  GET  /api/sucursales    → Lista de sucursales")
     print("  GET  /api/idiomas       → Idiomas disponibles")
     print("  POST /api/reset         → Limpiar historial")
+<<<<<<< HEAD
+=======
+    print("  GET  /api/capabilities  → Skills, MCPs y estado RAG")
+    print("  GET  /api/mcps          → Lista de MCPs")
+    print("  POST /api/mcps/execute  → Ejecutar MCP interno")
+    print("  GET  /api/skills        → Lista de skills")
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
     print("  GET  /api/status        → Estado del sistema")
     print("  POST /api/actualizar    → Forzar actualización")
     print("=" * 50)

@@ -20,7 +20,11 @@ import requests
 import json
 from flask import Blueprint, request, jsonify
 
+<<<<<<< HEAD
 from core import rag, ollama, session, location, idiomas, intents, updater
+=======
+from core import rag, ollama, session, location, idiomas, intents, updater, capabilities
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 
 # intentamos usar biblioteca de traducción local para evitar llamadas a LLM
 try:
@@ -42,6 +46,22 @@ bp = Blueprint("general", __name__)   # sin prefix → rutas en /api/*
 SUCURSALES: list = []
 
 
+<<<<<<< HEAD
+=======
+def _estado_capacidades() -> dict:
+    return capabilities.get_runtime_capabilities(
+        chunks=rag.total_chunks(),
+        embedding_model=os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"),
+        chroma_path=CHROMA_PATH,
+        ollama_ok=ollama.ollama_disponible(),
+        modelo=os.environ.get("LLM_MODEL", "correos-bot"),
+        sesiones_activas=session.total_sesiones(),
+        sucursales=SUCURSALES,
+        actualizacion=updater.get_estado(),
+    )
+
+
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 # ─────────────────────────────────────────────
 #  REINDEXADO
 # ─────────────────────────────────────────────
@@ -167,6 +187,24 @@ def chat():
 
     t    = idiomas.IDIOMAS[lang]
 
+<<<<<<< HEAD
+=======
+    consulta_especial = capabilities.detectar_consulta_especial(pregunta)
+    if consulta_especial is not None:
+        estado = _estado_capacidades()
+        resultado = capabilities.execute_special_query(consulta_especial, estado)
+        respuesta = resultado["response"]
+        session.agregar_turno(sid, pregunta, respuesta)
+        return jsonify(
+            {
+                "response": respuesta,
+                "lang": lang,
+                "capabilities": estado,
+                "tool_result": resultado,
+            }
+        )
+
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
     # ── 1. Saludo → sin Ollama
     if intents.es_saludo(pregunta):
         return jsonify({"response": t["saludo"], "lang": lang})
@@ -430,6 +468,10 @@ def reset():
 
 @bp.route("/api/status", methods=["GET"])
 def status():
+<<<<<<< HEAD
+=======
+    estado_cap = _estado_capacidades()
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
     return jsonify({
         "status"          : "ok",
         "chunks"          : rag.total_chunks(),
@@ -439,9 +481,49 @@ def status():
         "sucursales"      : len(SUCURSALES),
         "idiomas"         : list(idiomas.IDIOMAS.keys()),
         "actualizacion"   : updater.get_estado(),
+<<<<<<< HEAD
     })
 
 
+=======
+        "skills"          : estado_cap["skills"],
+        "mcps"            : estado_cap["mcps"],
+        "rag"             : estado_cap["rag"],
+    })
+
+
+@bp.route("/api/capabilities", methods=["GET"])
+def listar_capacidades():
+    return jsonify(_estado_capacidades())
+
+
+@bp.route("/api/mcps", methods=["GET"])
+def listar_mcps():
+    return jsonify({"mcps": _estado_capacidades()["mcps"]})
+
+
+@bp.route("/api/skills", methods=["GET"])
+def listar_skills():
+    return jsonify({"skills": _estado_capacidades()["skills"]})
+
+
+@bp.route("/api/mcps/execute", methods=["POST"])
+def ejecutar_mcp():
+    data = request.get_json(silent=True) or {}
+    mcp_id = (data.get("mcp_id") or "").strip()
+    if not mcp_id:
+        return jsonify({"error": "mcp_id es obligatorio"}), 400
+
+    try:
+        resultado = capabilities.execute_mcp(mcp_id, _estado_capacidades())
+        return jsonify(resultado)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Error ejecutando MCP: {e}"}), 500
+
+
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 @bp.route("/api/actualizar", methods=["POST"])
 def actualizar():
     if updater.estado["en_proceso"]:
@@ -490,4 +572,7 @@ def api_root():
     if "message" in data:
         return chat()
     return jsonify({"error": "requisição inválida"}), 400
+<<<<<<< HEAD
 
+=======
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)

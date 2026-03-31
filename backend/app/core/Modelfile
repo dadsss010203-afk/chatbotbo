@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿FROM llama3.2:3b
+=======
+﻿FROM llama3.2:1b
+>>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 
 PARAMETER temperature 0
 PARAMETER num_predict 250
