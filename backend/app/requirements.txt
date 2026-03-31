@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────
+#  ChatbotBO — Dependencias Python
+#  Instalar con: pip install -r requirements.txt
+# ─────────────────────────────────────────────
+
+# ── Servidor web
+flask==3.1.0
+flask-cors==5.0.0
+python-dotenv==1.0.1
+
+# ── HTTP
+requests==2.32.3
+
+# ── RAG / Embeddings
+sentence-transformers==3.4.1
+chromadb==0.5.23
+torch
+transformers
+
+# ── Detección de idioma
+langdetect==1.0.9
+
+# ── Scheduler
+apscheduler==3.10.4
+
+# ── Progreso en consola
+tqdm==4.67.1
+
+# ── Scraper
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# ── PDFs
+pdfplumber==0.11.4
+PyPDF2==3.0.1
+
+# ── Utilidades
+python-dateutil==2.9.0
+
+# traducción local sin LLM
+# deep-translator usa Google/Facebook/Microsoft gratis
+# (se instala opcionalmente, no es crítico si falla)
+deep-translator==1.11.4

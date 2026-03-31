@@ -1,0 +1,1168 @@
+{
+  "aplicaciones": [
+    {
+      "nombre": "Nuestros Aplicativos",
+      "descripcion": "",
+      "url": "http://correos.gob.bo/services/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio Encomienda Postal",
+      "descripcion": "Servicio de paquetes con regalos o mercancías, tratamiento oportuno y con sistema de rastreo. Importación y Exportación a todos los países asociados a las Organización de Naciones Unidas.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/servicio-encomienda-postal"
+    },
+    {
+      "nombre": "Servicio Mi Encomienda",
+      "descripcion": "Es un servicio de paquetería a nivel nacional a ser entregado en cualquier oficina de correos, con Acuse de Recibo o Constancia de Entrega, tracking y con la debida seguridad",
+      "url": null,
+      "fuente": "https://correos.gob.bo/me"
+    },
+    {
+      "nombre": "Excelente opción para aquellos que necesitan enviar paquetes de forma segura y confiable",
+      "descripcion": "Este servicio de paquetería es seguro, económico y eficiente en todo el territorio nacional, gracias a su sistema de itinerarios fijos, tarifas competitivas y un sistema de rastreo en línea.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/me"
+    },
+    {
+      "nombre": "Escala Salarial",
+      "descripcion": "No existe una Escala Salarial Aprobada por tratarse de personal comprendido en la Partida Presupuestaria 12100 “Personal Eventual” del presupuesto asignado a la Administración Central de la Agencia Boliviana de Correos – Gestión 2023.Cabe señalar que se cuenta con una Escala Salarial Referencial, to",
+      "url": null,
+      "fuente": "https://correos.gob.bo/institucional"
+    },
+    {
+      "nombre": "Uniendo...",
+      "descripcion": "",
+      "url": "https://ips.correos.gob.bo/ipswebtracking/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "INGRESE EL NÚMERO, VERIFICA SI EL MENSAJE DE WHATSAPP O MENSAJE DE TEXTO (SMS) CORRESPONDE A LA AGBC INFÓRMATE AQUÍ",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/evita-estafas/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "TRACKINGBO",
+      "descripcion": "TrackingBO te permite rastrear en línea los envíos postales y paquetes, mostrando su estado y ubicación en cada etapa del proceso.",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "TRACKINGBO APP",
+      "descripcion": "TrackingBo APP ,Consulta el estado de tus paquetes, recibe actualizaciones y mantén el control de tus entregas de forma rápida, simple y segura desde tu celular",
+      "url": "https://correos.gob.bo/wp-content/uploads/2026/03/TrackingBO_APP.apk",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Al abrir las puertas del Estado encontramos algo más que desorden:",
+      "descripcion": "Una herida profunda. Se usaron las reservas internacionales, el ahorro de las familias y el futuro del país para sostener empresas inviables ...",
+      "url": "https://correos.gob.bo/al-abrir-las-puertas-del-estado-encontramos-algo-mas-que-desorden/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Feliz DÍA DEL PADRE",
+      "descripcion": "#felizdiapapa | La #AGBC extiende las más grandes felicitaciones a todos los papás en su mes conmemorativo, felicidades!!!. #bolivia #uniendosentimientos",
+      "url": "https://correos.gob.bo/feliz-dia-del-padre/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "DESCARGA ACA",
+      "url": "https://correos.gob.bo/wp-content/uploads/2026/03/TrackingBO_APP.apk",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Aplicativo SITPRECO.S2PLUS",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/formularios"
+    },
+    {
+      "nombre": "Reglamentos de la Agencia Boliviana Correos",
+      "descripcion": "",
+      "url": "http://correos.gob.bo/wp-content/uploads/2023/07/1.-Codigo-de-Etica-de-la-AGBC.pdf",
+      "fuente": "https://correos.gob.bo/reglamentos"
+    },
+    {
+      "nombre": "Nuestros",
+      "descripcion": "El servicio Express Mail Service (EMS) de la Agencia Boliviana de Correos es un servicio de mensajería y paquetería urgente a nivel nacional e internacional. Está diseñado para aquellos envíos que requieren de una entrega rápida y segura a destinos dentro y fuera del territorio nacional.",
+      "url": "http://correos.gob.bo/ems/",
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "Servicio Encomienda Postal (SEP)",
+      "descripcion": "Servicio de paquetes con regalos o mercancías, tratamiento oportuno y con sistema de rastreo.\nImportación y Exportación a todos los países asociados a las Organización de Naciones\nUnidas.",
+      "url": "http://correos.gob.bo/servicio-encomienda-postal/",
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "ALERTA DE ESTAFAS POR WHATSAPP",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/evita-estafas"
+    },
+    {
+      "nombre": "Estimado/a\nLa Agencia Boliviana de Correos ha detectado una serie de intentos de estafa a través de mensajes de texto (SMS) y mensajes de WhatsApp. Donde, los estafadores se hacen pasar por funcionarios de nuestra institución pública para obtener información personal (dirección, nombre, número de cédula de identidad, número de tarjeta de débito, etc.) y depósitos financieros a cuentas bancarias de terceros, les recomendamos tener en cuenta esta información para poder proteger tu información personal. Asimismo, aclaramos que la Agencia Boliviana de Correos, solamente realiza en envío de mensajes a través del WhatsApp BRINDANDO información para el recojo de su correspondencia o paquetería en una determinada ventanilla de entrega y dentro de nuestras oficinas, las cuales están ubicadas en las 9 ciudades capitales del país. Por favor, ten en cuenta las siguientes recomendaciones para protegerte:",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/evita-estafas"
+    },
+    {
+      "nombre": "Verifica la autenticidad del remitente:",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/evita-estafas"
+    },
+    {
+      "nombre": "Desconfía de ofertas demasiado buenas para ser verdad:",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/evita-estafas"
+    },
+    {
+      "nombre": "Recursos Humanos",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/03/NOMINA-DE-AUTORIDADES.pdf",
+      "fuente": "https://correos.gob.bo/recursos-humanos"
+    }
+  ],
+  "servicios": [
+    {
+      "nombre": "Leyes y Decretos",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2023/10/Nueva-Constitucion-Politica-de-Estado-Promulgada-el-7-de-Febrero-de-2009.pdf",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Nuestros Servicios",
+      "descripcion": "",
+      "url": "http://correos.gob.bo/services/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Ministerio de Obras Públicas, Servicio y Vivienda",
+      "descripcion": "",
+      "url": "https://www.oopp.gob.bo/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Organizaciones Internacionales",
+      "descripcion": "",
+      "url": "https://www.upu.int/en/Home",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicios",
+      "url": "https://correos.gob.bo/services/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio Encomienda Postal",
+      "url": "https://correos.gob.bo/servicio-encomienda-postal/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio de Correo Prioritario",
+      "url": "https://correos.gob.bo/sp/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Envío de Correspondencia Agrupada",
+      "url": "https://correos.gob.bo/eca/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Mi Encomienda",
+      "url": "https://correos.gob.bo/me/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio de Filatelia",
+      "url": "https://correos.gob.bo/filatelia/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio de Casillas",
+      "url": "https://correos.gob.bo/casillas/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio de Delivery",
+      "url": "https://correos.gob.bo/chasquiexpressbo/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Servicio de mensajería y paquetería con un mayor nivel de urgencia y rapidez",
+      "descripcion": "Nuestro servicio básico de mensajería y paquetería es la opción ideal para tus envíos locales e internacionales, con diferentes opciones a medida y a precios económicos.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/sp"
+    },
+    {
+      "nombre": "NACIONAL",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/sp"
+    },
+    {
+      "nombre": "INTERNACIONAL",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/sp"
+    },
+    {
+      "nombre": "Tu encomienda, nuestro compromiso seguro y confiable.",
+      "descripcion": "Nuestro compromiso es garantizar la entrega segura y eficiente de tus envíos, tanto a nivel nacional como internacional. Desde el embalaje seguro hasta el seguimiento en tiempo real, te ofrecemos un servicio confiable que se adapta a tus necesidades.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/servicio-encomienda-postal"
+    },
+    {
+      "nombre": "Agencia Boliviana de Correos",
+      "url": "https://correos.gob.bo/category/agencia-boliviana-de-correos/",
+      "fuente": "https://correos.gob.bo/suscripcion-del-contrato-para-la-adecuacion-de-ambientes-y-equipamiento-del-centro-de-tratamiento-de-correspondencia"
+    },
+    {
+      "nombre": "¿Quiénes somos?",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Misión",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Visión",
+      "descripcion": "La Agencia Boliviana de Correos será una institución pública de servicios postales reconocida por la excelencia de su gestión, su alto nivel de competitividad, constante modernización y desarrollo en los productos y servicios que brinda.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Nuestra Historia...",
+      "descripcion": "La Agencia Boliviana de Correos ha dejado una huella imborrable en la historia de Bolivia. Su transformación constante y su capacidad de adaptarse a los desafíos del mundo moderno la han convertido en un actor clave en la comunicación y el comercio del país. La confianza depositada en esta instituci",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Nuestra",
+      "descripcion": "MIRANDA VELASCO BORIS MARIO (DAF)",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Nómina de Autoridades",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Directora General Ejecutiva",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Director Administrativo Financiero",
+      "descripcion": "MIRANDA VELASCO BORIS MARIO (DAF)",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Director de Operaciones",
+      "descripcion": "YAMPASSI CHACOLLA NEON JAVIER (DO)",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Directora Comercial Interina",
+      "descripcion": "VALDEZ MENDOZA YADIRA CANDY (DC)",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "PRINCIPIOS",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Vivir Bien",
+      "descripcion": "Buscamos promover la satisfacción integral de las necesidades humanas, que van más allá de lo material, abarcando también la afectividad y el reconocimiento mutuo. Nos esforzamos por alcanzar esta satisfacción en armonía con la naturaleza y en colaboración con la comunidad de seres humanos.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Calidez",
+      "descripcion": "Nos comprometemos a garantizar un trato amable, cortés y respetuoso tanto entre los servidores y servidoras públicos del MOPSV como con la población que utiliza nuestros servicios. Valoramos la importancia de una comunicación efectiva y empática, cultivando relaciones de confianza y colaboración.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Ética",
+      "descripcion": "Promovemos un compromiso efectivo por parte de nuestros servidores y servidoras públicas con los valores y principios establecidos en la Constitución Política del Estado (CPE). Creemos que estos valores y principios son fundamentales para un desempeño personal y laboral correcto.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Competencia",
+      "descripcion": "Valoramos y reconocemos la atribución legítima conferida a las autoridades para el conocimiento o resolución de asuntos determinados, tal como está establecido en las normas vigentes. Entendemos que esta atribución se ejerce en representación del pueblo, reflejando así la voluntad colectiva y democr",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Eficacia",
+      "descripcion": "Nuestro objetivo es alcanzar los resultados programados con el propósito de generar impacto positivo en la sociedad. Nos enfocamos en resultados tangibles y medibles que contribuyan al desarrollo y bienestar de nuestra comunidad. Trabajamos de manera estratégica y comprometida para lograr impactos s",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Honestidad",
+      "descripcion": "Nos comprometemos a actuar de manera correcta en el desempeño de nuestras funciones públicas, basándonos en los principios de verdad, transparencia y justicia. Valoramos la integridad y la ética en todas nuestras acciones, asegurando que nuestras decisiones y actuaciones estén fundamentadas en la ve",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Responsabilidad",
+      "descripcion": "Nos comprometemos a asumir plenamente las consecuencias de nuestros actos y omisiones en el desempeño de nuestras funciones públicas. Valoramos la responsabilidad y la rendición de cuentas como principios fundamentales de nuestro trabajo. Reconocemos que nuestras acciones tienen impacto en la socied",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Legitimidad",
+      "descripcion": "Promovemos un reconocimiento pleno por parte del Soberano a los actos de la administración pública cuando estos sean justos y satisfagan las necesidades de la población. Valoramos la importancia de una gestión pública eficiente y efectiva, basada en la transparencia, la rendición de cuentas y el res",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Legalidad",
+      "descripcion": "Nos comprometemos a actuar en estricto cumplimiento de las disposiciones legales vigentes en el país, las cuales reflejan la voluntad soberana del pueblo. Reconocemos la importancia de respetar y acatar las leyes como base fundamental de nuestra actuación.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Igualdad",
+      "descripcion": "Promovemos y garantizamos el pleno reconocimiento del derecho de ejercer la función pública, sin ningún tipo de discriminación. Nos comprometemos a proporcionar un trato equitativo a toda la población, sin distinción de ninguna naturaleza. Valoramos y respetamos la diversidad, promoviendo un ambient",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Transparencia",
+      "descripcion": "Promovemos y valoramos la práctica y el manejo transparente de los recursos del Estado tanto por parte de los servidores públicos como de personas naturales y jurídicas, nacionales y extranjeras, que presten servicios o se comprometan con dichos recursos. Nos comprometemos a actuar con honestidad e ",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Eficiencia",
+      "descripcion": "Nos comprometemos a cumplir los objetivos y metas establecidas de manera eficiente, optimizando los recursos disponibles de manera oportuna. Valoramos la importancia de una gestión eficaz y responsable, donde se maximice el uso de los recursos para alcanzar los resultados esperados. Buscamos impleme",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Calidad",
+      "descripcion": "Nos basamos en una serie de atributos fundamentales en nuestro desempeño laboral, con el enfoque de brindar servicios públicos óptimos. Valoramos la excelencia en nuestra labor y nos esforzamos por mantener altos estándares de calidad en todo momento. La profesionalidad, la eficiencia y la responsab",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Resultados",
+      "descripcion": "Nos enorgullece presentar los productos obtenidos a través del desempeño de nuestras funciones públicas, los cuales están diseñados para cumplir con los objetivos planificados y satisfacer las necesidades de la población. Nos esforzamos por ofrecer productos y resultados de alta calidad que generen ",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "OBJETIVOS INSTITUCIONALES",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "OBJETIVOS ESTRATÉGICOS INSTITUCIONALES",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "OBJETIVOS",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Organigrama de Nuestra Empresa",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Enlaces",
+      "descripcion": "",
+      "url": "https://www.upu.int/en/Home,https://www.upaep.int/,https://www.oopp.gob.bo/,https://www.abc.gob.bo/,https://www.aduana.gob.bo/aduana7/,https://www.abe.bo/,https://www.att.gob.bo/,https://www.boa.bo/BoAWebSite/,https://www.cclp.gob.bo/,https://emapa.gob.bo/,https://www.entel.bo/,https://www.miteleferico.bo/,https://www.naabol.gob.bo/",
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Externos",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Informacion Institucional",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2023/10/Convocatoria-Modalidad-de-seleccion-y-contratacion.pdf",
+      "fuente": "https://correos.gob.bo/institucional"
+    },
+    {
+      "nombre": "Convocatoria (Modalidad de selección y contratación)",
+      "descripcion": "El personal se encuentra dentro de la Partida Presupuestaria 12100 “Personal Eventual” del presupuesto asignado a la Administración Central de la Agencia Boliviana de Correos.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/institucional"
+    },
+    {
+      "nombre": "Términos de Referencia y Perfiles de Cargo",
+      "descripcion": "Los términos de Referencia son elaborados por la Unidad Solicitante de acuerdo a el perfil requerido y las necesidades de cada Unidad Organizacional de la Agencia Boliviana de Correos",
+      "url": null,
+      "fuente": "https://correos.gob.bo/institucional"
+    },
+    {
+      "nombre": "Planes Institucionales",
+      "descripcion": "Por motivos de seguridad la AGBC se guarda la reserva de la publicacion del PISI , PISLEA",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/01/PISLEA-AGBC.pdf",
+      "fuente": "https://correos.gob.bo/planesinstitucionales"
+    },
+    {
+      "nombre": "Pages",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/about/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "Casillas",
+      "url": "https://correos.gob.bo/casillas/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "Envio de Mensajeria Urgente",
+      "url": "https://correos.gob.bo/ems/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "Envios de correspondencia Agrupada",
+      "url": "https://correos.gob.bo/eca/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "Servicio Prioritario",
+      "url": "https://correos.gob.bo/sp/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "LA AGENCIA BOLIVIANA DE CORREOS RINDE HOMENAJE A BOLIVIA CON LA EMISIÓN DE LOS SELLOS POSTALES DEL BICENTENARIO",
+      "url": "https://correos.gob.bo/la-agencia-boliviana-de-correos-rinde-homenaje-a-bolivia-con-la-emision-de-los-sellos-postales-del-bicentenario/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "La Agencia Boliviana de Correos, en coordinación con la Embajada de la República Dominicana, lanzan y ponen en circulación los sellos postales “Homenaje a las hermanas Mirabal” y “Cacique Enriquillo, líder taíno de la primera sublevación indígena en América” acto a realizarse en instalaciones de Cancillería",
+      "url": "https://correos.gob.bo/la-agencia-boliviana-de-correos-en-coordinacion-con-la-embajada-de-la-republica-dominicana-lanzan-y-ponen-en-circulacion-los-sellos-postales-homenaje-a-las-hermanas-mirabal-y/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "DIFUSION REALIZADA POR EL MEDIO TELEVISIVO «F10» SOBRE ESTAFAS A NOMBRE DE LA AGENCIA BOLIVIANA DE CORREOS",
+      "url": "https://correos.gob.bo/difusion-realizada-por-el-medio-televisivo-f10-sobre-estafas-a-nombre-de-la-agencia-boliviana-de-correos/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "DIFUSION REALIZADA POR EL MEDIO TELEVISIVO «GIGAVISION» SOBRE ESTAFAS A NOMBRE DE LA AGENCIA BOLIVIANA DE CORREOS",
+      "url": "https://correos.gob.bo/comunicado-estafa/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "LLEGADA DE PAQUETES ECONOMICOS",
+      "url": "https://correos.gob.bo/llegada-de-paquetes-economicos/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "REALIZA ENVÍOS DIARIOS A:",
+      "url": "https://correos.gob.bo/realiza-envios-diarios-a/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "CUALES SON LOS REQUISITOS PARA REALIZAR UN ENVÍO?",
+      "url": "https://correos.gob.bo/cuales-son-los-requisitos-para-realizar-un-envio/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "Puedes Realizar Envíos Desde",
+      "url": "https://correos.gob.bo/puedes-realizar-envios-desde/",
+      "fuente": "https://correos.gob.bo/sitemap"
+    },
+    {
+      "nombre": "PARECE QUE ESTA PÁGINA ESTA EN CONSTRUCCION.",
+      "descripcion": "",
+      "url": "http://correos.gob.bo/",
+      "fuente": "https://correos.gob.bo/construccion"
+    },
+    {
+      "nombre": "A los carteros...",
+      "descripcion": "",
+      "url": "http://correos.gob.bo/services/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "En cada sobre, una historia viaja a través del tiempo y el espacio.",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Correos en todas partes...",
+      "descripcion": "",
+      "url": "http://correos.gob.bo/contact-us/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Porque llegamos a las 9 Capitales",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "+ 10 Mil",
+      "descripcion": "Paquetes entregados por Mes",
+      "url": null,
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "+ 60",
+      "descripcion": "Trabajadores en planta",
+      "url": null,
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "SIRECO",
+      "descripcion": "SIRECO te permite registrar consultas de manera rápida y directa, facilitando la comunicación entre los usuarios y la Agencia Boliviana de Correos.",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "POSTAR",
+      "descripcion": "POSTAR te permite conocer de manera rápida y sencilla los costos y condiciones de tus envíos, brindándote información clara antes de utilizar el servicio.",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "ChasquiEXPRESS",
+      "descripcion": "ChasquiEXPRESS te permite enviar y recibir paquetes directamente en tu domicilio, brindando comodidad, seguridad y eficiencia en cada entrega.",
+      "url": "https://correos.gob.bo/chasquiexpressbo/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "SERIE ANIMADA «TRASCENDER-Los Tejidos de la Vida»",
+      "descripcion": "Te invitamos a sumergirte en esta emocionante serie de televisión animada infantil boliviana «Trascender- Los Tejidos de la Vida» los cuales promueven ...",
+      "url": "https://correos.gob.bo/serie-animada-trascender-segunda-tierra-duplicado-6232/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "SUSCRIPCIÓN DEL CONTRATO PARA LA ADECUACIÓN DE AMBIENTES Y EQUIPAMIENTO DEL CENTRO DE TRATAMIENTO DE CORRESPONDENCIA",
+      "descripcion": "Con el objetivo de mejorar los tiempos de los procesos de clasificación y distribución de correspondencia tanto a nivel nacional como internacional, ...",
+      "url": "https://correos.gob.bo/suscripcion-del-contrato-para-la-adecuacion-de-ambientes-y-equipamiento-del-centro-de-tratamiento-de-correspondencia/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Comunicado 16/05/2024",
+      "descripcion": "#Comunicado | La Agencia Boliviana de Correos informa a toda la población en general, que personas inescrupulosas realizan actos inapropiados a nombre de esta institución ...",
+      "url": "https://correos.gob.bo/comunicado-16-05-2024/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "COMUNICADO",
+      "descripcion": "Cortes de energía eléctrica",
+      "url": "https://correos.gob.bo/comunicado/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "FELIZ DÍA DEL NIÑO 2024",
+      "descripcion": "Uniendo Sentimientos por nuestros niños | La AGENCIA BOLIVIANA DE CORREOS realizo el agasajo a los niños y niñas en su día. ...",
+      "url": "https://correos.gob.bo/feliz-dia-del-nino-2024/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "SERIE ANIMADA «TRASCENDER-SEGUNDA TIERRA»",
+      "descripcion": "Te invitamos a sumergirte en esta emocionante serie de televisión animada infantil boliviana «TRASCENDER-SEGUNDA TIERRA» en comemoracion del dia del Niño. #TrascenderDiadelNiño ...",
+      "url": "https://correos.gob.bo/serie-animada-trascender-segunda-tierra/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "INVITACION a Rendición Pública de Cuentas INICIAL 2024",
+      "descripcion": "Ver presentacion de la Rendición Pública de Cuentas Inicial 2024 Descargar Aqui LA AGENCIA BOLIVIANA DE CORREOS TE INVITA A LA AUDIENCIA RENDICIÓN ...",
+      "url": "https://correos.gob.bo/invitacion-a-rendicion-publica-de-cuentas-inicial-2024/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Invitacion a RENDICIÓN PÚBLICA DE CUENTAS FINAL 2023",
+      "descripcion": "Ver presentacion de la Rendición Pública de Cuentas Final 2023 Descargar Aqui LA AGENCIA BOLIVIANA DE CORREOS TE INVITA A LA AUDIENCIA RENDICIÓN ...",
+      "url": "https://correos.gob.bo/invitacion-a-rendicion-publica-de-cuentas-final-2023/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Alasitas 2024 Junto a la AGBC",
+      "descripcion": "El Dios de la abundancia llega para hacerte un CLIENTE POSTAL VIP. Visita las oficinas de la Agencia Boliviana de Correos, ubicadas ...",
+      "url": "https://correos.gob.bo/alasitas-2024-junto-a-la-agbc/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Lanzamiento de Sello postal AGBC/AXS",
+      "descripcion": "La Agencia Boliviana de Correos juntamente con AXS Bolivia S.A. lanzaran un Sello Postal conmemorando los más de 20 años de trayectoria ...",
+      "url": "https://correos.gob.bo/lanzamiento-de-sello-postal-agbc-axs/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Felicidades Beni",
+      "descripcion": "#18DeNoviembre | Felicidades #Beni, la Agencia Boliviana de Correos conmemora tus 181 años de aniversario.",
+      "url": "https://correos.gob.bo/felicidades-beni/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Felicidades Potosi",
+      "descripcion": "#10DeNoviembre | Felicidades #Potosi, la Agencia Boliviana de Correos conmemora tus 213 años de aniversario.",
+      "url": "https://correos.gob.bo/felicidades-potosi/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "ARTE POR LA TRANSPARENCIA",
+      "descripcion": "La AGBC y el Viceministerio de Transparencia Institucional y Lucha Contra la Corrupción, junto con las Unidades de Transparencia y Lucha contra ...",
+      "url": "https://correos.gob.bo/arte-por-la-transparencia/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "VERIFICACION ANTICORRUPCION",
+      "descripcion": "En el marco de lo dispuesto en el artículo 15 de la Ley N° 974 de Unidades de Transparencia y Lucha Contra ...",
+      "url": "https://correos.gob.bo/verificacion-anticorrupcion/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "MERCADERÍA PROHIBIDA PARA ENVIAR",
+      "descripcion": "Te explicamos sobre los materiales que no se pueden enviar por temas de seguridad y así saber un poco mas sobre el ...",
+      "url": "https://correos.gob.bo/mercaderia-prohibida-para-enviar/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "SABES COMO ROTULAR UN SOBRE?",
+      "descripcion": "SABES COMO ROTULAR UN SOBRE???? NOSOTROS TE AYUDAMOS PARA QUE PUEDAS LLENAR CORRECTAMENTE EL ROTULO DE TU CARTA O CUALQUIER ENVÍO.!!!!!! LA ...",
+      "url": "https://correos.gob.bo/sabes-como-rotular-un-sobre/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Nuestras",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Sucursales",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Santa Cruz",
+      "descripcion": "",
+      "url": "https://www.google.com/maps/place/-17.7834888,-63.174662",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Cochabamba",
+      "descripcion": "",
+      "url": "https://www.google.com/maps?ll=-17.392818,-66.158619&z=17&t=m&hl=es-US&gl=US&mapclient=embed&q=17%C2%B023%2734.1%22S+66%C2%B009%2731.0%22W+-17.392818,+-66.158619@-17.392818,-66.158619",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Oruro",
+      "descripcion": "",
+      "url": "https://www.google.com/maps?ll=-17.968703,-67.114877&z=17&t=m&hl=es-US&gl=US&mapclient=embed&q=17%C2%B058%2707.3%22S+67%C2%B006%2753.6%22W+-17.968703,+-67.114877@-17.968703,-67.11487699999999",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Beni",
+      "descripcion": "",
+      "url": "https://www.google.com/maps?ll=-14.834452,-64.903276&z=17&t=m&hl=es-US&gl=US&mapclient=embed&q=14%C2%B050%2704.0%22S+64%C2%B054%2711.8%22W+-14.834452,+-64.903276@-14.834452,-64.90327599999999",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Potosí",
+      "descripcion": "",
+      "url": "https://www.google.com/maps?ll=-19.588697,-65.748931&z=17&t=m&hl=es-US&gl=US&mapclient=embed&q=19%C2%B035%2719.3%22S+65%C2%B044%2756.2%22W+-19.588697,+-65.748931@-19.5886966,-65.7489307",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Tarija",
+      "descripcion": "",
+      "url": "https://www.google.com/maps?ll=-21.536122,-64.73457&z=17&t=m&hl=es-US&gl=US&mapclient=embed&q=21%C2%B032%2710.0%22S+64%C2%B044%2704.5%22W+-21.536122,+-64.734570@-21.5361215,-64.7345704",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Sucre",
+      "descripcion": "",
+      "url": "https://www.google.com/maps/place/19%C2%B002'49.8%22S+65%C2%B015'41.0%22W/@-19.047152,-65.261389,1027m/data=!3m1!1e3!4m4!3m3!8m2!3d-19.047152!4d-65.261389?hl=es-US&entry=ttu&g_ep=EgoyMDI1MTIwMi4wIKXMDSoASAFQAw%3D%3D",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Pando",
+      "descripcion": "",
+      "url": "https://www.google.com/maps?ll=-11.017715,-68.754428&z=17&t=m&hl=es-US&gl=US&mapclient=embed&q=11%C2%B001%2703.8%22S+68%C2%B045%2715.9%22W+-11.017715,+-68.754428@-11.0177149,-68.7544277",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Ver todos los servicios",
+      "url": "http://correos.gob.bo/services/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Encargado de la Agencia de Correos en Santa Cruz, dijo qué es totalmente falso qué estén subastando o vendiendo paquetes no recogidos por los usuarios en Bs. 21",
+      "url": "https://gigavision.tv/encargado-de-la-agencia-de-correos-en-santa-cruz-dijo-que-es-totalmente-falso-que-esten-subastando-o-vendiendo-paquetes-no-recogidos-por-los-usuarios-en-bs-21/",
+      "fuente": "https://correos.gob.bo/comunicado-estafa"
+    },
+    {
+      "nombre": "Servicio Envíos de Correspondencia Agrupada",
+      "descripcion": "Las instituciones, entidades o empresas que contraten el servicio de Grandes Impositores – ECA, se beneficiaran de tarifas preferenciales bajo los siguientes requisitos:",
+      "url": null,
+      "fuente": "https://correos.gob.bo/eca"
+    },
+    {
+      "nombre": "Soluciones eficientes y económicas para empresas u organizaciones",
+      "descripcion": "Especialmente útil para empresas que necesitan enviar grandes cantidades de facturas, estados de cuenta, publicidad, y cualquier otro tipo de correspondencia masiva.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/eca"
+    },
+    {
+      "nombre": "Información Financiera",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2023/10/docConFirmaDig.pdf",
+      "fuente": "https://correos.gob.bo/informacion-financiera"
+    },
+    {
+      "nombre": "Plan Operativo Anual",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/03/POA-2025-SIGEP.pdf",
+      "fuente": "https://correos.gob.bo/poa"
+    },
+    {
+      "nombre": "Dirección de Transparencia",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/04/PRESENTACION-API-GESTION-2025-UTLCC-AGBC-OFICIAL-07-04-25-1.pdf",
+      "fuente": "https://correos.gob.bo/rendicioncuentas"
+    },
+    {
+      "nombre": "Servicio Casillas",
+      "descripcion": "El servicio de casillas es un servicio orientado a empresas, entidades o personas particulares que requieren retirar sus envíos en oficina central de correos, por razones laborales o académicas u otras de índole personal.",
+      "url": "http://casillas.correos.gob.bo:3001/auth/welcome",
+      "fuente": "https://correos.gob.bo/casillas"
+    },
+    {
+      "nombre": "Brindando un servicio de calidad para conectar a Bolivia con el resto del mundo",
+      "descripcion": "Tu puerta al mundo, un espacio seguro para tus envíos. Con nuestras casillas, garantizamos la confidencialidad y protección de tus correspondencias. Mantén tus conexiones activas y confía en nosotros para recibir tus entregas de forma segura y confiable.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/casillas"
+    },
+    {
+      "nombre": "REQUISITOS PARA ADQUIRIR TU CASILLA",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/casillas"
+    },
+    {
+      "nombre": "Ver presentacion de la Rendición Pública de Cuentas Final 2023",
+      "descripcion": "LA AGENCIA BOLIVIANA DE CORREOS TE INVITA A LA AUDIENCIA RENDICIÓN PÚBLICA DE CUENTAS FINAL 2023Fecha: Viernes, 23 de febrero 2024Hora: 10:00 A.M.REGISTRO DE ASISTENCIA: Live:",
+      "url": "https://correos.gob.bo/wp-content/uploads/2024/02/UTLCC-APF-GESTION-2023-AGBC_compressed_compressed.pdf",
+      "fuente": "https://correos.gob.bo/invitacion-a-rendicion-publica-de-cuentas-final-2023"
+    },
+    {
+      "nombre": "Ejecución Presupuestaria de Recursos y Gastos",
+      "descripcion": "Programa Anual de Contrataciones Gestion 2025Programa Anual de Contrataciones Gestion 2025Descargar Aqui",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/03/Presupuesto-de-Recursos-y-Gastos-2025.pdf",
+      "fuente": "https://correos.gob.bo/ejecucion-presupuestaria-de-recursos-y-gastos"
+    },
+    {
+      "nombre": "Servicios Principales",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "Express Mail Service (EMS)",
+      "descripcion": "El servicio Express Mail Service (EMS) de la Agencia Boliviana de Correos es un servicio de mensajería y paquetería urgente a nivel nacional e internacional. Está diseñado para aquellos envíos que requieren de una entrega rápida y segura a destinos dentro y fuera del territorio nacional.",
+      "url": "http://correos.gob.bo/ems/",
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "Servicio de Correo Prioritario (SP)",
+      "descripcion": "Servicio para el envío de Cartas, Tarjetas Postales, Impresos, Pequeños Paquetes, Sacas M,\nOrdinarias o Certificadas",
+      "url": "http://correos.gob.bo/sp/",
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "Envíos de Correspondencia Agrupada (ECA)",
+      "descripcion": "El servicio de Envíos de Correspondencia Agrupada de la Agencia Boliviana de Correos es un servicio que permite a empresas, organizaciones y particulares enviar grandes cantidades de correo de forma eficiente y económica.",
+      "url": "http://correos.gob.bo/eca/",
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "Contrataciones",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/03/Programa-Anual-de-Contrataciones-2025.pdf",
+      "fuente": "https://correos.gob.bo/contrataciones"
+    },
+    {
+      "nombre": "Envío de mensajería y paquetería urgente",
+      "descripcion": "Porque sabemos lo importante que es para nuestros clientes que sus envíos lleguen en tiempo y forma, trabajamos con un equipo altamente capacitado con tecnología de última generación para asegurar que cada paquete sea entregado de manera segura y eficiente.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/ems"
+    },
+    {
+      "nombre": "Resoluciones Ministeriales",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2023/10/Resolucion-Ministerial-No-008-Reglamento-para-el-Programa-Nacional-de-Servicio-Postal-Universal-PNSPU.pdf",
+      "fuente": "https://correos.gob.bo/resolucion-ministerial"
+    },
+    {
+      "nombre": "Normativa Legal",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2023/10/Constitucion-Politica-del-Estado_compressed.pdf",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos-trasparencia"
+    },
+    {
+      "nombre": "¡TENGA CUIDADO CON ESTAFAS! OFRECEN POR REDES SOCIALES “PAQUETES PERDIDOS” A BS 21",
+      "url": "https://f10.tv.bo/tenga-cuidado-con-estafas-ofrecen-por-redes-sociales-paquetes-perdidos-a-bs-21/",
+      "fuente": "https://correos.gob.bo/difusion-realizada-por-el-medio-televisivo-f10-sobre-estafas-a-nombre-de-la-agencia-boliviana-de-correos"
+    },
+    {
+      "nombre": "contáctanos",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Contáctanos",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "llenando el formulario",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "¿Dónde Llegamos?",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "· SI",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "· NO",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regionales",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Oficina Central: La Paz",
+      "descripcion": "Avenida Mariscal Santa Cruz Esquina Calle Oruro Edificio Telecomunicaciones",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Dirección:",
+      "descripcion": "Avenida Mariscal Santa Cruz Esquina Calle Oruro Edificio Telecomunicaciones",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Teléfono:",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Email:",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Cochabamba",
+      "descripcion": "Calle Ayacucho esquina Av. Heroínas N° 113",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Santa Cruz",
+      "descripcion": "Calle Cobija Entre Sucre y Ballivian N° 24",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Oruro",
+      "descripcion": "Calle Presidente Montes Esquina Junin N° 1456",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Potosi",
+      "descripcion": "Calle Hoyos Esquina Topater, Villa Imperial de Potosí",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Tarija",
+      "descripcion": "Calle Mariscal Sucre esquina Virginio Lema N° 397",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Sucre",
+      "descripcion": "Calle Junin Esquina Ayacucho N° 699",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Beni",
+      "descripcion": "Calle Cipriano Barace N°10 Entre Manuel Limpias y Calle Sucre",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Regional: Pando",
+      "descripcion": "Av. Bruno Recua N.- 59",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Horarios en todas las sucursales",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/contact-us"
+    },
+    {
+      "nombre": "Resoluciones Administrativas de la Agencia Boliviana Correos",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/03/RES.-ADM.-No.-5-25NOMBRAMIENTO-DE-AUTORIDAD-SUMARIANTE.pdf",
+      "fuente": "https://correos.gob.bo/resoluciones"
+    },
+    {
+      "nombre": "Ver presentacion de la Rendición Pública de Cuentas Inicial 2024",
+      "descripcion": "LA AGENCIA BOLIVIANA DE CORREOS TE INVITA A LA AUDIENCIA RENDICIÓN PÚBLICA DE CUENTAS INICIAL 2024Fecha: Viernes, 26 de abril 2024Hora: 10:00 A.M.REGISTRO DE ASISTENCIA: Live:",
+      "url": "https://correos.gob.bo/wp-content/uploads/2024/04/PRESENTACION-AGBC-03042024_compressed.pdf",
+      "fuente": "https://correos.gob.bo/invitacion-a-rendicion-publica-de-cuentas-inicial-2024"
+    },
+    {
+      "nombre": "Si tienes dudas o sospechas de haber sido víctima de una estafa, contacta al numero (591-2) 2152423 o dirigete a nuestras oficinas para verificar su autenticidad. ¡Protégete y mantente alerta!",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/evita-estafas"
+    },
+    {
+      "nombre": "Servicio ChasquiExpressBO",
+      "descripcion": "Es nuestro servicio de entrega a domicilio diseñado para que empresas, tiendas o personas independientes puedan expandir sus ventas, facilitando la entrega de sus productos y/o artefactos adquiridos por sus clientes.",
+      "url": "https://correos.gob.bo/wp-content/uploads/2024/07/ChasquiExpressBo-1.apk",
+      "fuente": "https://correos.gob.bo/chasquiexpressbo"
+    },
+    {
+      "nombre": "ChasquiExpressBO contribuirá a que sus clientes puedan expandir la venta de sus productos optimizando los tiempos de entrega.",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/chasquiexpressbo"
+    },
+    {
+      "nombre": "Manual de Funciones",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/recursos-humanos"
+    },
+    {
+      "nombre": "Términos de Referencia",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/recursos-humanos"
+    },
+    {
+      "nombre": "Servicio Filatelia",
+      "descripcion": "Comprende la venta de sellos postales de colección y según cada emisión o motivo, se oferta a coleccionistas y al público en general.",
+      "url": "https://correos.gob.bo/wp-content/uploads/2024/05/CATALOGO-DE-SELLOS-POSTALES-GESTION-2024-1.pdf",
+      "fuente": "https://correos.gob.bo/filatelia"
+    },
+    {
+      "nombre": "Para mas informacion:",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/filatelia"
+    },
+    {
+      "nombre": "Donde cada sello cuenta una historia y cada colección es un tesoro",
+      "descripcion": "Sumérgete en la pasión de la filatelia con la Agencia Boliviana de Correos un universo de sellos que encierra historias, cultura y conexiones. Desde sellos conmemorativos hasta ediciones especiales, nuestra colección cautivadora te invita a descubrir el mundo a través de pequeñas obras de arte posta",
+      "url": null,
+      "fuente": "https://correos.gob.bo/filatelia"
+    },
+    {
+      "nombre": "Preguntas Frecuentes",
+      "descripcion": "",
+      "url": null,
+      "fuente": "https://correos.gob.bo/preguntas-frecuentes"
+    },
+    {
+      "nombre": "Requerimientos para el envío de paquetes",
+      "url": "https://correos.gob.bo#collapse-14514dc69ac55051bfbf",
+      "fuente": "https://correos.gob.bo/preguntas-frecuentes"
+    },
+    {
+      "nombre": "Requerimientos para recoger tus paquetes",
+      "url": "https://correos.gob.bo#collapse-35c8fe469ac55051bfbf",
+      "fuente": "https://correos.gob.bo/preguntas-frecuentes"
+    },
+    {
+      "nombre": "Lo que puede enviar por el servicio postal",
+      "url": "https://correos.gob.bo#collapse-c29457c69ac55051bfbf",
+      "fuente": "https://correos.gob.bo/preguntas-frecuentes"
+    },
+    {
+      "nombre": "Lo que no puede enviar por el servicio postal",
+      "url": "https://correos.gob.bo#collapse-f0f54c169ac55051bfbf",
+      "fuente": "https://correos.gob.bo/preguntas-frecuentes"
+    },
+    {
+      "nombre": "La Agencia Boliviana de Correos, en coordinación con la Embajada de la República Dominicana, lanzan y ponen en circulación los sellos postales “Homenaje a las hermanas Mirabal” y “Cacique Enriquillo, líder taíno de la primera sublevación indígena en América” acto a realizarse en instalaciones de Cancillería Leer más »",
+      "url": "https://correos.gob.bo/la-agencia-boliviana-de-correos-en-coordinacion-con-la-embajada-de-la-republica-dominicana-lanzan-y-ponen-en-circulacion-los-sellos-postales-homenaje-a-las-hermanas-mirabal-y/",
+      "fuente": "https://correos.gob.bo/category/agencia-boliviana-de-correos"
+    },
+    {
+      "nombre": "Auditoría Interna",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2025/02/01-RESUMEN-EJECUTIVO-001-2025.pdf",
+      "fuente": "https://correos.gob.bo/auditoria-interna"
+    },
+    {
+      "nombre": "Programa Operativo Anual",
+      "descripcion": "",
+      "url": "https://correos.gob.bo/wp-content/uploads/2023/10/Programa-Operativo-Anual-2024.pdf",
+      "fuente": "https://correos.gob.bo/auditoriapoa"
+    },
+    {
+      "nombre": "FILATELIA",
+      "descripcion": "Explora el mundo a través de sellos: tu ventana a la pasión de la filatelia.",
+      "url": "http://correos.gob.bo/filatelia/",
+      "fuente": "https://correos.gob.bo/prueba"
+    },
+    {
+      "nombre": "Filatelia",
+      "descripcion": "Explora el mundo a través de sellos: tu ventana a la pasión de la filatelia.",
+      "url": "http://correos.gob.bo/filatelia/",
+      "fuente": "https://correos.gob.bo/prueba"
+    },
+    {
+      "nombre": "LA AGENCIA BOLIVIANA DE CORREOS RINDE HOMENAJE A BOLIVIA CON LA EMISIÓN DE LOS SELLOS POSTALES DEL BICENTENARIO Leer más »",
+      "url": "https://correos.gob.bo/la-agencia-boliviana-de-correos-rinde-homenaje-a-bolivia-con-la-emision-de-los-sellos-postales-del-bicentenario/",
+      "fuente": "https://correos.gob.bo/category/sin-categoria"
+    }
+  ],
+  "herramientas": [
+    {
+      "nombre": "Descolonización",
+      "descripcion": "Nos comprometemos a diseñar las políticas públicas en base a los valores, principios, conocimientos y prácticas del pueblo boliviano. Reconocemos que las acciones de los servidores y servidoras públicos deben estar orientadas a preservar, desarrollar, proteger y difundir la diversidad cultural de ma",
+      "url": null,
+      "fuente": "https://correos.gob.bo/about"
+    },
+    {
+      "nombre": "Mi Encomienda",
+      "descripcion": "Es un servicio de paquetería a nivel nacional a ser entregado en cualquier oficina de correos,\ncon Acuse de Recibo o Constancia de Entrega, tracking y con la debida seguridad",
+      "url": "http://correos.gob.bo/me/",
+      "fuente": "https://correos.gob.bo/services"
+    },
+    {
+      "nombre": "Express Mail Service",
+      "descripcion": "Ofrecemos un servicio de envío de mensajería y paquetería urgente con cobertura en las 9 capitales de departamento y ciudades intermedias. Garantizamos tiempos de entrega rápidos y eficientes, con un lapso de entre 24 a 48 horas dependiendo del destino.",
+      "url": null,
+      "fuente": "https://correos.gob.bo/ems"
+    },
+    {
+      "nombre": "CALCULADORA POSTAL",
+      "descripcion": "Encuentra el costo justo, envía con confianza: tu calculadora postal en línea.",
+      "url": "http://correos.gob.bo/construccion/",
+      "fuente": "https://correos.gob.bo/prueba"
+    },
+    {
+      "nombre": "Calculadora Postal",
+      "descripcion": "Encuentra el costo justo, envía con confianza: tu calculadora postal en línea.",
+      "url": "http://correos.gob.bo/construccion/",
+      "fuente": "https://correos.gob.bo/prueba"
+    }
+  ],
+  "enlaces_externos": [
+    {
+      "nombre": "TrackingBO (Rastreo de Paquetes)",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "SIRECO (Sistema de Reclamos y Sugerencias)",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "UNIENVIO (Sistema de ECA)",
+      "url": "https://unienvio.correos.gob.bo:8103/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "POSTAR (Calculadora Postal)",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "GESDO (Sistema de Carteros)",
+      "url": "https://gesdo.correos.gob.bo:8106/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "SIREN (Sistema de Encomiendas)",
+      "url": "https://siren.correos.gob.bo:8107/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "ULTRAPOST (Sistema de EMS)",
+      "url": "https://ultrapost.correos.gob.bo:8108/login",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "GESCON(Sistema de contratos)",
+      "url": "http://gescon.correos.gob.bo:3005/",
+      "fuente": "https://correos.gob.bo/leyes-y-decretos"
+    },
+    {
+      "nombre": "Ver Correspondencia Internacional",
+      "url": "https://ips.correos.gob.bo/ipswebtracking/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "Seguimiento de Correspondencia",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "fuente": "https://correos.gob.bo/"
+    },
+    {
+      "nombre": "RASTREA ACA",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "fuente": "https://correos.gob.bo/"
+    }
+  ]
+}

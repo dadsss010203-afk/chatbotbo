@@ -1,0 +1,1209 @@
+{
+  "detalle": [
+    {
+      "nombre": "POSTAR - Calculadora",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "estado": "ok",
+      "titulo": "Postar | AGBC",
+      "contenido": "Calculadora Postal *Seleciona por que servicio quieres enviar. Seleccione un Servicio Postal EMS Nacional EMS Internacional Mi Encomienda Nacional Encomienda Internacional LC/AO Nacional LC/AO Internacional ECA Nacional ECA Internacional Pliegos Oficiales Nacional Pliegos Oficiales Internacional Sacas M Nacional Sacas M Internacional Super Express Nacional *Seleciona a donde quieres enviar. Seleccione un Destino Area Urbana (Hasta 2.5 Km) Area Urbana (Hasta 5 Km) Area Urbana (Hasta 7.5 Km) Area Urbana (Hasta 10 Km) Argentina Brasil Chile Colombia Ecuador Guyana Paraguay Perú Surinam Uruguay Venezuela Belice Costa Rica El Salvador Guatemala Honduras Nicaragua Panamá Antigua y Barbuda Bahamas Barbados Cuba Dominica República Dominicana Granada Haití Jamaica San Cristóbal y Nieves Santa Lucía San Vicente y las Granadinas Trinidad y Tobago Puerto Rico Canadá Estados Unidos México Alemania Andorra Austria Bélgica Bielorrusia Bosnia y Herzegovina Bulgaria Chipre Croacia Dinamarca Eslovaquia Eslovenia España Estonia Finlandia Francia Grecia Hungría Irlanda Islandia Italia Kosovo Letonia Liechtenstein Lituania Luxemburgo Macedonia del Norte Malta Mónaco Montenegro Noruega Países Bajos Polonia Portugal Reino Unido República Checa Rumania Rusia San Marino Serbia Suecia Suiza Ucrania Vaticano Arabia Saudita Baréin Catar Chipre Emiratos Árabes Unidos Irak Irán Israel Jordania Kuwait Líbano Omán Palestina Siria Turquía Yemen Argelia Angola Benín Botsuana Burkina Faso Burundi Cabo Verde Camerún Chad Comoras Congo Costa de Marfil Djibouti Egipto Eritrea Esuatini Etiopía Gabón Gambia Ghana Guinea Guinea-Bisáu Guinea Ecuatorial Kenia Lesoto Liberia Libia Madagascar Malawi Malí Marruecos Mauricio Mauritania Mozambique Namibia Níger Nigeria República Centroafricana República Democrática del Congo Ruanda Santo Tomé y Príncipe Senegal Seychelles Sierra Leona Somalia Sudáfrica Sudán Sudán del Sur Tanzania Togo Túnez Uganda Zambia Zimbabue Australia Fiyi Islas Marshall Islas Salomón Kiribati Micronesia Nauru Nueva Zelanda Palaos Papúa Nueva Guinea Samoa Tonga Tuvalu Vanuatu Beni Chuquisaca Cochabamba La Paz Oruro Pando Potosí Santa Cruz Tarija Chuquisaca Cochabamba La Paz Oruro Pando Potosí Santa Cruz Tarija Cuidades Intermedias Trinidad / Cobija Riberalta / Guayaramerin Provincia Dentro Departamento Provincia en Otro Departamento *Ingrese el peso del paquete.(Kg.) Ingrese las dimensiones del paquete.(OPCIONAL /cm.) Selecciona servicios adicionales: Paquete Certificado Aviso de Recibo Calcular *El precio mostrado es referencial y puede ajustarse según las tarifas vigentes.*",
+      "forms": [],
+      "funcionalidades": [
+        "Calculadora de tarifas",
+        "Gestión encomiendas",
+        "EMS Internacional"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "TrackingBO - Rastreo",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "estado": "ok",
+      "titulo": "Tracking BO | AGBC",
+      "contenido": "¿Estás buscando tu paquete? RASTREA TU CODIGO Este es un servicio de seguimiento de codigo rastreo postales a nivel internacional / nacional de la\nAgencia Boliviana de Correos Buscar Verificación de seguridad Enviar y Recoger Paquetes con la Agencia Boliviana de Correos: Simple y Rápido Envia tus paquetes en nuestras oficinas Envía tus paquetes en la Agencia Boliviana de Correos de manera sencilla. Visita nuestras\noficinas cercanas, empaca bien tu paquete y proporciona la dirección del destinatario. ¡Así de\nfácil es enviar tus paquetes con la Agencia Boliviana de Correos! Requerimientos para el envío de paquetes: - Fotocopia de CI. - Paquete abierto con el embalaje nesesario. - Paquete Rotulado con datos personales y destino. - Fotocopia de pasaporte (para personas extranjeras). Recoje tus paquetes en nuestras oficinas Para recoger paquetes en la Agencia Boliviana de Correos, sigue estos pasos simples: ve a\nnuestras oficinas cuando recibas un aviso, lleva una identificación válida y el código de\nrastreo, y nuestro personal te ayudará a recoger tu paquete de forma segura. ¡Es conveniente\ny rápido! Requerimientos para recojer tus paquetes: - CI / Pasaporte. Sabes lo que puedes y lo que no puedes enviar por el servicio postal? Artículos u Objetos Volátiles Peligrosos EXPLOSIVOS GASES COMPRIMIDOS LIQUIDOS INFLAMABLES SUSTANCIAS COMBURENTES SUSTANCIAS TOXICAS MATERIALES RADIOACTIVOS NO Artículos u Objetos Peligrosos Artículos u Objetos Permitidos ROPA DOCUMENTOS CARTAS APARATOS ELECTRONICOS COSMETICOS ARTICULOS PARA EL HOGAR TODO LO QUE SE LE OCURRA SI Artículos u Objetos Permitidos Consulte Aquí Artículos u Objetos Peligrosa Prohibidos MEDICAMENTOS ESTRUPEFACIENTES ANIMALES EN GENERAL DINERO BATERIAS ELECTRICAS ALIMENTOS PERECEDEROS NO Artículos u Objetos Prohibidos ¡Te invitamos a visitar nuestra página web Agencia Boliviana de Correos! En nuestro sitio, encontrarás toda la información que necesitas sobre nuestros servicios postales. Explora\nsobre nuestra Institucion, horarios de atención, ubicaciones de oficinas a nivel nacional, y más.¡Descubre\nlo que la Agencia\nBoliviana de Correos tiene para ofrecerte en línea hoy mismo! Visitame! ​",
+      "forms": [
+        {
+          "action": "https://trackingbo.correos.gob.bo:8100/search",
+          "method": "GET",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "_token",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "codigo",
+              "placeholder": "Ingresa tu código de rastreo",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "captcha",
+              "placeholder": "Ingrese el texto",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Rastreo de envíos"
+      ],
+      "pdfs_encontrados": [
+        "https://www.upu.int/UPU/media/upu/files/UPU/outreachAndCampaigns/Dangerous%20Goods%20Campaign/UPU_Flyer_es_web.pdf"
+      ],
+      "error": null
+    },
+    {
+      "nombre": "SIRECO - Reclamos",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "estado": "ok",
+      "titulo": "SIRECO | AGBC",
+      "contenido": "Envianos tu Consulta o Sugerencia En Correos, uno de nuestros recursos más valiosos para mejorar el servicio son las\nsugerencias, incidencias y consultas de nuestros clientes. Atenderlas con eficacia nos permite resolver\nlos problemas planteados y prevenir inconvenientes futuros, garantizando así una mejor experiencia para\nnuestros clientes. Libro de Consultas / Sugerencias Nombre Completo * Carnet de Identidad Dirección País * Codigo de Rastreo Correo Electrónico * Teléfono * Descripción * Enviar Proceso del tratamiento de una consulta Alta Cuando una persona realiza una consulta, esta se registra y se\nasigna un número de caso único. Este número sirve para rastrear y gestionar la\nconsulta a lo largo de todo el proceso. Investigación y Análisis Se recopilan los datos necesarios para resolver la consulta.\nCon los datos recopilados, se analiza lo cuestionado por el cliente y se le\nofrece la mejor respuesta. Respuesta Se proporciona una respuesta al cliente abordando los puntos\nplanteados en su consulta. La respuesta se comunica de manera oportuna,\ngarantizando que el cliente reciba la respuesta necesaria para resolver\ncualquier duda. Cómo Enviar Tus Consultas, Sugerencias e Incidencias 1 Página Web Disponible las 24 horas del día. Horario de atención telefónica: Lunes a Viernes\n(no festivos) de 8:00 a 20:00 y Sábados de 9:00 a 13:00. 2 Línea Interna Horario de atención: Lunes a Viernes (no festivos) de 8:00 a 20:00 y Sábados de\n9:00 a 13:00. Teléfono: +591 22152423 3 Oficinas Apersonate a nuestras oficinas en horarios de 8:00 a 20:00. Asegúrate de\nvisitarnos durante estas horas para recibir la asistencia que necesitas. 4 Correo Electronico Disponible 24 horas .Horario de atención de lunes a viernes no festivos: de 9 a\n20 horas. Preguntas Frecuentes Aviso Legal Condiciones de Uso Aviso de Privacidad Enlaces Externos Autoridad de Regulación y\nFiscalización de Telecomunicaciones y Transportes Ministerio de\nJusticia y Transparencia Institucional Ministerio de Obras Públicas,\nServicio y Vivienda Union Postal Universal Unión Postal de las Américas, España y\nPortugal Redes Sociales Facebook Twitter Instagram Tiktok Sobre Nosotros Quienes Somos Nuestros Servicios Contáctanos Nuestros Servicios Envió de Mensajería Urgente Servicio Prioritario Envíos de Correspondencia\nAgrupada Mi Encomienda Servicio de Filatelia Servicio de Casillas TrackingBO (Rastreo de\nPaquetes) Calculadora Postal",
+      "forms": [
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "text",
+              "name": "fullName",
+              "placeholder": "Ej. César Rojas",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "identityCard",
+              "placeholder": "Ej. 10203040",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "address",
+              "placeholder": "Ej. Av. Los Ángeles 1025",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "country",
+              "placeholder": "Ej. Bolivia",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "codepostal",
+              "placeholder": "Ej. RP012345678BO",
+              "required": false
+            },
+            {
+              "type": "email",
+              "name": "email",
+              "placeholder": "Ej. nombre@correo.com",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "phone",
+              "placeholder": "Ej. 1 294-0008",
+              "required": true
+            },
+            {
+              "type": "textarea",
+              "name": "description",
+              "placeholder": "Escribe aquí tu reclamación, sugerencia o incidencia",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "Reclamos/Sugerencias",
+        "Gestión encomiendas",
+        "Casillas postales",
+        "Filatelia"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "UNIENVIO - ECA",
+      "url": "https://unienvio.correos.gob.bo:8103/",
+      "estado": "ok",
+      "titulo": "UNIENVIO|AGBC",
+      "contenido": "Login Form SISTEMA DE GESTIÓN DE ENVÍOS DE CORRESPONDENCIA AGRUPADA “UNIENVÍO” Recuérdame Iniciar sesión",
+      "forms": [
+        {
+          "action": "https://unienvio.correos.gob.bo:8103/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "_token",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "email",
+              "name": "email",
+              "placeholder": "Email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "placeholder": "Password",
+              "required": true
+            },
+            {
+              "type": "checkbox",
+              "name": "remember",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Autenticación"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "GESDO - Carteros",
+      "url": "https://gesdo.correos.gob.bo:8106/",
+      "estado": "ok",
+      "titulo": "GESDO|AGBC",
+      "contenido": "SISTEMA DE GESTION DE ENTREGAS A DOMICILIO GESDO Remember Me Log in",
+      "forms": [
+        {
+          "action": "https://gesdo.correos.gob.bo:8106/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "_token",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "email",
+              "name": "email",
+              "placeholder": "Email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "placeholder": "Password",
+              "required": true
+            },
+            {
+              "type": "checkbox",
+              "name": "remember",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "SIREN - Encomiendas",
+      "url": "https://siren.correos.gob.bo:8107/",
+      "estado": "ok",
+      "titulo": "SIREN | AGBC",
+      "contenido": "SISTEMA DE GESTIÓN DE PAQUETERÍA DE ENCOMIENDAS \"SIREN\" Correo Electrónico Contraseña Ingresar © 2026 Agencia Boliviana de Correos",
+      "forms": [
+        {
+          "action": "https://siren.correos.gob.bo:8107/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "_token",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "email",
+              "name": "email",
+              "placeholder": "",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "placeholder": "",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Autenticación",
+        "Gestión encomiendas"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "ULTRAPOST - EMS",
+      "url": "https://ultrapost.correos.gob.bo:8108/login",
+      "estado": "ok",
+      "titulo": "Login",
+      "contenido": "INICIAR SESIÓN 👁️ INGRESAR",
+      "forms": [
+        {
+          "action": "https://ultrapost.correos.gob.bo:8108/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "_token",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "email",
+              "name": "email",
+              "placeholder": "Email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "placeholder": "Password",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "GESCON - Contratos",
+      "url": "http://gescon.correos.gob.bo:3005/",
+      "estado": "ok",
+      "titulo": "Gescon",
+      "contenido": "Loading...",
+      "forms": [],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "IPS Web Tracking",
+      "url": "https://ips.correos.gob.bo/ipswebtracking/",
+      "estado": "ok",
+      "titulo": "IPS Web Tracking/Item Tracking",
+      "contenido": "Identificador : Ingrese el identificador del Item que desea buscar, luego haga click en Buscar. Id del Item:",
+      "forms": [
+        {
+          "action": "IPSWeb_item_events.aspx",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "text",
+              "name": "itemid",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "Submit",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "reset",
+              "name": "Submit2",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Filatelia",
+      "url": "https://correos.gob.bo/filatelia/",
+      "estado": "ok",
+      "titulo": "Filatelia - Agencia Boliviana de Correos",
+      "contenido": "Comprende la venta de sellos postales de colección y según cada emisión o motivo, se oferta a coleccionistas y al público en general. Catálogos y Publicaciones La agencia ofrece publicaciones y catálogos especializados que reúnen sellos postales emitidos en el territorio nacional, así como en el internacional. Emisión de Sellos Postales La agencia viabiliza, asesora y coadyuva a las empresas, instituciones y entidades que quieran emitir un sello postal por diferentes motivos, como la aceleración de un aniversario. Exposiciones Filatélicas La Agencia Boliviana de Correos, organiza exposiciones didácticas relacionadas con la afición de coleccionar, estudiar y clasificar sellos sobres y otros documentos postales en espacios abiertos para poder interactuar con el público en general. Compra tus sellos Servicio Filatelia Comprende la venta de sellos postales de colección y según cada emisión o motivo, se oferta a coleccionistas y al público en general. Catálogos y Publicaciones La agencia ofrece publicaciones y catálogos especializados que reúnen sellos postales emitidos en el territorio nacional, así como en el internacional. Emisión de Sellos Postales La agencia viabiliza, asesora y coadyuva a las empresas, instituciones y entidades que quieran emitir un sello postal por diferentes motivos, como la aceleración de un aniversario. Exposiciones Filatélicas La Agencia Boliviana de Correos, organiza exposiciones didácticas relacionadas con la afición de coleccionar, estudiar y clasificar sellos sobres y otros documentos postales en espacios abiertos para poder interactuar con el público en general. Para mas informacion: Compra tus sellos Donde cada sello cuenta una historia y cada colección es un tesoro Sumérgete en la pasión de la filatelia con la Agencia Boliviana de Correos un universo de sellos que encierra historias, cultura y conexiones. Desde sellos conmemorativos hasta ediciones especiales, nuestra colección cautivadora te invita a descubrir el mundo a través de pequeñas obras de arte postales. Con nuestro servicio de filatelia, te proporcionamos acceso exclusivo a sellos postales, publicaciones especializadas y la emoción de las exposiciones filatélicas. Donde cada sello cuenta una historia y cada colección es un tesoro Sumérgete en la pasión de la filatelia con la Agencia Boliviana de Correos un universo de sellos que encierra historias, cultura y conexiones. Desde sellos conmemorativos hasta ediciones especiales, nuestra colección cautivadora te invita a descubrir el mundo a través de pequeñas obras de arte postales. Con nuestro servicio de filatelia, te proporcionamos acceso exclusivo a sellos postales, publicaciones especializadas y la emoción de las exposiciones filatélicas.",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Filatelia"
+      ],
+      "pdfs_encontrados": [
+        "https://correos.gob.bo/wp-content/uploads/2024/05/CATALOGO-DE-SELLOS-POSTALES-GESTION-2024-1.pdf",
+        "https://correos.gob.bo/wp-content/uploads/2024/05/CATALOGO-DE-SELLOS-POSTALES-GESTION-2024-1.pdf"
+      ],
+      "error": null
+    },
+    {
+      "nombre": "Servicio Postal SP",
+      "url": "https://correos.gob.bo/sp/",
+      "estado": "ok",
+      "titulo": "Servicio Prioritario - Agencia Boliviana de Correos",
+      "contenido": "Servicio para el envío de Cartas, Tarjetas Postales, Impresos, Pequeños Paquetes, Sacas M, Ordinarias o Certificadas Para envíos Certificados debe acreditarse una tasa de certificación Los envíos Certificados incluyen indemnización en caso de pérdida Servicio de Correo Prioritario Servicio para el envío de Cartas, Tarjetas Postales, Impresos, Pequeños Paquetes, Sacas M, Ordinarias o Certificadas Para envíos Certificados debe acreditarse una tasa de certificación Los envíos Certificados incluyen indemnización en caso de pérdida Servicio de mensajería y paquetería con un mayor nivel de urgencia y rapidez Nuestro servicio básico de mensajería y paquetería es la opción ideal para tus envíos locales e internacionales, con diferentes opciones a medida y a precios económicos. NACIONAL - Tiempo de entrega: En 24 a 48 horas, dependiendo de las ciudades de origen y destino - Cobertura: Todo el territorio nacional - Peso: Desde los 5 gramos hasta los 2 kilogramos por envió. - Dimensiones: Si la longitud máxima de cualquiera de los lados excede los 1,50 metros,\nse aplicarán costos volumétricos. INTERNACIONAL - Tiempo de entrega: De 7 a 14 días, dependiendo del país de destino (tiempos\ncuantificables desde que la correspondencia y/o paquetería salga de Bolivia). - Cobertura: 192 países miembros de la Unión Postal Universal (UPU) - Peso: Desde los 5 gramos hasta los 2 kilogramos por envió. - Dimensiones: Si la longitud máxima de cualquiera de los lados excede los 1.50 metros,\nse aplicarán costos volumétricos Servicio de mensajería y paquetería con un mayor nivel de urgencia y rapidez Nuestro servicio básico de mensajería y paquetería es la opción ideal para tus envíos locales e internacionales, con diferentes opciones a medida y a precios económicos.",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Encomienda Postal",
+      "url": "https://correos.gob.bo/servicio-encomienda-postal/",
+      "estado": "ok",
+      "titulo": "Servicio Encomienda Postal - Agencia Boliviana de Correos",
+      "contenido": "Servicio de paquetes con regalos o mercancías, tratamiento oportuno y con sistema de rastreo. Importación y Exportación a todos los países asociados a las Organización de Naciones Unidas. Servicio Encomienda Postal Servicio de paquetes con regalos o mercancías, tratamiento oportuno y con sistema de rastreo. Importación y Exportación a todos los países asociados a las Organización de Naciones Unidas. Tu encomienda, nuestro compromiso seguro y confiable. Nuestro compromiso es garantizar la entrega segura y eficiente de tus envíos, tanto a nivel nacional como internacional. Desde el embalaje seguro hasta el seguimiento en tiempo real, te ofrecemos un servicio confiable que se adapta a tus necesidades. INTERNACIONAL - Tiempo de entrega: De 8 a 14 días dependiendo el país de destino (tiempos\ncuantificables desde que la correspondencia y/o paquetería salga de Bolivia). - Cobertura: 192 destino (países miembros de la Unión Postal Universal) - Peso: Desde 10 gramos hasta los 20 kilogramos (Recomendable) por envío - Dimensiones: Si la longitud máxima de cualquiera de los lados excede los 1.50 metros,\nse aplicarán costos volumétricos. Tu encomienda, nuestro compromiso seguro y confiable. Nuestro compromiso es garantizar la entrega segura y eficiente de tus envíos, tanto a nivel nacional como internacional. Desde el embalaje seguro hasta el seguimiento en tiempo real, te ofrecemos un servicio confiable que se adapta a tus necesidades.",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Gestión encomiendas"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "ECA - Correspondencia",
+      "url": "https://correos.gob.bo/eca/",
+      "estado": "ok",
+      "titulo": "Envios de correspondencia Agrupada - Agencia Boliviana de Correos",
+      "contenido": "Servicio Envíos de Correspondencia Agrupada Las instituciones, entidades o empresas que contraten el servicio de Grandes Impositores – ECA, se beneficiaran de tarifas preferenciales bajo los siguientes requisitos: a) Deben enviarse al menos 40 sobres y pequeños paquetes de hasta 100 gramos por imposición. b) Si la imposición no cumple con lo establecido en el inciso a), el envío será cobrado con tarifa de correo convencional de ventanilla. En caso de que la imposición no cumpla con los requisitos mínimos mencionados anteriormente, el envío será cobrado por el Correo según la tarifa convencional de ventanilla. Por lo tanto, es importante que el cliente se asegure de cumplir con las condiciones requeridas para poder beneficiarse de las tarifas preferenciales del servicio ECA. Las instituciones, entidades o empresas que contraten el servicio de Grandes Impositores – ECA, se beneficiaran de tarifas preferenciales bajo los siguientes requisitos: a) Deben enviarse al menos 40 sobres y pequeños paquetes de hasta 100 gramos por imposición. b) Si la imposición no cumple con lo establecido en el inciso a), el envío será cobrado con tarifa de correo convencional de ventanilla. En caso de que la imposición no cumpla con los requisitos mínimos mencionados anteriormente, el envío será cobrado por el Correo según la tarifa convencional de ventanilla. Por lo tanto, es importante que el cliente se asegure de cumplir con las condiciones requeridas para poder beneficiarse de las tarifas preferenciales del servicio ECA. Soluciones eficientes y económicas para empresas u organizaciones Especialmente útil para empresas que necesitan enviar grandes cantidades de facturas, estados de cuenta, publicidad, y cualquier otro tipo de correspondencia masiva. NACIONAL - Tiempo de entrega: De entre 24 a 72 horas en ciudades capitales (dependiendo la\nciudad de origen y destino). - Cobertura: Llega a las ciudades capitales de los 9 departamentos de Bolivia - Peso: Desde 10 gramos hasta los 20 kilogramos por envió. - Dimensiones: Si la longitud máxima de cualquiera de los lados excede los 1.50 metros,\nse aplicarán costos volumétricos INTERNACIONAL - Tiempo de entrega: De 7 a 14 días, dependiendo del país de destino - Cobertura: 192 países miembros de la Unión Postal Universal (UPU) - Peso: Desde 10 gramos hasta los 20 kilogramos por envió. - Dimensiones: Si la longitud máxima de cualquiera de los lados excede los 1.50 metros,\nse aplicarán costos volumétricos.",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Calculadora de tarifas"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "EMS Internacional",
+      "url": "https://correos.gob.bo/ems/",
+      "estado": "ok",
+      "titulo": "Envio de Mensajeria Urgente - Agencia Boliviana de Correos",
+      "contenido": "Ofrecemos un servicio de envío de mensajería y paquetería urgente con cobertura en las 9 capitales de departamento y ciudades intermedias. Garantizamos tiempos de entrega rápidos y eficientes, con un lapso de entre 24 a 72 horas dependiendo del destino. Además, nos enorgullece decir que nuestro servicio es de clase mundial, ya que tenemos alcance internacional a través de los países miembros de la UNIÓN POSTAL UNIVERSAL (UPU). Esto significa que puedes confiar en nosotros para enviar tus paquetes y documentos a cualquier parte del mundo con la misma calidad y eficiencia que nos caracteriza localmente. Express Mail Service Ofrecemos un servicio de envío de mensajería y paquetería urgente con cobertura en las 9 capitales de departamento y ciudades intermedias. Garantizamos tiempos de entrega rápidos y eficientes, con un lapso de entre 24 a 48 horas dependiendo del destino. Además, nos enorgullece decir que nuestro servicio es de clase mundial, ya que tenemos alcance internacional a través de los países miembros de la UNIÓN POSTAL UNIVERSAL (UPU). Esto significa que puedes confiar en nosotros para enviar tus paquetes y documentos a cualquier parte del mundo con la misma calidad y eficiencia que nos caracteriza localmente. Beneficios del servicio: Servicio especializado y seguro Cuenta con código de rastreo en tiempo real. Distribución Puerta a Puerta y con Prueba de Entrega Comprende: Documentos Mercancías Envío de mensajería y paquetería urgente Porque sabemos lo importante que es para nuestros clientes que sus envíos lleguen en tiempo y forma, trabajamos con un equipo altamente capacitado con tecnología de última generación para asegurar que cada paquete sea entregado de manera segura y eficiente. NACIONAL - Tiempo de entrega: de 24 a 48 horas, dependiendo de las ciudades de origen y destino - Cobertura: en las 9 capitales de departamento de Bolivia - Peso: desde los 10 gramos hasta los 20 Kilogramos (recomendable) por envió - Dimensiones: sí la longitud máxima de cualquiera de los lados excede los 1,50 metros,\nse aplicarán tarifas volumétricas.. INTERNACIONAL - Tiempo de entrega: De 5 a 8 días, dependiendo el país de destino (tiempo cuantificable\nuna vez que la correspondencia y/o paquetería salga de Bolivia). - Cobertura: En 175 operadores oficiales de la red EMS, países miembros de la Unión\nPostal Universal (UPU) - Peso: Desde los 10 gramos hasta los 20 Kilogramos (recomendables) por envió. - Dimensiones: Si la longitud máxima de cualquiera de los lados excede los 1.50 metros, se aplicarán costos volumétricos",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "EMS Internacional"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Casillas Postales",
+      "url": "https://correos.gob.bo/casillas/",
+      "estado": "ok",
+      "titulo": "Casillas - Agencia Boliviana de Correos",
+      "contenido": "Servicio Casillas El servicio de casillas es un servicio orientado a empresas, entidades o personas particulares que requieren retirar sus envíos en oficina central de correos, por razones laborales o académicas u otras de índole personal. Beneficios del Servicio Servicio seguro y confiable para recibir envíos de correspondencia y paquetes. Es un servicio personalizado y acelerado porque se entregan en plazo inmediato al arribo de los envíos. Los concesionarios de las casillas pueden retirar envíos en cualquier momento entre horas 08.00 a 18.30 de lunes a viernes y sábados de 08.30 a 13.00 horas. Los alquileres de Casillas son trimestrales, semestrales y anuales según el tamaño: pequeñas, medianas, gavetas y cajón. Registrate El servicio de casillas es un servicio orientado a empresas, entidades o personas particulares que requieren retirar sus envíos en oficina central de correos, por razones laborales o académicas u otras de índole personal. Beneficios del Servicio Servicio seguro y confiable para recibir envíos de correspondencia y paquetes. Es un servicio personalizado y acelerado porque se entregan en plazo inmediato al arribo de los envíos. Los concesionarios de las casillas pueden retirar envíos en cualquier momento entre horas 08.00 a 18.30 de lunes a viernes y sábados de 08.30 a 13.00 horas. Los alquileres de Casillas son trimestrales, semestrales y anuales según el tamaño: pequeñas, medianas, gavetas y cajón. Registrate Brindando un servicio de calidad para conectar a Bolivia con el resto del mundo Tu puerta al mundo, un espacio seguro para tus envíos. Con nuestras casillas, garantizamos la confidencialidad y protección de tus correspondencias. Mantén tus conexiones activas y confía en nosotros para recibir tus entregas de forma segura y confiable. REQUISITOS PARA ADQUIRIR TU CASILLA - Fotocopia de CI Actualizado. (Persona Natural y/o Jurídica) - Fotocopia de NIT. (Solo Persona Jurídica) - Fotocopia de Luz o Agua. Brindando un servicio de calidad para conectar a Bolivia con el resto del mundo Tu puerta al mundo, un espacio seguro para tus envíos. Con nuestras casillas, garantizamos la confidencialidad y protección de tus correspondencias. Mantén tus conexiones activas y confía en nosotros para recibir tus entregas de forma segura y confiable.",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Chasqui Express",
+      "url": "https://correos.gob.bo/chasquiexpressbo/",
+      "estado": "ok",
+      "titulo": "ChasquiExpressBO - Agencia Boliviana de Correos",
+      "contenido": "Servicio ChasquiExpressBO Servicio de Delivery Es nuestro servicio de entrega a domicilio diseñado para que empresas, tiendas o personas independientes puedan expandir sus ventas, facilitando la entrega de sus productos y/o artefactos adquiridos por sus clientes. Descarga Aqui Es nuestro servicio de entrega a domicilio diseñado para que empresas, tiendas o personas independientes puedan dar opciones a sus clientes como forma de entrega de los productos y/o artefactos vendidos. Chasqui express bo, contribuirá a que sus clientes puedan expandir la venta de sus productos optimizando los tiempos de entrega. Descarga Aqui Brindando un servicio de calidad para conectar a Bolivia con el resto del mundo Tu puerta al mundo, un espacio seguro para tus envíos. Con nuestras casillas, garantizamos la confidencialidad y protección de tus correspondencias. Mantén tus conexiones activas y confía en nosotros para recibir tus entregas de forma segura y confiable. ChasquiExpressBO contribuirá a que sus clientes puedan expandir la venta de sus productos optimizando los tiempos de entrega. REQUISITOS PARA ADQUIRIR TU CASILLA - Fotocopia de CI Actualizado. (Persona Natural y/o Jurídica) - Fotocopia de NIT. (Solo Persona Jurídica) - Fotocopia de Luz o Agua.",
+      "forms": [
+        {
+          "action": "#",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "search",
+              "name": "phrase",
+              "placeholder": "Buscar...",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "phrase",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "submit",
+              "name": "",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        },
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "hidden",
+              "name": "filters_changed",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "filters_initial",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "hidden",
+              "name": "qtranslate_lang",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "asl_gen[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            },
+            {
+              "type": "checkbox",
+              "name": "customset[]",
+              "placeholder": "",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    }
+  ],
+  "resumen": [
+    {
+      "nombre": "POSTAR - Calculadora",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "estado": "ok",
+      "titulo": "Postar | AGBC",
+      "funcionalidades": [
+        "Calculadora de tarifas",
+        "Gestión encomiendas",
+        "EMS Internacional"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "TrackingBO - Rastreo",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "estado": "ok",
+      "titulo": "Tracking BO | AGBC",
+      "funcionalidades": [
+        "Rastreo de envíos"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "SIRECO - Reclamos",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "estado": "ok",
+      "titulo": "SIRECO | AGBC",
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "Reclamos/Sugerencias",
+        "Gestión encomiendas",
+        "Casillas postales",
+        "Filatelia"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "UNIENVIO - ECA",
+      "url": "https://unienvio.correos.gob.bo:8103/",
+      "estado": "ok",
+      "titulo": "UNIENVIO|AGBC",
+      "funcionalidades": [
+        "Autenticación"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "GESDO - Carteros",
+      "url": "https://gesdo.correos.gob.bo:8106/",
+      "estado": "ok",
+      "titulo": "GESDO|AGBC",
+      "funcionalidades": [],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "SIREN - Encomiendas",
+      "url": "https://siren.correos.gob.bo:8107/",
+      "estado": "ok",
+      "titulo": "SIREN | AGBC",
+      "funcionalidades": [
+        "Autenticación",
+        "Gestión encomiendas"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "ULTRAPOST - EMS",
+      "url": "https://ultrapost.correos.gob.bo:8108/login",
+      "estado": "ok",
+      "titulo": "Login",
+      "funcionalidades": [],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "GESCON - Contratos",
+      "url": "http://gescon.correos.gob.bo:3005/",
+      "estado": "ok",
+      "titulo": "Gescon",
+      "funcionalidades": [],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "IPS Web Tracking",
+      "url": "https://ips.correos.gob.bo/ipswebtracking/",
+      "estado": "ok",
+      "titulo": "IPS Web Tracking/Item Tracking",
+      "funcionalidades": [],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "Filatelia",
+      "url": "https://correos.gob.bo/filatelia/",
+      "estado": "ok",
+      "titulo": "Filatelia - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Filatelia"
+      ],
+      "forms": 2,
+      "error": null
+    },
+    {
+      "nombre": "Servicio Postal SP",
+      "url": "https://correos.gob.bo/sp/",
+      "estado": "ok",
+      "titulo": "Servicio Prioritario - Agencia Boliviana de Correos",
+      "funcionalidades": [],
+      "forms": 2,
+      "error": null
+    },
+    {
+      "nombre": "Encomienda Postal",
+      "url": "https://correos.gob.bo/servicio-encomienda-postal/",
+      "estado": "ok",
+      "titulo": "Servicio Encomienda Postal - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Gestión encomiendas"
+      ],
+      "forms": 2,
+      "error": null
+    },
+    {
+      "nombre": "ECA - Correspondencia",
+      "url": "https://correos.gob.bo/eca/",
+      "estado": "ok",
+      "titulo": "Envios de correspondencia Agrupada - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Calculadora de tarifas"
+      ],
+      "forms": 2,
+      "error": null
+    },
+    {
+      "nombre": "EMS Internacional",
+      "url": "https://correos.gob.bo/ems/",
+      "estado": "ok",
+      "titulo": "Envio de Mensajeria Urgente - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "EMS Internacional"
+      ],
+      "forms": 2,
+      "error": null
+    },
+    {
+      "nombre": "Casillas Postales",
+      "url": "https://correos.gob.bo/casillas/",
+      "estado": "ok",
+      "titulo": "Casillas - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "forms": 2,
+      "error": null
+    },
+    {
+      "nombre": "Chasqui Express",
+      "url": "https://correos.gob.bo/chasquiexpressbo/",
+      "estado": "ok",
+      "titulo": "ChasquiExpressBO - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "forms": 2,
+      "error": null
+    }
+  ]
+}
