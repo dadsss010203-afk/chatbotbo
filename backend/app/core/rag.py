@@ -5,6 +5,8 @@ Compartido por todos los chatbots.
 """
 
 import os
+import re
+import hashlib
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 import chromadb
@@ -15,8 +17,10 @@ import chromadb
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
 CHROMA_PATH     = os.environ.get("CHROMA_PATH",     "chroma_db")
 CHUNK_SIZE      = int(os.environ.get("CHUNK_SIZE",   "600"))
+CHUNK_OVERLAP   = int(os.environ.get("CHUNK_OVERLAP", "120"))
 BATCH_SIZE      = int(os.environ.get("BATCH_SIZE",   "500"))
 N_RESULTADOS    = int(os.environ.get("N_RESULTADOS",  "3"))
+MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
 
 # ─────────────────────────────────────────────
 #  ESTADO GLOBAL
@@ -85,6 +89,102 @@ def total_chunks() -> int:
 #  CHUNKING
 # ─────────────────────────────────────────────
 
+def _normalizar_texto(texto: str) -> str:
+    texto = (texto or "").replace("\r\n", "\n").replace("\r", "\n")
+    texto = re.sub(r"[ \t]+", " ", texto)
+    texto = re.sub(r"\n{3,}", "\n\n", texto)
+    return texto.strip()
+
+
+def _dividir_bloque_largo(texto: str, size: int, overlap: int) -> list[str]:
+    partes = []
+    resto = texto.strip()
+
+    while resto:
+        if len(resto) <= size:
+            partes.append(resto)
+            break
+
+        ventana = resto[:size]
+        corte = max(
+            ventana.rfind("\n"),
+            ventana.rfind(". "),
+            ventana.rfind("; "),
+            ventana.rfind(", "),
+            ventana.rfind(" "),
+        )
+
+        if corte < size * 0.45:
+            corte = size
+
+        chunk = resto[:corte].strip()
+        if chunk:
+            partes.append(chunk)
+
+        siguiente = max(corte - overlap, 1)
+        resto = resto[siguiente:].strip()
+
+    return partes
+
+
+def _segmentar_texto(texto: str, size: int, overlap: int) -> list[str]:
+    bloques = [b.strip() for b in re.split(r"\n\s*\n", _normalizar_texto(texto)) if b.strip()]
+    segmentos = []
+
+    for bloque in bloques:
+        if len(bloque) <= size:
+            segmentos.append(bloque)
+        else:
+            segmentos.extend(_dividir_bloque_largo(bloque, size=size, overlap=overlap))
+
+    if not segmentos and texto.strip():
+        segmentos = _dividir_bloque_largo(texto.strip(), size=size, overlap=overlap)
+
+    return segmentos
+
+
+def documento_a_chunks(
+    texto: str,
+    prefijo: str = "txt",
+    chunk_size: int = None,
+    metadata_base: dict | None = None,
+) -> tuple[list, list, list]:
+    """
+    Convierte un documento en chunks más estables semánticamente y con metadatos.
+
+    Returns:
+        (chunks, chunk_ids, metadatas)
+    """
+    size = chunk_size or CHUNK_SIZE
+    overlap = min(CHUNK_OVERLAP, max(size // 3, 40))
+    metadata_base = dict(metadata_base or {})
+
+    chunks = []
+    ids = []
+    metadatas = []
+
+    for idx, chunk in enumerate(_segmentar_texto(texto, size=size, overlap=overlap)):
+        limpio = chunk.strip()
+        if len(limpio) < 40:
+            continue
+
+        chunk_id = f"{prefijo}_{idx}"
+        meta = dict(metadata_base)
+        meta.update(
+            {
+                "chunk_index": idx,
+                "chunk_chars": len(limpio),
+                "source_id": prefijo,
+                "content_hash": hashlib.sha1(limpio.encode("utf-8")).hexdigest()[:16],
+            }
+        )
+        chunks.append(limpio)
+        ids.append(chunk_id)
+        metadatas.append(meta)
+
+    return chunks, ids, metadatas
+
+
 def texto_a_chunks(texto: str, prefijo: str = "txt", chunk_size: int = None) -> tuple[list, list]:
     """
     Divide un texto largo en chunks con solapamiento de 100 chars.
@@ -97,18 +197,7 @@ def texto_a_chunks(texto: str, prefijo: str = "txt", chunk_size: int = None) -> 
     Returns:
         (chunks, chunk_ids)
     """
-    size   = chunk_size or CHUNK_SIZE
-    chunks = []
-    ids    = []
-    idx    = 0
-    start  = 0
-
-    while start < len(texto):
-        chunks.append(texto[start:start + size])
-        ids.append(f"{prefijo}_{idx}")
-        start += size - 100
-        idx   += 1
-
+    chunks, ids, _ = documento_a_chunks(texto, prefijo=prefijo, chunk_size=chunk_size)
     return chunks, ids
 
 
@@ -126,16 +215,44 @@ def archivo_a_chunks(filepath: str, prefijo: str = "txt") -> tuple[list, list]:
     with open(filepath, "r", encoding="utf-8") as f:
         texto = f.read()
 
-    chunks, ids = texto_a_chunks(texto, prefijo=prefijo)
+    chunks, ids, _ = documento_a_chunks(
+        texto,
+        prefijo=prefijo,
+        metadata_base={"source_type": "file", "source_path": filepath},
+    )
     print(f"   → {len(chunks)} chunks de '{filepath}'")
     return chunks, ids
+
+
+def archivo_a_documentos(
+    filepath: str,
+    prefijo: str = "txt",
+    metadata_base: dict | None = None,
+) -> tuple[list, list, list]:
+    """
+    Lee un archivo y devuelve chunks con metadatos listos para indexación.
+    """
+    if not os.path.exists(filepath):
+        print(f"   Archivo no encontrado: {filepath}")
+        return [], [], []
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        texto = f.read()
+
+    metadatos = {"source_type": "file", "source_path": filepath}
+    if metadata_base:
+        metadatos.update(metadata_base)
+
+    chunks, ids, docs_meta = documento_a_chunks(texto, prefijo=prefijo, metadata_base=metadatos)
+    print(f"   → {len(chunks)} chunks de '{filepath}'")
+    return chunks, ids, docs_meta
 
 
 # ─────────────────────────────────────────────
 #  INDEXADO
 # ─────────────────────────────────────────────
 
-def indexar(chunks: list, chunk_ids: list, limpiar: bool = True) -> bool:
+def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpiar: bool = True) -> bool:
     """
     Indexa una lista de chunks en ChromaDB.
 
@@ -171,11 +288,14 @@ def indexar(chunks: list, chunk_ids: list, limpiar: bool = True) -> bool:
 
     # Insertar en lotes
     for i in tqdm(range(0, len(chunks), BATCH_SIZE), total=total_lotes, desc="Indexando"):
-        col.add(
-            documents  = chunks[i:i + BATCH_SIZE],
-            embeddings = embeddings[i:i + BATCH_SIZE].tolist(),
-            ids        = chunk_ids[i:i + BATCH_SIZE],
-        )
+        payload = {
+            "documents": chunks[i:i + BATCH_SIZE],
+            "embeddings": embeddings[i:i + BATCH_SIZE].tolist(),
+            "ids": chunk_ids[i:i + BATCH_SIZE],
+        }
+        if metadatas:
+            payload["metadatas"] = metadatas[i:i + BATCH_SIZE]
+        col.add(**payload)
 
     print(f" {len(chunks)} chunks indexados en ChromaDB")
     return True
@@ -185,16 +305,92 @@ def indexar(chunks: list, chunk_ids: list, limpiar: bool = True) -> bool:
 #  BÚSQUEDA
 # ─────────────────────────────────────────────
 
+def _prioridad_fuente(source_type: str) -> int:
+    prioridades = {
+        "branch": 5,
+        "section": 4,
+        "web_main": 4,
+        "service": 4,
+        "pdf": 3,
+        "file": 2,
+    }
+    return prioridades.get(source_type or "", 1)
+
+
+def _formatear_fuente(metadata: dict | None) -> str:
+    metadata = metadata or {}
+    source_type = metadata.get("source_type")
+    label = metadata.get("source_label") or metadata.get("source_name") or metadata.get("source_path")
+
+    tipo = {
+        "branch": "Sucursal",
+        "section": "Seccion",
+        "web_main": "Sitio web",
+        "pdf": "PDF",
+        "file": "Archivo",
+    }.get(source_type, "Fuente")
+
+    if label:
+        return f"{tipo}: {label}"
+    return tipo
+
+
 def buscar(pregunta: str, n_resultados: int = None) -> str:
     col = get_collection()
     emb = get_embedder()
-    n   = n_resultados or N_RESULTADOS
+    n = n_resultados or N_RESULTADOS
+    n_query = max(n * 4, 8)
 
     # Pre-calcular embedding para evitar timeout en ChromaDB
     vector = emb.encode([pregunta]).tolist()
-    results = col.query(query_embeddings=vector, n_results=n)
+    results = col.query(
+        query_embeddings=vector,
+        n_results=min(n_query, max(col.count(), 1)),
+        include=["documents", "metadatas", "distances"],
+    )
 
-    contexto = "\n\n".join(results["documents"][0])
-    if len(contexto) > 800:
-        contexto = contexto[:800].rsplit(" ", 1)[0]
+    documents = (results.get("documents") or [[]])[0]
+    metadatas = (results.get("metadatas") or [[]])[0]
+    distances = (results.get("distances") or [[]])[0]
+
+    candidatos = []
+    vistos = set()
+    for idx, doc in enumerate(documents):
+        texto = _normalizar_texto(doc)
+        if not texto:
+            continue
+
+        firma = hashlib.sha1(texto[:300].lower().encode("utf-8")).hexdigest()[:16]
+        if firma in vistos:
+            continue
+        vistos.add(firma)
+
+        metadata = metadatas[idx] if idx < len(metadatas) else {}
+        distance = distances[idx] if idx < len(distances) else 99
+        length_penalty = 0.4 if len(texto) > CHUNK_SIZE * 1.4 else 0
+        score = distance - (_prioridad_fuente((metadata or {}).get("source_type")) * 0.08) + length_penalty
+
+        candidatos.append(
+            {
+                "texto": texto,
+                "metadata": metadata or {},
+                "score": score,
+            }
+        )
+
+    candidatos.sort(key=lambda item: item["score"])
+    seleccionados = candidatos[:n]
+
+    contexto_partes = []
+    chars = 0
+    for item in seleccionados:
+        bloque = f"[Fuente: {_formatear_fuente(item['metadata'])}]\n{item['texto']}"
+        if chars + len(bloque) > MAX_CONTEXT_CHARS and contexto_partes:
+            break
+        contexto_partes.append(bloque)
+        chars += len(bloque) + 2
+
+    contexto = "\n\n".join(contexto_partes)
+    if len(contexto) > MAX_CONTEXT_CHARS:
+        contexto = contexto[:MAX_CONTEXT_CHARS].rsplit(" ", 1)[0]
     return contexto

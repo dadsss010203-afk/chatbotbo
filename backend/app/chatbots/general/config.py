@@ -34,7 +34,14 @@ SYSTEM_PROMPT = (
 )
 
 
-def construir_prompt(instruccion_idioma: str, contexto: str, hora: dict, sin_info: str) -> str:
+def construir_prompt(
+    instruccion_idioma: str,
+    contexto: str,
+    hora: dict,
+    sin_info: str,
+    skills_context: str = "",
+    skill_name: str = "",
+) -> str:
     """Construye el system prompt completo para inyectar en Ollama."""
     return (
         f" CRITICAL LANGUAGE RULE: {instruccion_idioma} "
@@ -43,9 +50,17 @@ def construir_prompt(instruccion_idioma: str, contexto: str, hora: dict, sin_inf
         f"FECHA Y HORA EN BOLIVIA:\n"
         f"  Fecha: {hora['fecha']}  Hora: {hora['hora']}  Día: {hora['dia']}\n"
         f"  Estado: {hora['estado']}  Horario: {hora['horario']}\n\n"
+        f"SKILLS ACTIVAS DEL BOT:\n{skills_context or 'Sin skills declaradas.'}\n\n"
+        f"SKILL PRINCIPAL PARA ESTA CONSULTA:\n{skill_name or 'Consulta general de Correos de Bolivia'}\n\n"
         f"INFORMACIÓN OFICIAL:\n{contexto}\n\n"
         f"INSTRUCCIONES:\n"
         f"- Responde SOLO con la información del texto\n"
+        f"- Habla SOLO de Correos de Bolivia y sus servicios postales; no cambies a temas generales ajenos\n"
+        f"- Si el usuario se sale del dominio postal de Correos de Bolivia, rechaza cortésmente y redirígelo a los temas permitidos\n"
+        f"- Usa la skill principal como prioridad temática para enfocar la respuesta\n"
+        f"- Prioriza la información más específica y operativa sobre texto general o institucional\n"
+        f"- Si el contexto incluye varias fuentes, combina solo las que realmente respondan la pregunta\n"
+        f"- No copies bloques completos del contexto; sintetiza con precisión\n"
         f"- Si preguntan si está abierto, usa el Estado de arriba\n"
         f"- Máximo 3 párrafos cortos, sin asteriscos ni markdown\n"
         f"- Si no tienes la info di: \"{sin_info}\"\n"

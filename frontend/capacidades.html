@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capacidades | ChatbotBO</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <style>
+    :root{
+      --gold-900:#7a4f00;--gold-700:#c8860e;--gold-500:#f5a623;--gold-200:#ffe49a;
+      --navy-900:#0b1f4e;--navy-700:#163a80;--navy-500:#2255b8;
+      --cream:#fffaf0;--paper:#fff5d0;--white:#ffffff;--border:#e7d08c;
+      --ink:#1a0e00;--ink-soft:rgba(26,14,0,.66);--ink-faint:rgba(26,14,0,.45);
+      --ok:#2f8f4e;--danger:#b44231;--warn:#a06600;
+      --shadow:0 18px 48px rgba(11,31,78,.12);
+      --shadow-soft:0 8px 26px rgba(122,79,0,.10);
+      --radius-xl:26px;--radius-lg:18px;--radius-md:14px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:'DM Sans',sans-serif;
+      color:var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(245,166,35,.14), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(34,85,184,.08), transparent 25%),
+        linear-gradient(180deg,#fffdf6 0%,#fff5df 100%);
+    }
+    .shell{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+    .sidebar{
+      position:sticky;top:0;height:100vh;padding:24px 18px 20px;
+      background:linear-gradient(180deg,var(--navy-900) 0%, #11295f 100%);
+      color:#fff;border-right:1px solid rgba(255,255,255,.08)
+    }
+    .brand{padding:10px 12px 18px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:18px}
+    .brand h1{margin:0;font-family:'Playfair Display',serif;font-size:1.7rem;letter-spacing:.02em}
+    .brand p{margin:8px 0 0;color:rgba(255,255,255,.72);font-size:.92rem;line-height:1.7}
+    .menu{display:grid;gap:10px}
+    .menu-btn{
+      border:none;border-radius:16px;padding:13px 14px;text-align:left;cursor:pointer;
+      background:rgba(255,255,255,.06);color:#fff;font:inherit;font-weight:700;
+      transition:all .2s ease;text-decoration:none;display:block
+    }
+    .menu-btn small{display:block;margin-top:4px;color:rgba(255,255,255,.58);font-weight:500}
+    .menu-btn.active,.menu-btn:hover{background:linear-gradient(135deg,rgba(245,166,35,.94),rgba(200,134,14,.94));color:var(--navy-900);transform:translateX(3px)}
+    .menu-btn.active small,.menu-btn:hover small{color:rgba(11,31,78,.75)}
+    .side-actions{margin-top:18px;display:grid;gap:10px}
+    .side-link{
+      display:flex;align-items:center;justify-content:center;text-decoration:none;
+      border-radius:14px;padding:11px 14px;font-weight:700;background:rgba(255,255,255,.08);color:#fff
+    }
+    .side-runtime{
+      margin-top:18px;padding:16px;border-radius:18px;
+      background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.05));
+      border:1px solid rgba(255,255,255,.08)
+    }
+    .side-runtime h3{margin:0 0 10px;font-size:.92rem;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+    .side-runtime strong{display:block;font-size:1.55rem}
+    .side-runtime p{margin:7px 0 0;color:rgba(255,255,255,.7);font-size:.88rem;line-height:1.6}
+    .content{padding:28px 28px 40px;display:grid;gap:22px}
+    .top-strip{
+      display:grid;grid-template-columns:1.1fr .9fr .9fr .9fr;gap:14px
+    }
+    .top-card{
+      background:rgba(255,255,255,.82);
+      border:1px solid rgba(231,208,140,.8);
+      border-radius:20px;
+      padding:16px 18px;
+      box-shadow:var(--shadow-soft);
+    }
+    .top-card span{display:block;font-size:.8rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+    .top-card strong{display:block;font-size:1.35rem;color:var(--navy-900)}
+    .top-card p{margin:8px 0 0;color:var(--ink-soft);font-size:.9rem;line-height:1.6}
+    .hero{
+      background:rgba(255,255,255,.86);border:1px solid rgba(231,208,140,.8);box-shadow:var(--shadow);
+      border-radius:var(--radius-xl);padding:28px;display:grid;grid-template-columns:1.2fr .8fr;gap:20px
+    }
+    .hero h2{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:clamp(1.9rem,4vw,2.9rem)}
+    .hero p{margin:12px 0 0;color:var(--ink-soft);line-height:1.8;max-width:780px}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .btn{
+      border:none;border-radius:14px;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer;
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:all .2s ease
+    }
+    .btn-primary{background:linear-gradient(135deg,var(--gold-500),var(--gold-700));color:var(--navy-900)}
+    .btn-secondary{background:#fff;border:1px solid var(--border);color:var(--navy-900)}
+    .btn-danger{background:#fff2ef;border:1px solid rgba(180,66,49,.18);color:var(--danger)}
+    .btn:hover{transform:translateY(-1px)}
+    .hero-panel{background:linear-gradient(155deg,var(--paper),#fffdf7);border:1px solid var(--border);border-radius:22px;padding:18px}
+    .hero-panel h3{margin:0 0 10px;font-family:'Playfair Display',serif;color:var(--navy-900)}
+    .hero-panel .runtime-line{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px dashed rgba(122,79,0,.12)}
+    .hero-panel .runtime-line span:first-child{color:var(--ink-faint)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .stat{background:#fff;border:1px solid rgba(231,208,140,.88);border-radius:18px;padding:18px;box-shadow:var(--shadow-soft)}
+    .stat strong{display:block;font-size:1.5rem;color:var(--navy-900);margin-bottom:6px}
+    .stat span{color:var(--ink-faint);font-size:.86rem}
+    .stat small{display:block;margin-top:10px;color:var(--ink-soft);line-height:1.5}
+    .section{background:rgba(255,255,255,.9);border:1px solid rgba(231,208,140,.86);border-radius:var(--radius-xl);box-shadow:var(--shadow-soft);padding:22px}
+    .section-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px}
+    .section-head h3{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:1.5rem}
+    .section-head p{margin:8px 0 0;color:var(--ink-soft);line-height:1.7;max-width:760px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .section-summary{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px
+    }
+    .summary-card{
+      background:linear-gradient(180deg,#fffdf7,#fff6db);
+      border:1px solid rgba(231,208,140,.85);
+      border-radius:18px;
+      padding:16px;
+    }
+    .summary-card span{display:block;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+    .summary-card strong{display:block;color:var(--navy-900);font-size:1.25rem}
+    .summary-card small{display:block;margin-top:8px;color:var(--ink-soft);line-height:1.55}
+    .search{
+      min-width:250px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px;
+      font:inherit;color:var(--ink)
+    }
+    .table-wrap{
+      border:1px solid rgba(231,208,140,.9);border-radius:20px;overflow:hidden;background:#fff
+    }
+    table{width:100%;border-collapse:collapse}
+    thead{background:linear-gradient(180deg,#fff7de 0%,#fff1c0 100%)}
+    th,td{padding:14px 12px;text-align:left;border-bottom:1px solid rgba(231,208,140,.62);vertical-align:top}
+    th{font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--navy-900)}
+    td{font-size:.92rem;color:var(--ink-soft)}
+    tbody tr:hover{background:#fffbf0}
+    .cell-strong{font-weight:700;color:var(--ink)}
+    .table-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .mini-btn{
+      border:none;border-radius:11px;padding:8px 12px;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer
+    }
+    .mini-run{background:var(--navy-700);color:#fff}
+    .mini-soft{background:#fff;border:1px solid var(--border);color:var(--navy-900)}
+    .mini-danger{background:#fff1ee;color:var(--danger);border:1px solid rgba(180,66,49,.18)}
+    .mini-run:disabled{opacity:.45;cursor:not-allowed}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
+      font-size:.75rem;font-weight:700;white-space:nowrap
+    }
+    .pill.ok{background:rgba(47,143,78,.12);color:var(--ok)}
+    .pill.warn{background:rgba(180,66,49,.1);color:var(--danger)}
+    .pill.info{background:rgba(34,85,184,.10);color:var(--navy-700)}
+    .resource-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+    .resource-card{background:#fffdf6;border:1px solid var(--border);border-radius:18px;padding:16px}
+    .resource-card h4{margin:0 0 10px;color:var(--navy-900)}
+    .resource-line{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed rgba(122,79,0,.12);font-size:.9rem}
+    .resource-line span:first-child{color:var(--ink-faint)}
+    .resource-note{margin-top:12px;color:var(--ink-soft);font-size:.86rem;line-height:1.6;word-break:break-word}
+    .table-footer{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 12px;background:#fffef9}
+    .table-footer span{color:var(--ink-faint);font-size:.86rem}
+    .dataTables_wrapper{padding:10px 12px 14px}
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter{margin-bottom:10px}
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select{
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:8px 10px;
+      background:#fffdf8;
+      color:var(--ink);
+    }
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate{margin-top:12px}
+    .dataTables_wrapper .dataTables_paginate .paginate_button{
+      border-radius:10px!important;
+      border:1px solid transparent!important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover{
+      background:linear-gradient(135deg,var(--gold-500),var(--gold-700))!important;
+      color:var(--navy-900)!important;
+      border-color:rgba(200,134,14,.35)!important;
+    }
+    .modal{
+      position:fixed;inset:0;background:rgba(11,31,78,.56);backdrop-filter:blur(8px);
+      display:none;align-items:center;justify-content:center;padding:20px;z-index:3000
+    }
+    .modal.open{display:flex}
+    .modal-card{
+      width:min(760px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:28px;
+      border:1px solid rgba(231,208,140,.86);box-shadow:0 34px 90px rgba(11,31,78,.24);padding:22px
+    }
+    .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+    .modal-head h4{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:1.45rem}
+    .modal-head p{margin:6px 0 0;color:var(--ink-soft);line-height:1.7}
+    .close-btn{border:none;background:#fff5e3;border-radius:12px;padding:10px 12px;cursor:pointer;font-weight:700;color:var(--navy-900)}
+    form{display:grid;gap:12px}
+    .field{display:grid;gap:7px}
+    .field label{font-size:.82rem;font-weight:700;color:var(--navy-900)}
+    .field input,.field select,.field textarea{
+      width:100%;border-radius:14px;border:1px solid var(--border);background:#fff;padding:12px 13px;font:inherit
+    }
+    .field textarea{min-height:110px;resize:vertical}
+    .msg{display:none;margin-top:10px;padding:12px 14px;border-radius:14px;font-size:.9rem;white-space:pre-wrap}
+    .msg.show{display:block}
+    .msg.ok{background:rgba(47,143,78,.10);color:var(--ok);border:1px solid rgba(47,143,78,.22)}
+    .msg.err{background:rgba(180,66,49,.09);color:var(--danger);border:1px solid rgba(180,66,49,.18)}
+    .hidden{display:none!important}
+    .view-section{display:none}
+    .view-section.active{display:block}
+    .empty-state{
+      padding:28px 18px;text-align:center;color:var(--ink-soft)
+    }
+    .empty-state strong{display:block;color:var(--navy-900);font-size:1.08rem;margin-bottom:8px}
+    @media (max-width: 1120px){
+      .shell{grid-template-columns:1fr}
+      .sidebar{position:relative;height:auto}
+      .top-strip,
+      .hero{grid-template-columns:1fr}
+      .section-summary,
+      .resource-grid{grid-template-columns:repeat(2,1fr)}
+      .stats{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width: 720px){
+      .content{padding:18px}
+      .top-strip,
+      .section-summary,
+      .stats,.resource-grid{grid-template-columns:1fr}
+      .search{min-width:100%}
+      th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){display:none}
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Capacidades</h1>
+        <p>Centro de administración de skills, PDFs y recursos de IA del chatbot.</p>
+      </div>
+      <nav class="menu">
+        <a class="menu-btn" data-view="overview" href="/gestion/capacidades">Resumen<small>Estado general del sistema</small></a>
+        <a class="menu-btn" data-view="skills" href="/gestion/capacidades/skills">Skills<small>Capacidades funcionales</small></a>
+        <a class="menu-btn" data-view="pdfs" href="/gestion/capacidades/pdfs">PDFs<small>Extracción y limpieza</small></a>
+        <a class="menu-btn" data-view="resources" href="/gestion/capacidades/recursos">Recursos IA<small>Modelos, rutas y configuración</small></a>
+      </nav>
+      <div class="side-actions">
+        <a class="side-link" href="/">Volver al chat</a>
+        <a class="side-link" href="/widget.html">Abrir widget</a>
+      </div>
+      <div class="side-runtime" id="side-runtime">
+        <h3>Estado del Bot</h3>
+        <strong>Sin datos</strong>
+        <p>Cargando runtime del sistema...</p>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section class="top-strip">
+        <article class="top-card" id="top-card-health"></article>
+        <article class="top-card" id="top-card-rag"></article>
+        <article class="top-card" id="top-card-content"></article>
+        <article class="top-card" id="top-card-update"></article>
+      </section>
+
+      <section class="hero">
+        <div>
+          <h2 id="page-title">Panel de Capacidades</h2>
+          <p id="page-description">Desde esta ruta administras todo lo relacionado con capacidades del bot: skills, PDFs del scraping y recursos de IA. El panel quedó centrado en tablas operativas y acciones por modal para mantener el flujo limpio y más profesional.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" type="button" onclick="loadAll()">Actualizar panel</button>
+            <button class="btn btn-primary" type="button" onclick="triggerUpdate()">Actualizar datos IA</button>
+            <button class="btn btn-secondary" type="button" id="hero-create-skill" onclick="openModal('skill')">Nueva Skill</button>
+          </div>
+        </div>
+        <div class="hero-panel" id="hero-runtime"></div>
+      </section>
+
+      <section class="stats view-section" id="view-overview-stats"></section>
+
+      <section class="section view-section" id="view-skills">
+        <div class="section-head">
+          <div>
+            <h3>Skills</h3>
+            <p>Catálogo funcional del bot con categoría, prioridad, disparadores y activación real desde modales.</p>
+          </div>
+          <div class="toolbar">
+            <input class="search" id="search-skills" placeholder="Buscar skills..." oninput="renderSkills()">
+            <button class="btn btn-secondary" type="button" onclick="openModal('skill')">Crear Skill</button>
+          </div>
+        </div>
+        <div class="section-summary" id="skills-summary"></div>
+        <div class="table-wrap">
+          <table id="skills-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>ID</th>
+                <th>Categoría</th>
+                <th>Modo</th>
+                <th>Estado</th>
+                <th>Prioridad</th>
+                <th>Trigger</th>
+                <th>Descripción</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="skills-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="skills-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-pdfs">
+        <div class="section-head">
+          <div>
+            <h3>PDFs</h3>
+            <p>Control de PDFs descargados por el scraper, con estado de extracción, texto disponible y acciones de revisión o eliminación.</p>
+          </div>
+          <div class="toolbar">
+            <span class="pill info">Tabla avanzada con filtros, orden y paginación</span>
+            <button class="btn btn-secondary" type="button" onclick="openModal('pdf-upload')">Subir PDF</button>
+          </div>
+        </div>
+        <div class="section-summary" id="pdfs-summary"></div>
+        <div class="table-wrap">
+          <table id="pdfs-table">
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>Estado</th>
+                <th>Método</th>
+                <th>Texto</th>
+                <th>Fuente</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="pdfs-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="pdfs-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-resources">
+        <div class="section-head">
+          <div>
+            <h3>Recursos de IA</h3>
+            <p>Estado ampliado de modelos, almacenamiento, parámetros del RAG y archivos críticos del sistema.</p>
+          </div>
+        </div>
+        <div class="resource-grid" id="resources-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="modal-shell" onclick="closeModal(event)">
+    <div class="modal-card" id="modal-card">
+      <div class="modal-head">
+        <div>
+          <h4 id="modal-title">Modal</h4>
+          <p id="modal-subtitle">Gestiona el elemento seleccionado.</p>
+        </div>
+        <button class="close-btn" type="button" onclick="closeModal()">Cerrar</button>
+      </div>
+
+      <form id="skill-form" class="hidden">
+        <div class="field">
+          <label for="skill-id">ID</label>
+          <input id="skill-id" name="id" placeholder="ej: soporte_operativo" required>
+        </div>
+        <div class="field">
+          <label for="skill-name">Nombre</label>
+          <input id="skill-name" name="nombre" placeholder="Nombre visible de la skill" required>
+        </div>
+        <div class="field">
+          <label for="skill-description">Descripción</label>
+          <textarea id="skill-description" name="descripcion" placeholder="Qué resuelve esta skill" required></textarea>
+        </div>
+        <div class="field">
+          <label for="skill-category">Categoría</label>
+          <select id="skill-category" name="categoria" required></select>
+        </div>
+        <div class="field">
+          <label for="skill-mode">Modo</label>
+          <select id="skill-mode" name="modo" required></select>
+        </div>
+        <div class="field">
+          <label for="skill-priority">Prioridad</label>
+          <input id="skill-priority" name="prioridad" type="number" min="1" max="5" step="1" value="3" required>
+        </div>
+        <div class="field">
+          <label for="skill-trigger">Trigger</label>
+          <input id="skill-trigger" name="trigger" placeholder="Palabras o intención que activan la skill">
+        </div>
+        <div class="field">
+          <label for="skill-active">Estado</label>
+          <select id="skill-active" name="activa" required>
+            <option value="true">Activa</option>
+            <option value="false">Inactiva</option>
+          </select>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-primary" type="submit">Guardar Skill</button>
+          <button class="btn btn-secondary" type="button" onclick="resetSkillForm()">Limpiar</button>
+        </div>
+        <div id="skill-msg" class="msg"></div>
+      </form>
+
+      <form id="pdf-form" class="hidden" enctype="multipart/form-data">
+        <div class="field">
+          <label for="pdf-file">Archivo PDF</label>
+          <input id="pdf-file" name="file" type="file" accept="application/pdf" required>
+        </div>
+        <div class="field">
+          <label for="pdf-fuente-url">URL de origen</label>
+          <input id="pdf-fuente-url" name="fuente_url" placeholder="https://...">
+        </div>
+        <div class="field">
+          <label for="pdf-pagina-fuente">Página fuente</label>
+          <input id="pdf-pagina-fuente" name="pagina_fuente" placeholder="Página o módulo relacionado">
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-primary" type="submit">Procesar PDF</button>
+          <button class="btn btn-secondary" type="button" onclick="resetPdfForm()">Limpiar</button>
+        </div>
+        <div id="pdf-msg" class="msg"></div>
+      </form>
+
+      <div id="detail-panel" class="hidden">
+        <pre id="detail-output">Sin detalle cargado.</pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script>
+    const state = {
+      capabilities: null,
+      pdfsPayload: null,
+      options: null,
+      currentModal: null,
+      pdfsDataTable: null,
+    };
+
+    const els = {
+      menuBtns: Array.from(document.querySelectorAll('.menu-btn')),
+      modal: document.getElementById('modal-shell'),
+      skillForm: document.getElementById('skill-form'),
+      pdfForm: document.getElementById('pdf-form'),
+      detailPanel: document.getElementById('detail-panel'),
+      detailOutput: document.getElementById('detail-output'),
+      modalTitle: document.getElementById('modal-title'),
+      modalSubtitle: document.getElementById('modal-subtitle'),
+      pageTitle: document.getElementById('page-title'),
+      pageDescription: document.getElementById('page-description'),
+      sideRuntime: document.getElementById('side-runtime'),
+      topCardHealth: document.getElementById('top-card-health'),
+      topCardRag: document.getElementById('top-card-rag'),
+      topCardContent: document.getElementById('top-card-content'),
+      topCardUpdate: document.getElementById('top-card-update'),
+      skillsSummary: document.getElementById('skills-summary'),
+      pdfsSummary: document.getElementById('pdfs-summary'),
+      skillMsg: document.getElementById('skill-msg'),
+      pdfMsg: document.getElementById('pdf-msg'),
+      heroRuntime: document.getElementById('hero-runtime'),
+      statsGrid: document.getElementById('view-overview-stats'),
+      skillsBody: document.getElementById('skills-body'),
+      pdfsBody: document.getElementById('pdfs-body'),
+      skillsCount: document.getElementById('skills-count'),
+      pdfsCount: document.getElementById('pdfs-count'),
+      resourcesGrid: document.getElementById('resources-grid'),
+      skillMode: document.getElementById('skill-mode'),
+      skillCategory: document.getElementById('skill-category'),
+      heroCreateSkill: document.getElementById('hero-create-skill'),
+      viewSections: {
+        overview: document.getElementById('view-overview-stats'),
+        skills: document.getElementById('view-skills'),
+        pdfs: document.getElementById('view-pdfs'),
+        resources: document.getElementById('view-resources'),
+      }
+    };
+
+    const viewConfig = {
+      overview: {
+        title: 'Resumen General',
+        description: 'Vista ejecutiva del estado del sistema, el runtime del bot, el RAG y el volumen documental disponible.',
+        showSkillButton: true,
+      },
+      skills: {
+        title: 'Gestión de Skills',
+        description: 'Mantén el catálogo funcional del bot con categoría, prioridad, activación, disparadores y edición centralizada.',
+        showSkillButton: true,
+      },
+      pdfs: {
+        title: 'Gestión de PDFs',
+        description: 'Supervisa los PDFs descargados por el scraping, el estado de extracción y la limpieza documental del RAG.',
+        showSkillButton: false,
+      },
+      resources: {
+        title: 'Recursos de IA',
+        description: 'Consulta modelos, rutas, configuración del RAG y archivos críticos usados por el sistema.',
+        showSkillButton: false,
+      }
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[m]);
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      return data;
+    }
+
+    function renderSummaryCards(target, items) {
+      target.innerHTML = items.map(item => `
+        <div class="summary-card">
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.value)}</strong>
+          <small>${escapeHtml(item.note || '')}</small>
+        </div>
+      `).join('');
+    }
+
+    function getCurrentView() {
+      const parts = window.location.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (!last || last === 'capacidades') return 'overview';
+      if (last === 'recursos') return 'resources';
+      return viewConfig[last] ? last : 'overview';
+    }
+
+    function applyView() {
+      const currentView = getCurrentView();
+      const config = viewConfig[currentView] || viewConfig.overview;
+
+      els.menuBtns.forEach(item => {
+        item.classList.toggle('active', item.dataset.view === currentView);
+      });
+
+      Object.entries(els.viewSections).forEach(([view, element]) => {
+        element.classList.toggle('active', view === currentView);
+      });
+
+      els.pageTitle.textContent = config.title;
+      els.pageDescription.textContent = config.description;
+      els.heroCreateSkill.classList.toggle('hidden', !config.showSkillButton);
+    }
+
+    function updateHero(cap) {
+      const runtime = cap.runtime || {};
+      const act = runtime.actualizacion || {};
+      els.heroRuntime.innerHTML = `
+        <h3>Runtime actual</h3>
+        <div class="runtime-line"><span>Modelo</span><strong>${escapeHtml(runtime.modelo || '—')}</strong></div>
+        <div class="runtime-line"><span>Ollama</span><strong>${runtime.ollama ? 'Disponible' : 'No disponible'}</strong></div>
+        <div class="runtime-line"><span>Sesiones activas</span><strong>${runtime.sesiones_activas ?? 0}</strong></div>
+        <div class="runtime-line"><span>Próxima actualización</span><strong>${escapeHtml(act.proxima_vez || '—')}</strong></div>
+        <div class="runtime-line"><span>Último resultado</span><strong>${escapeHtml(act.ultimo_resultado || '—')}</strong></div>
+      `;
+
+      els.sideRuntime.innerHTML = `
+        <h3>Estado del Bot</h3>
+        <strong>${runtime.ollama ? 'Operativo' : 'Revisar'}</strong>
+        <p>Modelo ${escapeHtml(runtime.modelo || '—')} con ${cap.rag?.chunks ?? 0} chunks indexados y ${runtime.sesiones_activas ?? 0} sesiones activas.</p>
+      `;
+    }
+
+    function updateTopStrip(cap, pdfPayload) {
+      const runtime = cap.runtime || {};
+      const rag = cap.rag || {};
+      const pdfs = pdfPayload?.resumen || {};
+      const act = runtime.actualizacion || {};
+
+      els.topCardHealth.innerHTML = `
+        <span>Salud General</span>
+        <strong>${runtime.ollama ? 'Sistema estable' : 'Atención requerida'}</strong>
+        <p>${runtime.ollama ? 'Ollama responde y el backend tiene capacidad operativa.' : 'El modelo o el backend necesitan revisión.'}</p>
+      `;
+      els.topCardRag.innerHTML = `
+        <span>RAG</span>
+        <strong>${rag.chunks ?? 0} chunks</strong>
+        <p>Modelo de embeddings ${escapeHtml(rag.embedding_model || '—')} con base en ${escapeHtml(rag.chroma_path || '—')}.</p>
+      `;
+      els.topCardContent.innerHTML = `
+        <span>Contenido</span>
+        <strong>${pdfs.total ?? 0} PDFs y ${runtime.sucursales ?? 0} sucursales</strong>
+        <p>${pdfs.con_texto ?? 0} PDFs ya aportan texto utilizable al sistema documental.</p>
+      `;
+      els.topCardUpdate.innerHTML = `
+        <span>Actualización</span>
+        <strong>${escapeHtml(act.proxima_vez || 'Sin agenda')}</strong>
+        <p>Último estado reportado: ${escapeHtml(act.ultimo_resultado || 'Pendiente')}.</p>
+      `;
+    }
+
+    function renderStats(cap, pdfPayload) {
+      const runtime = cap.runtime || {};
+      const pdfs = pdfPayload?.resumen || {};
+      els.statsGrid.innerHTML = `
+        <div class="stat"><strong>${cap.rag?.chunks ?? 0}</strong><span>Chunks RAG</span><small>Volumen actual de conocimiento utilizable por el chatbot.</small></div>
+        <div class="stat"><strong>${cap.skills?.length ?? 0}</strong><span>Skills activas</span><small>Capacidades funcionales declaradas para el comportamiento del bot.</small></div>
+        <div class="stat"><strong>${runtime.sucursales ?? 0}</strong><span>Sucursales cargadas</span><small>Datos operativos listos para consultas de ubicación y atención.</small></div>
+        <div class="stat"><strong>${pdfs.total ?? 0}</strong><span>PDFs registrados</span><small>Documentos disponibles para extracción, revisión y soporte del RAG.</small></div>
+        <div class="stat"><strong>${pdfs.con_texto ?? 0}</strong><span>PDFs con texto</span><small>Documentos ya convertidos en contenido potencialmente indexable.</small></div>
+        <div class="stat"><strong>${pdfs.sin_texto ?? 0}</strong><span>PDFs sin texto</span><small>Fuentes candidatas a OCR, limpieza o reprocesamiento.</small></div>
+        <div class="stat"><strong>${pdfs.tamano_directorio_kb ?? 0} KB</strong><span>Tamaño carpeta PDF</span><small>Peso estimado del almacenamiento documental actual.</small></div>
+        <div class="stat"><strong>${cap.ai_resources?.capabilities?.skills_registradas ?? 0}</strong><span>Skills registradas</span><small>Catálogo total de capacidades funcionales mantenidas desde el panel.</small></div>
+      `;
+    }
+
+    function matchesSearch(value, term) {
+      return value.toLowerCase().includes(term.toLowerCase());
+    }
+
+    function renderSkills() {
+      const skills = state.capabilities?.skills || [];
+      const term = document.getElementById('search-skills').value.trim();
+      const rows = skills.filter(item => {
+        const blob = [item.nombre, item.id, item.modo, item.categoria, item.descripcion, item.estado, item.trigger].join(' ');
+        return !term || matchesSearch(blob, term);
+      });
+      els.skillsBody.innerHTML = rows.map(item => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(item.nombre)}</span></td>
+          <td>${escapeHtml(item.id)}</td>
+          <td>${escapeHtml(item.categoria || '—')}</td>
+          <td>${escapeHtml(item.modo || '—')}</td>
+          <td><span class="pill ${item.activa ? 'ok' : 'warn'}">${item.activa ? 'Activa' : 'Inactiva'}</span></td>
+          <td>${escapeHtml(item.prioridad || '—')}</td>
+          <td>${escapeHtml(item.trigger || '—')}</td>
+          <td>${escapeHtml(item.descripcion || '')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="editSkill('${escapeHtml(item.id)}')">Editar</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deleteSkill('${escapeHtml(item.id)}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.skillsCount.textContent = `${rows.length} registros`;
+      renderSummaryCards(els.skillsSummary, [
+        { label: 'Total Skills', value: skills.length, note: 'Capacidades declaradas en el catálogo del bot.' },
+        { label: 'Activas', value: skills.filter(item => item.activa).length, note: 'Disponibles para el comportamiento actual del bot.' },
+        { label: 'Automatizables', value: skills.filter(item => item.automatizable).length, note: 'Quedan alineadas con modos operables por el sistema.' },
+        { label: 'Alta prioridad', value: skills.filter(item => Number(item.prioridad) >= 4).length, note: 'Entradas que merecen mayor peso operativo o de diseño.' },
+      ]);
+      setupGenericDataTable('#skills-table', 'skills', 8);
+    }
+
+    function renderPdfs() {
+      const pdfs = state.pdfsPayload?.pdfs || [];
+      els.pdfsBody.innerHTML = pdfs.map(item => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(item.nombre_archivo)}</span></td>
+          <td><span class="pill ${item.texto_disponible ? 'ok' : 'warn'}">${escapeHtml(item.estado_extraccion)}</span></td>
+          <td>${escapeHtml(item.metodo_extraccion || 'sin método')}</td>
+          <td>${item.longitud_texto || 0} chars</td>
+          <td>${escapeHtml(item.pagina_fuente || '—')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showPdfDetail('${escapeHtml(item.nombre_archivo)}')">Detalle</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deletePdf('${escapeHtml(item.nombre_archivo)}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.pdfsCount.textContent = `${pdfs.length} registros`;
+      renderSummaryCards(els.pdfsSummary, [
+        { label: 'Total PDFs', value: pdfs.length, note: 'Documentos detectados y almacenados por el scraping.' },
+        { label: 'Con texto', value: pdfs.filter(item => item.texto_disponible).length, note: 'Aptos para revisión documental y soporte RAG.' },
+        { label: 'Sin texto', value: pdfs.filter(item => !item.texto_disponible).length, note: 'Candidatos a reprocesamiento u OCR.' },
+      ]);
+      setupPdfsDataTable();
+    }
+
+    function setupGenericDataTable(selector, label, lastColumnIndex) {
+      if (!window.jQuery || !window.jQuery.fn?.DataTable) return;
+      const table = window.jQuery(selector);
+      if (!table.length) return;
+
+      if (window.jQuery.fn.DataTable.isDataTable(selector)) {
+        table.DataTable().destroy();
+      }
+
+      table.DataTable({
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[0, 'asc']],
+        language: {
+          search: 'Buscar:',
+          lengthMenu: `Mostrar _MENU_ ${label}`,
+          info: `Mostrando _START_ a _END_ de _TOTAL_ ${label}`,
+          infoEmpty: `Sin ${label} disponibles`,
+          zeroRecords: `No se encontraron ${label}`,
+          paginate: {
+            first: 'Primero',
+            last: 'Último',
+            next: 'Siguiente',
+            previous: 'Anterior'
+          }
+        },
+        columnDefs: [
+          { orderable: false, targets: lastColumnIndex }
+        ]
+      });
+    }
+
+    function setupPdfsDataTable() {
+      if (!window.jQuery || !window.jQuery.fn?.DataTable) return;
+
+      if (state.pdfsDataTable) {
+        state.pdfsDataTable.destroy();
+        state.pdfsDataTable = null;
+      }
+
+      state.pdfsDataTable = window.jQuery('#pdfs-table').DataTable({
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[0, 'asc']],
+        language: {
+          search: 'Buscar:',
+          lengthMenu: 'Mostrar _MENU_ PDFs',
+          info: 'Mostrando _START_ a _END_ de _TOTAL_ PDFs',
+          infoEmpty: 'Sin PDFs disponibles',
+          zeroRecords: 'No se encontraron PDFs',
+          paginate: {
+            first: 'Primero',
+            last: 'Último',
+            next: 'Siguiente',
+            previous: 'Anterior'
+          }
+        },
+        columnDefs: [
+          { orderable: false, targets: 5 }
+        ]
+      });
+    }
+
+    function renderResources(cap, pdfPayload) {
+      const ai = cap.ai_resources || {};
+      const llm = ai.llm || {};
+      const emb = ai.embeddings || {};
+      const session = ai.session || {};
+      const storage = ai.storage || {};
+      const pdfs = pdfPayload?.resumen || ai.pdfs || {};
+      const cards = [
+        {
+          title: 'Modelo Generativo',
+          lines: [
+            ['Modelo', llm.modelo || '—'],
+            ['Ollama', llm.ollama_disponible ? 'Disponible' : 'No disponible'],
+            ['Timeout', `${llm.timeout_segundos ?? 0} s`],
+          ],
+          note: llm.ollama_url || '—',
+        },
+        {
+          title: 'Embeddings y RAG',
+          lines: [
+            ['Embeddings', emb.modelo || '—'],
+            ['Chunk size', emb.chunk_size ?? 0],
+            ['Batch size', emb.batch_size ?? 0],
+            ['N resultados', emb.n_resultados ?? 0],
+          ],
+        },
+        {
+          title: 'Sesiones',
+          lines: [
+            ['Historial máximo', session.max_historial ?? 0],
+            ['Sesiones activas', session.sesiones_activas ?? 0],
+          ],
+        },
+        {
+          title: 'PDFs',
+          lines: [
+            ['Registrados', pdfs.total ?? 0],
+            ['Con texto', pdfs.con_texto ?? 0],
+            ['Sin texto', pdfs.sin_texto ?? 0],
+            ['Carpeta PDF', `${pdfs.tamano_directorio_kb ?? 0} KB`],
+          ],
+        },
+        {
+          title: 'Storage',
+          lines: [
+            ['Chroma', storage.chroma_path?.exists ? 'Sí' : 'No'],
+            ['Skills', storage.skills_file?.exists ? 'Sí' : 'No'],
+            ['PDFs JSON', storage.pdfs_file?.exists ? 'Sí' : 'No'],
+          ],
+          note: storage.chroma_path?.path || '—',
+        },
+        {
+          title: 'Fuentes Base',
+          lines: [
+            ['Texto base', storage.data_file?.exists ? 'Sí' : 'No'],
+            ['Sucursales', storage.sucursales_file?.exists ? 'Sí' : 'No'],
+            ['Secciones', storage.secciones_file?.exists ? 'Sí' : 'No'],
+          ],
+          note: storage.data_file?.path || '—',
+        },
+      ];
+
+      els.resourcesGrid.innerHTML = cards.map(card => `
+        <div class="resource-card">
+          <h4>${escapeHtml(card.title)}</h4>
+          ${card.lines.map(line => `
+            <div class="resource-line">
+              <span>${escapeHtml(line[0])}</span>
+              <strong>${escapeHtml(line[1])}</strong>
+            </div>
+          `).join('')}
+          ${card.note ? `<div class="resource-note">${escapeHtml(card.note)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function showMsg(target, text, type = 'ok') {
+      target.textContent = text;
+      target.className = `msg show ${type}`;
+    }
+
+    function resetSkillForm() {
+      els.skillForm.reset();
+      document.getElementById('skill-category').value = 'atencion';
+      document.getElementById('skill-mode').value = 'rag+llm';
+      document.getElementById('skill-priority').value = 3;
+      document.getElementById('skill-active').value = 'true';
+      els.skillMsg.className = 'msg';
+    }
+
+    function resetPdfForm() {
+      els.pdfForm.reset();
+      els.pdfMsg.className = 'msg';
+    }
+
+    function openModal(type) {
+      state.currentModal = type;
+      els.skillForm.classList.add('hidden');
+      els.pdfForm.classList.add('hidden');
+      els.detailPanel.classList.add('hidden');
+      if (type === 'skill') {
+        els.modalTitle.textContent = 'Skill';
+        els.modalSubtitle.textContent = 'Crea o edita una skill funcional para el bot.';
+        els.skillForm.classList.remove('hidden');
+      } else if (type === 'pdf-upload') {
+        els.modalTitle.textContent = 'Subir PDF';
+        els.modalSubtitle.textContent = 'El PDF se procesa de forma temporal, se conserva solo la información extraída y el archivo real se elimina.';
+        els.pdfForm.classList.remove('hidden');
+      } else {
+        els.modalTitle.textContent = 'Detalle';
+        els.modalSubtitle.textContent = 'Vista detallada del elemento seleccionado.';
+        els.detailPanel.classList.remove('hidden');
+      }
+      els.modal.classList.add('open');
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== els.modal) return;
+      els.modal.classList.remove('open');
+    }
+
+    function editSkill(id) {
+      const item = (state.capabilities?.skills || []).find(entry => entry.id === id);
+      if (!item) return;
+      resetSkillForm();
+      document.getElementById('skill-id').value = item.id || '';
+      document.getElementById('skill-name').value = item.nombre || '';
+      document.getElementById('skill-description').value = item.descripcion || '';
+      document.getElementById('skill-category').value = item.categoria || 'custom';
+      document.getElementById('skill-mode').value = item.modo || '';
+      document.getElementById('skill-priority').value = item.prioridad || 3;
+      document.getElementById('skill-trigger').value = item.trigger || '';
+      document.getElementById('skill-active').value = item.activa ? 'true' : 'false';
+      openModal('skill');
+    }
+
+    function showPdfDetail(nombreArchivo) {
+      const item = (state.pdfsPayload?.pdfs || []).find(entry => entry.nombre_archivo === nombreArchivo);
+      els.detailOutput.textContent = item ? JSON.stringify(item, null, 2) : 'PDF no encontrado';
+      openModal('detail');
+    }
+
+    async function deleteSkill(id) {
+      if (!confirm(`Eliminar skill ${id}?`)) return;
+      try {
+        await fetchJson(`/api/skills/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deletePdf(nombreArchivo) {
+      if (!confirm(`Eliminar PDF ${nombreArchivo}?`)) return;
+      try {
+        await fetchJson(`/api/pdfs/${encodeURIComponent(nombreArchivo)}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function triggerUpdate() {
+      try {
+        await fetchJson('/api/actualizar', { method: 'POST' });
+        els.detailOutput.textContent = 'Actualización lanzada correctamente. Refresca el panel en unos segundos.';
+        openModal('detail');
+        await loadAll();
+      } catch (err) {
+        els.detailOutput.textContent = err.message;
+        openModal('detail');
+      }
+    }
+
+    async function loadOptions() {
+      state.options = await fetchJson('/api/capabilities/options');
+      document.getElementById('skill-mode').innerHTML = (state.options.modos_skill || []).map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.nombre)}</option>`).join('');
+      document.getElementById('skill-category').innerHTML = (state.options.categorias_skill || []).map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.nombre)}</option>`).join('');
+    }
+
+    async function loadAll() {
+      const [capabilities, pdfs] = await Promise.all([
+        fetchJson('/api/capabilities'),
+        fetchJson('/api/pdfs'),
+      ]);
+      state.capabilities = capabilities;
+      state.pdfsPayload = pdfs;
+      updateHero(capabilities);
+      updateTopStrip(capabilities, pdfs);
+      renderStats(capabilities, pdfs);
+      renderSkills();
+      renderPdfs();
+      renderResources(capabilities, pdfs);
+    }
+
+    els.skillForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(els.skillForm).entries());
+      try {
+        const result = await fetchJson('/api/skills', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showMsg(els.skillMsg, result.created ? 'Skill creada correctamente.' : 'Skill actualizada correctamente.', 'ok');
+        await loadAll();
+      } catch (err) {
+        showMsg(els.skillMsg, err.message, 'err');
+      }
+    });
+
+    els.pdfForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = new FormData(els.pdfForm);
+      try {
+        const response = await fetch('/api/pdfs/upload', {
+          method: 'POST',
+          body: payload,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        showMsg(els.pdfMsg, result.created ? 'PDF procesado correctamente. Se guardó solo la información extraída.' : 'PDF actualizado correctamente. Se guardó solo la información extraída.', 'ok');
+        await loadAll();
+      } catch (err) {
+        showMsg(els.pdfMsg, err.message, 'err');
+      }
+    });
+
+    (async function init() {
+      applyView();
+      try {
+        await loadOptions();
+        await loadAll();
+      } catch (err) {
+        els.detailOutput.textContent = `No se pudo cargar el panel: ${err.message}`;
+        openModal('detail');
+      }
+    })();
+  </script>
+</body>
+</html>

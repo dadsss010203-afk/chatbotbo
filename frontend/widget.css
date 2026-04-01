@@ -801,47 +801,10 @@ header::after {
   50%       { transform: translateY(-6px); opacity: 1; }
 }
 
-.quick-actions {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-  padding: 10px 11px 0;
-  background: var(--white);
-  border-top: 1px solid rgba(237, 216, 138, 0.5);
-}
-
-.quick-btn {
-  flex: 1 1 calc(50% - 4px);
-  min-width: 0;
-  border: 1.5px solid var(--border);
-  background: linear-gradient(135deg, var(--paper), var(--white));
-  color: var(--b900);
-  border-radius: 12px;
-  padding: 8px 10px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.quick-btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--y500);
-  box-shadow: 0 6px 18px rgba(122, 79, 0, 0.15);
-}
-
-.quick-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
 /* ─── Form Area ─────────────────────────────────── */
 #form-area {
   background: var(--white);
-  border-top: none;
+  border-top: 1.5px solid var(--border);
   padding: 10px 11px 9px;
   flex-shrink: 0;
 }

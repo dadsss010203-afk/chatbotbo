@@ -67,21 +67,61 @@ def reindexar() -> bool:
     `pdfs_contenido.json` está situado en el mismo directorio de datos.
     """
     global SUCURSALES
-    chunks, ids = [], []
+    chunks, ids, metadatas = [], [], []
+
+    try:
+        pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
+        if pdf_refresh.get("reprocesados"):
+            print(
+                "   PDFs reprocesados antes de indexar: "
+                f"{pdf_refresh['reprocesados']} | mejorados: {pdf_refresh['mejorados']} | "
+                f"fallidos: {pdf_refresh['fallidos']}"
+            )
+    except Exception as e:
+        print(f"   Error refrescando PDFs antes del RAG: {e}")
 
     # 1. Texto principal (HTML plano acumulado)
-    c, i = rag.archivo_a_chunks(DATA_FILE, prefijo="txt")
-    chunks += c; ids += i
+    c, i, m = rag.archivo_a_documentos(
+        DATA_FILE,
+        prefijo="txt",
+        metadata_base={
+            "source_type": "web_main",
+            "source_label": "Sitio principal de Correos de Bolivia",
+            "source_path": DATA_FILE,
+        },
+    )
+    chunks += c; ids += i; metadatas += m
 
     # 2. Sucursales
     SUCURSALES = location.cargar_sucursales(SUCURSALES_FILE)
     for idx, s in enumerate(SUCURSALES):
-        chunks.append(location.sucursal_a_texto(s))
-        ids.append(f"suc_{idx}")
+        nombre = s.get("nombre", f"Sucursal {idx + 1}")
+        c, i, m = rag.documento_a_chunks(
+            location.sucursal_a_texto(s),
+            prefijo=f"suc_{idx}",
+            metadata_base={
+                "source_type": "branch",
+                "source_name": nombre,
+                "source_label": nombre,
+                "city": nombre,
+            },
+        )
+        chunks += c; ids += i; metadatas += m
 
     # 3. Secciones del home
     c, i = location.cargar_secciones(SECCIONES_FILE)
-    chunks += c; ids += i
+    for idx, texto in enumerate(c):
+        source_name = i[idx] if idx < len(i) else f"seccion_{idx}"
+        sec_chunks, sec_ids, sec_meta = rag.documento_a_chunks(
+            texto,
+            prefijo=source_name,
+            metadata_base={
+                "source_type": "section",
+                "source_name": source_name,
+                "source_label": source_name.replace("sec_", "").replace("_", " "),
+            },
+        )
+        chunks += sec_chunks; ids += sec_ids; metadatas += sec_meta
 
     # 4. Contenido de PDFs (si existe el JSON generado por el scraper)
     try:
@@ -92,12 +132,24 @@ def reindexar() -> bool:
             for idx, p in enumerate(pdfs):
                 texto = p.get("texto_extraido") or ""
                 if texto:
-                    chunks.append(texto)
-                    ids.append(f"pdf_{idx}")
+                    nombre_pdf = p.get("nombre_archivo") or f"PDF {idx + 1}"
+                    pdf_chunks, pdf_ids, pdf_meta = rag.documento_a_chunks(
+                        texto,
+                        prefijo=f"pdf_{idx}",
+                        metadata_base={
+                            "source_type": "pdf",
+                            "source_name": nombre_pdf,
+                            "source_label": nombre_pdf,
+                            "source_url": p.get("url", ""),
+                            "source_page": p.get("pagina_fuente", ""),
+                            "extraction_method": p.get("metodo_extraccion", ""),
+                        },
+                    )
+                    chunks += pdf_chunks; ids += pdf_ids; metadatas += pdf_meta
     except Exception as e:
         print(f"   Error leyendo PDF JSON: {e}")
 
-    return rag.indexar(chunks, ids)
+    return rag.indexar(chunks, ids, metadatas=metadatas)
 
 
 # ─────────────────────────────────────────────
@@ -117,6 +169,16 @@ def inicializar():
     else:
         print(f" BD lista ({rag.total_chunks()} chunks)")
         SUCURSALES = location.cargar_sucursales(SUCURSALES_FILE)
+        try:
+            pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
+            if pdf_refresh.get("mejorados"):
+                print(
+                    "  PDFs heredados mejorados tras arranque "
+                    f"({pdf_refresh['mejorados']} mejoras) → reindexando..."
+                )
+                reindexar()
+        except Exception as e:
+            print(f"   Error validando PDFs al arrancar: {e}")
 
     updater.iniciar_scheduler(reindexar_fn=reindexar)
     print(f" {NOMBRE} listo en http://localhost:5000\n")
@@ -179,6 +241,7 @@ def chat():
             pregunta = nueva  # añade contexto
 
     t    = idiomas.IDIOMAS[lang]
+    skill_resolution = capabilities.resolve_skills_for_query(pregunta)
 
     consulta_especial = capabilities.detectar_consulta_especial(pregunta)
     if consulta_especial is not None:
@@ -271,6 +334,19 @@ def chat():
             }
         return jsonify(resp_json)
 
+    if not skill_resolution["in_scope"]:
+        respuesta = capabilities.out_of_scope_response()
+        session.agregar_turno(sid, pregunta, respuesta)
+        return jsonify({
+            "response": respuesta,
+            "lang": lang,
+            "skill_resolution": {
+                "in_scope": False,
+                "primary_skill": None,
+                "matched_skills": [],
+            },
+        })
+
     # ── 6. Consulta general → RAG + Ollama
     try:
         contexto = rag.buscar(pregunta)
@@ -278,7 +354,15 @@ def chat():
         return jsonify({"error": f"Error en búsqueda RAG: {e}"}), 500
 
     hora     = session.get_hora_bolivia()
-    sistema  = construir_prompt(t["instruccion"], contexto, hora, t["sin_info"])
+    primary_skill = skill_resolution.get("primary_skill") or {}
+    sistema  = construir_prompt(
+        t["instruccion"],
+        contexto,
+        hora,
+        t["sin_info"],
+        skills_context=capabilities.build_skill_manifest(),
+        skill_name=primary_skill.get("nombre", ""),
+    )
     mensajes = [
         {"role": "system", "content": sistema},
         *session.historial_reciente(sid),
@@ -303,7 +387,15 @@ def chat():
 
         session.agregar_turno(sid, pregunta, respuesta)
         print(f" [{lang}] {len(respuesta)} chars")
-        return jsonify({"response": respuesta, "lang": lang})
+        return jsonify({
+            "response": respuesta,
+            "lang": lang,
+            "skill_resolution": {
+                "in_scope": skill_resolution["in_scope"],
+                "primary_skill": primary_skill.get("id"),
+                "matched_skills": skill_resolution.get("skill_ids", []),
+            },
+        })
 
     except requests.exceptions.Timeout:
         return jsonify({"error": "El modelo tardó demasiado. Intenta de nuevo."}), 504
@@ -469,7 +561,6 @@ def status():
         "idiomas"         : list(idiomas.IDIOMAS.keys()),
         "actualizacion"   : updater.get_estado(),
         "skills"          : estado_cap["skills"],
-        "mcps"            : estado_cap["mcps"],
         "rag"             : estado_cap["rag"],
     })
 
@@ -479,9 +570,41 @@ def listar_capacidades():
     return jsonify(_estado_capacidades())
 
 
-@bp.route("/api/mcps", methods=["GET"])
-def listar_mcps():
-    return jsonify({"mcps": _estado_capacidades()["mcps"]})
+@bp.route("/api/capabilities/options", methods=["GET"])
+def listar_opciones_capacidades():
+    return jsonify(capabilities.management_options())
+
+
+@bp.route("/api/pdfs", methods=["GET"])
+def listar_pdfs():
+    return jsonify({
+        "pdfs": capabilities.listar_pdfs(),
+        "resumen": capabilities.resumen_pdfs(),
+    })
+
+
+@bp.route("/api/pdfs/upload", methods=["POST"])
+def subir_pdf():
+    archivo = request.files.get("file")
+    fuente_url = request.form.get("fuente_url", "")
+    pagina_fuente = request.form.get("pagina_fuente", "")
+    try:
+        resultado = capabilities.guardar_pdf_subido(archivo, fuente_url=fuente_url, pagina_fuente=pagina_fuente)
+        return jsonify(resultado), 201 if resultado.get("created") else 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": f"Error subiendo PDF: {e}"}), 500
+
+
+@bp.route("/api/pdfs/<path:nombre_archivo>", methods=["DELETE"])
+def eliminar_pdf(nombre_archivo: str):
+    try:
+        return jsonify(capabilities.eliminar_pdf(nombre_archivo))
+    except FileNotFoundError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        return jsonify({"error": f"Error eliminando PDF: {e}"}), 500
 
 
 @bp.route("/api/skills", methods=["GET"])
@@ -489,20 +612,23 @@ def listar_skills():
     return jsonify({"skills": _estado_capacidades()["skills"]})
 
 
-@bp.route("/api/mcps/execute", methods=["POST"])
-def ejecutar_mcp():
+@bp.route("/api/skills", methods=["POST"])
+def guardar_skill():
     data = request.get_json(silent=True) or {}
-    mcp_id = (data.get("mcp_id") or "").strip()
-    if not mcp_id:
-        return jsonify({"error": "mcp_id es obligatorio"}), 400
-
     try:
-        resultado = capabilities.execute_mcp(mcp_id, _estado_capacidades())
-        return jsonify(resultado)
+        resultado = capabilities.guardar_skill(data)
+        return jsonify(resultado), 201 if resultado["created"] else 200
     except ValueError as e:
-        return jsonify({"error": str(e)}), 404
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": f"Error ejecutando MCP: {e}"}), 500
+        return jsonify({"error": f"Error guardando skill: {e}"}), 500
+
+
+@bp.route("/api/skills/<skill_id>", methods=["DELETE"])
+def eliminar_skill(skill_id: str):
+    if capabilities.eliminar_skill(skill_id):
+        return jsonify({"ok": True, "id": skill_id})
+    return jsonify({"error": "Skill no encontrada"}), 404
 
 
 @bp.route("/api/actualizar", methods=["POST"])

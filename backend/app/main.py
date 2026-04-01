@@ -44,6 +44,13 @@ def index():
     """Sirve la interfaz principal del chatbot."""
     return send_from_directory(FRONTEND_DIR, "chatbot.html")
 
+
+@app.route("/gestion/capacidades")
+@app.route("/gestion/capacidades/<path:_vista>")
+def gestion_capacidades(_vista=None):
+    """Sirve el panel de gestion de skills, PDFs y recursos del bot."""
+    return send_from_directory(FRONTEND_DIR, "capacidades.html")
+
 @app.route("/widget.js")
 def widget():
     return send_from_directory(FRONTEND_DIR, "widget.js", mimetype="application/javascript")
@@ -100,6 +107,7 @@ def inicializar():
     print("=" * 50)
     print("  Rutas disponibles:")
     print("  GET  /                  → Interfaz del chatbot")
+    print("  GET  /gestion/capacidades → Panel de gestion")
     print("  GET  /widget.js         → Widget embebible")
     print("  GET  /api/welcome       → Mensaje de bienvenida")
     print("  POST /api/chat          → Enviar mensaje")
@@ -107,10 +115,11 @@ def inicializar():
     print("  GET  /api/sucursales    → Lista de sucursales")
     print("  GET  /api/idiomas       → Idiomas disponibles")
     print("  POST /api/reset         → Limpiar historial")
-    print("  GET  /api/capabilities  → Skills, MCPs y estado RAG")
-    print("  GET  /api/mcps          → Lista de MCPs")
-    print("  POST /api/mcps/execute  → Ejecutar MCP interno")
+    print("  GET  /api/capabilities  → Skills y estado RAG")
+    print("  GET  /api/capabilities/options → Opciones para formularios")
     print("  GET  /api/skills        → Lista de skills")
+    print("  POST /api/skills        → Crear o actualizar skill")
+    print("  DELETE /api/skills/<id> → Eliminar skill")
     print("  GET  /api/status        → Estado del sistema")
     print("  POST /api/actualizar    → Forzar actualización")
     print("=" * 50)

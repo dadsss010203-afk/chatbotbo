@@ -31,6 +31,9 @@ class ScraperConfig:
     MAX_PDFS      = 100
     REQUEST_TIMEOUT = 30
     DELAY_REQUESTS  = 0.2
+    PDF_OCR_DPI     = 260
+    PDF_OCR_MAX_PAGES = 20
+    PDF_TEXTO_MINIMO = 120
 
     # ── Headers HTTP
     HEADERS = {

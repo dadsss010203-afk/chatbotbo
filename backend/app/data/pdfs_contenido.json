@@ -450,13 +450,16 @@
     "pagina_fuente": "https://correos.gob.bo/reglamentos"
   },
   {
-    "url": "http://correos.gob.bo/wp-content/uploads/2023/07/10.-Reglamento-Especifico-del-sistema-de-administracion-de-bienes-y-servicios.pdf",
-    "archivo_local": "data\\pdfs_descargados\\10.-Reglamento-Especifico-del-sistema-de-administracion-de-bienes-y-servicios.pdf",
+    "url": "",
+    "archivo_local": "",
     "nombre_archivo": "10.-Reglamento-Especifico-del-sistema-de-administracion-de-bienes-y-servicios.pdf",
-    "tamano_bytes": 5021033,
+    "tamano_bytes": 0,
     "texto_extraido": null,
     "longitud_texto": 0,
-    "pagina_fuente": "https://correos.gob.bo/reglamentos"
+    "metodo_extraccion": null,
+    "pagina_fuente": "",
+    "subido_manual": true,
+    "archivo_guardado": false
   },
   {
     "url": "http://correos.gob.bo/wp-content/uploads/2023/07/3.-Reglamento-Especifico-del-Sistema-de-Contabilidad-Integrada.pdf",

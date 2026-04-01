@@ -430,7 +430,6 @@ def status():
         "idiomas"         : list(idiomas.IDIOMAS.keys()),
         "actualizacion"   : updater.get_estado(),
         "skills"          : estado_cap["skills"],
-        "mcps"            : estado_cap["mcps"],
         "rag"             : estado_cap["rag"],
     })
 
@@ -440,30 +439,9 @@ def listar_capacidades():
     return jsonify(_estado_capacidades())
 
 
-@bp.route("/api/mcps", methods=["GET"])
-def listar_mcps():
-    return jsonify({"mcps": _estado_capacidades()["mcps"]})
-
-
 @bp.route("/api/skills", methods=["GET"])
 def listar_skills():
     return jsonify({"skills": _estado_capacidades()["skills"]})
-
-
-@bp.route("/api/mcps/execute", methods=["POST"])
-def ejecutar_mcp():
-    data = request.get_json(silent=True) or {}
-    mcp_id = (data.get("mcp_id") or "").strip()
-    if not mcp_id:
-        return jsonify({"error": "mcp_id es obligatorio"}), 400
-
-    try:
-        resultado = capabilities.execute_mcp(mcp_id, _estado_capacidades())
-        return jsonify(resultado)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404
-    except Exception as e:
-        return jsonify({"error": f"Error ejecutando MCP: {e}"}), 500
 
 
 @bp.route("/api/actualizar", methods=["POST"])

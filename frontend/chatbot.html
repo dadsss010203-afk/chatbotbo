@@ -146,11 +146,6 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .td:nth-child(2){background:var(--b700);animation-delay:0.18s}
 .td:nth-child(3){background:var(--y500);animation-delay:0.36s}
 @keyframes tdBounce{0%,100%{transform:translateY(0);opacity:0.4}50%{transform:translateY(-6px);opacity:1}}
-.quick-actions{display:flex;gap:7px;flex-wrap:wrap;padding:10px 11px 0;background:var(--white);border-top:1px solid rgba(237,216,138,0.5)}
-.quick-btn{flex:1 1 calc(50% - 4px);min-width:0;border:1.5px solid var(--border);background:linear-gradient(135deg,var(--paper),var(--white));color:var(--b900);border-radius:12px;padding:8px 10px;font-size:0.68rem;font-weight:700;letter-spacing:0.03em;cursor:pointer;transition:all 0.2s}
-.quick-btn:hover{transform:translateY(-1px);border-color:var(--y500);box-shadow:0 6px 18px rgba(122,79,0,0.15)}
-.quick-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none;box-shadow:none}
-
 .scard{background:var(--white);border:1.5px solid var(--border2);border-radius:16px;overflow:hidden;max-width:248px;box-shadow:var(--shd2)}
 .sc-head{background:linear-gradient(135deg,var(--b900),var(--b700));padding:12px 14px;display:flex;align-items:center;gap:10px;position:relative;overflow:hidden}
 .sc-head::after{content:'✦';position:absolute;right:10px;bottom:-10px;font-size:40px;color:rgba(245,166,35,0.20);line-height:1}
@@ -167,7 +162,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .sc-cta:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .sc-cta svg{width:12px;height:12px;fill:var(--b900)}
 
-#form-area{background:var(--white);border-top:none;padding:10px 11px 9px;flex-shrink:0}
+#form-area{background:var(--white);border-top:1.5px solid var(--border);padding:10px 11px 9px;flex-shrink:0}
 #form{display:flex;gap:7px;align-items:center;margin-bottom:5px}
 #input{flex:1;background:var(--cream);border:1.5px solid var(--border);color:var(--ink);padding:9px 13px;border-radius:11px;font-size:0.81rem;font-family:'DM Sans',sans-serif;outline:none;transition:all 0.22s}
 #input:focus{border-color:var(--y500);box-shadow:0 0 0 3px rgba(245,166,35,0.18);background:var(--white)}
@@ -307,13 +302,6 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
     </div>
   </div>
 
-  <div class="quick-actions" aria-label="Acciones del bot">
-    <button type="button" class="quick-btn" onclick="quickAction('generar')">Generar</button>
-    <button type="button" class="quick-btn" onclick="quickAction('mcps')">MCPs</button>
-    <button type="button" class="quick-btn" onclick="quickAction('skills')">Skills</button>
-    <button type="button" class="quick-btn" onclick="quickAction('rag')">Analizar RAG</button>
-  </div>
-
   <div id="form-area">
     <form id="form">
       <input id="input" type="text" placeholder="Escriba su consulta aquí…" autocomplete="off"/>
@@ -351,12 +339,6 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 // ─── ESTADO ───────────────────────────────────
 let chatOpen=false, welcomeLoaded=false, busy=false, ctrl=null, lang='es';
 let translating=false; // flag para evitar traducciones simultáneas
-const QUICK_ACTIONS={
-  generar:'Genera un resumen breve de tus capacidades actuales en este bot.',
-  mcps:'Muestra los MCPs configurados en este bot.',
-  skills:'Muestra las skills configuradas en este bot.',
-  rag:'Analiza el estado del RAG de este bot.'
-};
 
 // ─── TEXTOS POR IDIOMA ────────────────────────
 const TX={
@@ -622,11 +604,6 @@ async function sendMsg(msg){
 }
 
 function suggest(btn){sendMsg(btn.textContent);}
-function quickAction(action){
-  const prompt=QUICK_ACTIONS[action];
-  if(!prompt)return;
-  sendMsg(prompt);
-}
 
 // ─── LIMPIAR CONVERSACIÓN ─────────────────────
 function clearConv(){document.getElementById('confirm-bar').classList.add('open');}

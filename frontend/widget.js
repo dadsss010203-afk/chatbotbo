@@ -114,13 +114,6 @@ let translating = false;
 let ctrl        = null;
 let mapInst     = null;
 
-const QUICK_ACTIONS = {
-  generar: 'Genera un resumen breve de tus capacidades actuales en este bot.',
-  mcps: 'Muestra los MCPs configurados en este bot.',
-  skills: 'Muestra las skills configuradas en este bot.',
-  rag: 'Analiza el estado del RAG de este bot.'
-};
-
 // ─── TEXTOS POR IDIOMA ─────────────────────────────
 const TX = {
   es: {
@@ -394,11 +387,6 @@ function showTyping() {
 
 function removeTyping() { document.getElementById('tyEl')?.remove(); }
 
-function quickAction(action) {
-  const prompt = QUICK_ACTIONS[action];
-  if (!prompt) return;
-  sendMsg(prompt);
-}
 
 // ─── ENVIAR MENSAJE ────────────────────────────────
 async function sendMsg(msg) {
