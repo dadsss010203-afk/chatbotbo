@@ -9,7 +9,39 @@ import re
 import hashlib
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
+
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "FALSE")
+
+try:
+    import posthog  # type: ignore
+
+    _original_capture = getattr(posthog, "capture", None)
+
+    if callable(_original_capture):
+        def _safe_capture(*args, **kwargs):
+            try:
+                return _original_capture(*args, **kwargs)
+            except TypeError:
+                try:
+                    distinct_id = args[0] if len(args) > 0 else kwargs.get("distinct_id")
+                    event = args[1] if len(args) > 1 else kwargs.get("event")
+                    properties = args[2] if len(args) > 2 else kwargs.get("properties")
+                    return _original_capture(
+                        distinct_id=distinct_id,
+                        event=event,
+                        properties=properties,
+                    )
+                except Exception:
+                    return None
+            except Exception:
+                return None
+
+        posthog.capture = _safe_capture
+except Exception:
+    pass
+
 import chromadb
+from chromadb.config import Settings
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
@@ -26,7 +58,9 @@ MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
 #  ESTADO GLOBAL
 # ─────────────────────────────────────────────
 _embedder   = None
+_client     = None
 _collection = None
+_collection_name = None
 
 
 # ─────────────────────────────────────────────
@@ -43,7 +77,7 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
         embedding_model  : nombre del modelo sentence-transformers
         collection_name  : nombre de la colección en ChromaDB (uno por chatbot)
     """
-    global _embedder, _collection
+    global _embedder, _client, _collection, _collection_name
 
     modelo = embedding_model or EMBEDDING_MODEL
     path   = chroma_path     or CHROMA_PATH
@@ -61,11 +95,32 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
     _embedder = SentenceTransformer(modelo, **kwargs)
     print(" Modelo de embeddings cargado (con ignore_mismatched_sizes)")
 
-    client      = chromadb.PersistentClient(path=path)
+    client      = chromadb.PersistentClient(
+        path=path,
+        settings=Settings(anonymized_telemetry=False),
+    )
+    _client = client
+    _collection_name = collection_name
     _collection = client.get_or_create_collection(name=collection_name)
     print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
 
     return _embedder, _collection
+
+
+def reset_collection() -> bool:
+    """Elimina y recrea la colección actual de ChromaDB."""
+    global _collection
+
+    if _client is None or not _collection_name:
+        raise RuntimeError("RAG no inicializado. Llama a rag.inicializar() primero.")
+
+    try:
+        _client.delete_collection(name=_collection_name)
+    except Exception:
+        pass
+
+    _collection = _client.get_or_create_collection(name=_collection_name)
+    return True
 
 
 def get_collection():
@@ -307,6 +362,7 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
 
 def _prioridad_fuente(source_type: str) -> int:
     prioridades = {
+        "history": 5,
         "branch": 5,
         "section": 4,
         "web_main": 4,
@@ -323,6 +379,7 @@ def _formatear_fuente(metadata: dict | None) -> str:
     label = metadata.get("source_label") or metadata.get("source_name") or metadata.get("source_path")
 
     tipo = {
+        "history": "Historia",
         "branch": "Sucursal",
         "section": "Seccion",
         "web_main": "Sitio web",
@@ -335,7 +392,21 @@ def _formatear_fuente(metadata: dict | None) -> str:
     return tipo
 
 
-def buscar(pregunta: str, n_resultados: int = None) -> str:
+def _source_preference_bonus(source_type: str, preferred_source_types: list[str] | None) -> float:
+    if not preferred_source_types:
+        return 0.0
+    try:
+        idx = preferred_source_types.index(source_type or "")
+    except ValueError:
+        return 0.0
+    return max(0.22 - (idx * 0.06), 0.04)
+
+
+def buscar(
+    pregunta: str,
+    n_resultados: int = None,
+    preferred_source_types: list[str] | None = None,
+) -> dict:
     col = get_collection()
     emb = get_embedder()
     n = n_resultados or N_RESULTADOS
@@ -367,8 +438,10 @@ def buscar(pregunta: str, n_resultados: int = None) -> str:
 
         metadata = metadatas[idx] if idx < len(metadatas) else {}
         distance = distances[idx] if idx < len(distances) else 99
+        source_type = (metadata or {}).get("source_type")
         length_penalty = 0.4 if len(texto) > CHUNK_SIZE * 1.4 else 0
-        score = distance - (_prioridad_fuente((metadata or {}).get("source_type")) * 0.08) + length_penalty
+        source_bonus = _source_preference_bonus(source_type, preferred_source_types)
+        score = distance - (_prioridad_fuente(source_type) * 0.08) - source_bonus + length_penalty
 
         candidatos.append(
             {
@@ -393,4 +466,35 @@ def buscar(pregunta: str, n_resultados: int = None) -> str:
     contexto = "\n\n".join(contexto_partes)
     if len(contexto) > MAX_CONTEXT_CHARS:
         contexto = contexto[:MAX_CONTEXT_CHARS].rsplit(" ", 1)[0]
-    return contexto
+
+    sources = []
+    seen_sources = set()
+    for item in seleccionados:
+        metadata = item["metadata"] or {}
+        label = _formatear_fuente(metadata)
+        source_key = (
+            metadata.get("source_type"),
+            metadata.get("source_name"),
+            metadata.get("source_path"),
+            metadata.get("source_url"),
+        )
+        if source_key in seen_sources:
+            continue
+        seen_sources.add(source_key)
+        sources.append(
+            {
+                "label": label,
+                "source_type": metadata.get("source_type", "unknown"),
+                "source_name": metadata.get("source_name") or metadata.get("source_label") or metadata.get("source_path") or "",
+                "source_path": metadata.get("source_path", ""),
+                "source_url": metadata.get("source_url", ""),
+                "source_page": metadata.get("source_page", ""),
+            }
+        )
+
+    primary_source_type = sources[0]["source_type"] if sources else None
+    return {
+        "context": contexto,
+        "sources": sources,
+        "primary_source_type": primary_source_type,
+    }

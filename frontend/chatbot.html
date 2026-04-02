@@ -115,7 +115,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .chip{background:var(--y100);border:1.5px solid var(--border);color:var(--ink2);padding:5px 11px;border-radius:20px;font-size:0.68rem;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;transition:all 0.22s;outline:none}
 .chip:hover{background:var(--b700);border-color:var(--b700);color:#fff;transform:translateY(-2px);box-shadow:0 4px 14px rgba(22,58,128,0.24)}
 
-.msg{display:flex;gap:8px;animation:msgIn 0.28s cubic-bezier(.22,1,.36,1)}
+.msg{display:flex;gap:8px;animation:msgIn 0.28s cubic-bezier(.22,1,.36,1);max-width:100%}
 .msg.u{align-self:flex-end;flex-direction:row-reverse}
 .msg.b{align-self:flex-start}
 @keyframes msgIn{from{opacity:0;transform:translateY(10px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -125,7 +125,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .msg.u .av svg,.msg.b .av svg{width:13px;height:13px}
 .msg.u .av svg{fill:#fff}
 .msg.b .av svg{fill:var(--b900)}
-.bub{ padding: 9px 13px;border-radius: 14px;font-size: 0.81rem;line-height: 1.65; word-wrap: break-word;max-width: 82%;min-width: fit-content;   /* ← AGREGAR */ white-space: pre-wrap; transition: opacity 0.2s;}
+.bub{padding:9px 13px;border-radius:14px;font-size:0.81rem;line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere;display:inline-block;width:fit-content;min-width:0;max-width:min(88%,620px);white-space:pre-wrap;transition:opacity 0.2s}
 .msg.u .bub{background:linear-gradient(135deg,var(--b500),var(--b900));color:#fff;border-bottom-right-radius:3px;box-shadow:0 3px 12px rgba(22,58,128,0.28);font-weight:500}
 .msg.b .bub{background:var(--white);color:var(--ink2);border:1px solid var(--border);border-bottom-left-radius:3px;box-shadow:var(--shd)}
 .bub.farewell{background:var(--b200);color:var(--b900);border:1px solid rgba(22,58,128,0.22);font-style:italic;font-family:'Playfair Display',serif}

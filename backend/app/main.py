@@ -11,9 +11,10 @@ import sys
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
 
-# ── Cargar variables de entorno desde backend/.env
+# ── Cargar variables de entorno priorizando backend/app/.env
 from dotenv import load_dotenv
-load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+load_dotenv(os.path.join(BASE_DIR, "..", ".env"), override=False)
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -120,6 +121,7 @@ def inicializar():
     print("  GET  /api/skills        → Lista de skills")
     print("  POST /api/skills        → Crear o actualizar skill")
     print("  DELETE /api/skills/<id> → Eliminar skill")
+    print("  POST /api/rag/rebuild   → Rebuild limpio del RAG")
     print("  GET  /api/status        → Estado del sistema")
     print("  POST /api/actualizar    → Forzar actualización")
     print("=" * 50)

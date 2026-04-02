@@ -13,6 +13,8 @@ POST /api/actualizar
 
 import sys
 import os
+import threading
+import re
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
@@ -21,6 +23,7 @@ import json
 from flask import Blueprint, request, jsonify
 
 from core import rag, ollama, session, location, idiomas, intents, updater, capabilities
+import tarifas
 
 # intentamos usar biblioteca de traducción local para evitar llamadas a LLM
 try:
@@ -30,8 +33,8 @@ except ImportError:
     GoogleTranslator = None  # type: ignore
     _translator_available = False
 from chatbots.general.config import (
-    NOMBRE, CHROMA_PATH, DATA_FILE, SUCURSALES_FILE, SECCIONES_FILE,
-    construir_prompt,
+    NOMBRE, CHROMA_PATH, DATA_FILE, SUCURSALES_FILE, SECCIONES_FILE, HISTORIA_FILE,
+    construir_prompt, REQUIRE_EVIDENCE,
 )
 
 # ─────────────────────────────────────────────
@@ -40,11 +43,349 @@ from chatbots.general.config import (
 bp = Blueprint("general", __name__)   # sin prefix → rutas en /api/*
 
 SUCURSALES: list = []
+CHATBOT_GENERAL_ONLY = os.environ.get("CHATBOT_GENERAL_ONLY", "false").strip().lower() in ("1", "true", "yes")
+GENERAL_SYSTEM_PROMPT = (
+    "Eres un asistente conversacional general, útil, claro y profesional. "
+    "No afirmes tener acceso a bases de datos, documentos, skills, RAG, PDFs, scraping o contexto institucional "
+    "si no aparecen explícitamente en la conversación. "
+    "Responde solo con conocimiento general del modelo y con lo que diga el usuario en esta charla. "
+    "Mantén respuestas breves, naturales y en el mismo idioma del usuario."
+)
+
+
+def _modo_general_only() -> bool:
+    return CHATBOT_GENERAL_ONLY
+
+
+def _respuesta_chat_vacio(lang: str, pregunta: str) -> str:
+    texto = (pregunta or "").strip().lower()
+    if any(token in texto for token in ("hola", "buenas", "hello", "bonjour", "olá", "ola", "hi")):
+        if lang == "en":
+            return "Hello. This chatbot has no information loaded yet."
+        if lang == "fr":
+            return "Bonjour. Ce chatbot n'a encore aucune information chargée."
+        if lang == "pt":
+            return "Olá. Este chatbot ainda não tem informações carregadas."
+        if lang == "zh":
+            return "您好。这个聊天机器人目前还没有加载任何信息。"
+        if lang == "ru":
+            return "Здравствуйте. В этом чат-боте пока не загружена информация."
+        return "Hola. Este chatbot todavía no tiene información cargada."
+
+    if lang == "en":
+        return "I have no information loaded yet."
+    if lang == "fr":
+        return "Je n'ai encore aucune information chargée."
+    if lang == "pt":
+        return "Ainda não tenho nenhuma informação carregada."
+    if lang == "zh":
+        return "我目前还没有加载任何信息。"
+    if lang == "ru":
+        return "У меня пока нет загруженной информации."
+    return "No tengo información cargada todavía."
+
+
+def _normalizar_busqueda_local(texto: str) -> str:
+    texto = (texto or "").lower().strip()
+    texto = re.sub(r"[^a-z0-9áéíóúñü\s]", " ", texto)
+    texto = re.sub(r"\s+", " ", texto)
+    return texto.strip()
+
+
+def _cargar_contexto_local_minimo() -> list[dict]:
+    fuentes = []
+
+    try:
+        pdfs_path = os.path.join(os.path.dirname(DATA_FILE), "pdfs_contenido.json")
+        if os.path.exists(pdfs_path):
+            with open(pdfs_path, "r", encoding="utf-8") as fh:
+                pdfs = json.load(fh)
+            for item in pdfs:
+                texto = (item.get("texto_extraido") or "").strip()
+                if not texto:
+                    continue
+                fuentes.append({
+                    "source_type": "pdf",
+                    "source_name": item.get("nombre_archivo") or "PDF",
+                    "source_url": item.get("url") or "",
+                    "texto": texto,
+                })
+    except Exception:
+        pass
+
+    try:
+        historia_path = HISTORIA_FILE
+        if historia_path and not os.path.isabs(historia_path):
+            historia_path = os.path.join(os.path.dirname(DATA_FILE), os.path.basename(historia_path))
+        if os.path.exists(historia_path):
+            with open(historia_path, "r", encoding="utf-8") as fh:
+                historia = json.load(fh)
+            for item in historia if isinstance(historia, list) else []:
+                texto = (item.get("contenido") or "").strip()
+                if not texto:
+                    continue
+                fuentes.append({
+                    "source_type": "history",
+                    "source_name": item.get("titulo") or "Historia",
+                    "source_url": item.get("url") or "",
+                    "texto": texto,
+                })
+    except Exception:
+        pass
+
+    try:
+        if os.path.exists(DATA_FILE):
+            with open(DATA_FILE, "r", encoding="utf-8") as fh:
+                texto = fh.read().strip()
+            if texto:
+                fuentes.append({
+                    "source_type": "web_main",
+                    "source_name": "Texto base",
+                    "source_url": "",
+                    "texto": texto,
+                })
+    except Exception:
+        pass
+
+    return fuentes
+
+
+def _buscar_contexto_local_minimo(pregunta: str) -> dict:
+    consulta = _normalizar_busqueda_local(pregunta)
+    palabras = [w for w in consulta.split() if len(w) >= 4]
+    if not palabras:
+        palabras = consulta.split()
+
+    candidatos = []
+    for fuente in _cargar_contexto_local_minimo():
+        texto = fuente["texto"]
+        texto_norm = _normalizar_busqueda_local(texto)
+        score = 0
+        for palabra in palabras:
+            if palabra and palabra in texto_norm:
+                score += 2
+        if consulta and consulta in texto_norm:
+            score += 4
+        if score <= 0:
+            continue
+
+        inicio = 0
+        for palabra in palabras:
+            pos = texto_norm.find(palabra)
+            if pos >= 0:
+                inicio = pos
+                break
+        snippet = texto[max(0, inicio - 220):inicio + 650].strip() or texto[:700].strip()
+        candidatos.append({
+            "score": score,
+            "context": snippet,
+            "source_type": fuente["source_type"],
+            "source_name": fuente["source_name"],
+            "source_url": fuente["source_url"],
+        })
+
+    candidatos.sort(key=lambda item: (-item["score"], item["source_name"]))
+    if not candidatos:
+        return {"context": "", "sources": [], "primary_source_type": None}
+
+    top = candidatos[:2]
+    context = "\n\n".join(item["context"] for item in top if item["context"])
+    sources = [{
+        "label": f"{item['source_type']}: {item['source_name']}",
+        "source_name": item["source_name"],
+        "source_page": "",
+        "source_path": "",
+        "source_type": item["source_type"],
+        "source_url": item["source_url"],
+    } for item in top]
+    return {
+        "context": context,
+        "sources": sources,
+        "primary_source_type": top[0]["source_type"],
+    }
+
+
+def _respuesta_extractiva_local(pregunta: str, contexto: str, lang: str) -> str:
+    consulta = _normalizar_busqueda_local(pregunta)
+    palabras = [w for w in consulta.split() if len(w) >= 4]
+    if not palabras:
+        palabras = consulta.split()
+
+    texto = (contexto or "").strip()
+    if not texto:
+        return _respuesta_chat_vacio(lang, pregunta)
+
+    bloques = [b.strip() for b in re.split(r"\n\s*\n", texto) if b.strip()]
+    candidatos = []
+    for bloque in bloques:
+        bloque_norm = _normalizar_busqueda_local(bloque)
+        score = 0
+        if consulta and consulta in bloque_norm:
+            score += 4
+        for palabra in palabras:
+            if palabra and palabra in bloque_norm:
+                score += 2
+        if score > 0:
+            candidatos.append((score, bloque))
+
+    if not candidatos:
+        return _respuesta_chat_vacio(lang, pregunta)
+
+    candidatos.sort(key=lambda item: -item[0])
+    mejor = candidatos[0][1]
+    lineas = [l.strip() for l in mejor.splitlines() if l.strip() and not l.strip().startswith("--- Página")]
+    if not lineas:
+        return _respuesta_chat_vacio(lang, pregunta)
+
+    texto_lineal = " ".join(lineas).strip()
+    if not texto_lineal:
+        return _respuesta_chat_vacio(lang, pregunta)
+
+    consulta = _normalizar_busqueda_local(pregunta)
+    texto_norm = _normalizar_busqueda_local(texto_lineal)
+    inicio_real = 0
+    if consulta and consulta in texto_norm:
+        inicio_real = texto_norm.find(consulta)
+    else:
+        for palabra in palabras:
+            pos = texto_norm.find(palabra)
+            if pos >= 0:
+                inicio_real = pos
+                break
+
+    ventana_inicio = max(0, inicio_real - 180)
+    ventana_fin = min(len(texto_lineal), inicio_real + 1100)
+    respuesta = texto_lineal[ventana_inicio:ventana_fin].strip()
+
+    if ventana_inicio > 0:
+        respuesta = "... " + respuesta
+    if ventana_fin < len(texto_lineal):
+        respuesta = respuesta.rstrip() + " ..."
+
+    if len(respuesta) > 1200:
+        respuesta = respuesta[:1200].rsplit(" ", 1)[0].strip() + " ..."
+    return respuesta or _respuesta_chat_vacio(lang, pregunta)
+
+
+def _respuesta_tarifaria_directa(tarifa_result: dict, lang: str) -> str:
+    detalle = tarifa_result.get("tariff_result") or {}
+    monto = detalle.get("amount_bs")
+    servicio = detalle.get("service") or "el servicio consultado"
+    peso = detalle.get("weight_g")
+    destino = detalle.get("destination") or "la modalidad indicada"
+    rango = detalle.get("matched_range") or ""
+
+    if monto is None:
+        return _respuesta_chat_vacio(lang, "")
+
+    peso_txt = ""
+    if isinstance(peso, (int, float)):
+        if float(peso) >= 1000:
+            kg = float(peso) / 1000.0
+            peso_txt = f"{kg:.2f}".rstrip("0").rstrip(".") + " kg"
+        else:
+            peso_txt = f"{int(peso) if float(peso).is_integer() else peso} g"
+
+    monto_txt = f"{int(monto) if float(monto).is_integer() else monto}"
+
+    if lang == "en":
+        return (
+            f"The exact cost is Bs {monto_txt} for {servicio}, with a weight of {peso_txt}, "
+            f"under the {destino} column. Applicable range: {rango}."
+        )
+    if lang == "pt":
+        return (
+            f"O custo exato é Bs {monto_txt} para {servicio}, com peso de {peso_txt}, "
+            f"na coluna {destino}. Faixa aplicada: {rango}."
+        )
+    if lang == "fr":
+        return (
+            f"Le coût exact est de Bs {monto_txt} pour {servicio}, avec un poids de {peso_txt}, "
+            f"dans la colonne {destino}. Plage appliquée : {rango}."
+        )
+    if lang == "zh":
+        return (
+            f"准确费用是 Bs {monto_txt}。服务：{servicio}，重量：{peso_txt}，对应栏目：{destino}。适用区间：{rango}。"
+        )
+    if lang == "ru":
+        return (
+            f"Точная стоимость: Bs {monto_txt}. Услуга: {servicio}, вес: {peso_txt}, "
+            f"колонка: {destino}. Применённый диапазон: {rango}."
+        )
+    return (
+        f"El costo exacto es Bs {monto_txt} para {servicio}, con un peso de {peso_txt}, "
+        f"en la columna {destino}. El rango aplicado del tarifario es: {rango}."
+    )
+
+
+def _respuesta_tarifaria_faltante(tarifa_result: dict, lang: str) -> str:
+    contexto = (tarifa_result.get("prompt_context") or "").strip()
+    if not contexto:
+        return _respuesta_chat_vacio(lang, "")
+    if lang == "en":
+        return contexto
+    if lang == "pt":
+        return contexto
+    if lang == "fr":
+        return contexto
+    if lang == "zh":
+        return contexto
+    if lang == "ru":
+        return contexto
+    return contexto
+
+def _extraer_citas_evidencia(respuesta: str) -> list[str]:
+    """
+    Extrae citas entre comillas dobles desde una línea 'EVIDENCIA:'.
+    Devuelve lista vacía si no hay evidencia.
+    """
+    if not respuesta:
+        return []
+    for line in (respuesta or "").splitlines():
+        if line.strip().lower().startswith("evidencia:"):
+            return [q.strip() for q in re.findall(r"\"([^\"]+)\"", line) if q.strip()]
+    return []
+
+
+def _validar_evidencia_en_contexto(citas: list[str], contexto: str) -> bool:
+    if not citas:
+        return False
+    ctx = contexto or ""
+    return all(cita in ctx for cita in citas)
+
+
+def _refresh_pdfs_after_start() -> None:
+    """Revisa PDFs heredados después del arranque para no bloquear Flask."""
+    try:
+        pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
+        if pdf_refresh.get("mejorados"):
+            print(
+                "  PDFs heredados mejorados tras arranque "
+                f"({pdf_refresh['mejorados']} mejoras) → reindexando..."
+            )
+            reindexar()
+        elif pdf_refresh.get("reprocesados"):
+            print(
+                "  PDFs revisados en segundo plano: "
+                f"{pdf_refresh['reprocesados']} reprocesados, "
+                f"{pdf_refresh['mejorados']} mejorados."
+            )
+    except Exception as e:
+        print(f"   Error validando PDFs tras arranque: {e}")
+
+
+def _rag_chunks_seguro() -> int:
+    if _modo_general_only():
+        return 0
+    try:
+        return rag.total_chunks()
+    except Exception:
+        return 0
 
 
 def _estado_capacidades() -> dict:
     return capabilities.get_runtime_capabilities(
-        chunks=rag.total_chunks(),
+        chunks=_rag_chunks_seguro(),
         embedding_model=os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"),
         chroma_path=CHROMA_PATH,
         ollama_ok=ollama.ollama_disponible(),
@@ -149,6 +490,36 @@ def reindexar() -> bool:
     except Exception as e:
         print(f"   Error leyendo PDF JSON: {e}")
 
+    # 5. Historia institucional (si existe el JSON generado por el scraper)
+    try:
+        historia_path = HISTORIA_FILE
+        if historia_path and not os.path.isabs(historia_path):
+            historia_path = os.path.join(os.path.dirname(DATA_FILE), os.path.basename(historia_path))
+        if os.path.exists(historia_path):
+            with open(historia_path, "r", encoding="utf-8") as f:
+                historia = json.load(f)
+            for idx, item in enumerate(historia):
+                if not isinstance(item, dict):
+                    continue
+                contenido = (item.get("contenido") or "").strip()
+                if not contenido:
+                    continue
+                titulo = item.get("titulo") or f"Historia {idx + 1}"
+                hist_chunks, hist_ids, hist_meta = rag.documento_a_chunks(
+                    contenido,
+                    prefijo=f"hist_{idx}",
+                    metadata_base={
+                        "source_type": "history",
+                        "source_name": titulo,
+                        "source_label": titulo,
+                        "source_url": item.get("url", ""),
+                        "years": ", ".join(str(y) for y in item.get("anos_mencionados", [])[:12]),
+                    },
+                )
+                chunks += hist_chunks; ids += hist_ids; metadatas += hist_meta
+    except Exception as e:
+        print(f"   Error leyendo historia institucional: {e}")
+
     return rag.indexar(chunks, ids, metadatas=metadatas)
 
 
@@ -161,6 +532,14 @@ def inicializar():
     global SUCURSALES
     print(f"\n🤖 Iniciando {NOMBRE}...")
 
+    SUCURSALES = location.cargar_sucursales(SUCURSALES_FILE)
+
+    if _modo_general_only():
+        print("  Modo general activo → sin embeddings, sin ChromaDB y sin RAG al arranque")
+        updater.iniciar_scheduler(reindexar_fn=reindexar)
+        print(f" {NOMBRE} listo en http://localhost:5000\n")
+        return
+
     rag.inicializar(chroma_path=CHROMA_PATH, collection_name="general")
 
     if rag.total_chunks() == 0:
@@ -169,16 +548,7 @@ def inicializar():
     else:
         print(f" BD lista ({rag.total_chunks()} chunks)")
         SUCURSALES = location.cargar_sucursales(SUCURSALES_FILE)
-        try:
-            pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
-            if pdf_refresh.get("mejorados"):
-                print(
-                    "  PDFs heredados mejorados tras arranque "
-                    f"({pdf_refresh['mejorados']} mejoras) → reindexando..."
-                )
-                reindexar()
-        except Exception as e:
-            print(f"   Error validando PDFs al arrancar: {e}")
+        threading.Thread(target=_refresh_pdfs_after_start, daemon=True).start()
 
     updater.iniciar_scheduler(reindexar_fn=reindexar)
     print(f" {NOMBRE} listo en http://localhost:5000\n")
@@ -223,6 +593,76 @@ def chat():
             return jsonify({"response": respuesta, "lang": lang})
         except Exception as e:
             return jsonify({"error": f"Error traduciéndose: {e}"}), 500
+
+    if _modo_general_only():
+        tarifa_result = tarifas.resolve_tariff_query(pregunta)
+        if tarifa_result is not None:
+            if tarifa_result.get("mode") == "answer":
+                respuesta = _respuesta_tarifaria_directa(tarifa_result, lang)
+            else:
+                respuesta = _respuesta_tarifaria_faltante(tarifa_result, lang)
+
+            session.agregar_turno(sid, pregunta, respuesta)
+            return jsonify({
+                "response": respuesta,
+                "lang": lang,
+                "general_only": True,
+                "skill_resolution": {
+                    "in_scope": None,
+                    "primary_skill": None,
+                    "matched_skills": [],
+                },
+                "sources": tarifa_result.get("sources", []),
+                "primary_source_type": tarifa_result.get("primary_source_type"),
+                "tariff_result": tarifa_result.get("tariff_result"),
+            })
+
+        local_result = _buscar_contexto_local_minimo(pregunta)
+        contexto = local_result.get("context", "").strip()
+        sistema = (
+            f"CRITICAL LANGUAGE RULE: {idiomas.IDIOMAS[lang]['instruccion']} "
+            f"You MUST respond ONLY in that language.\n\n"
+            "Eres un asistente que razona SOLO con el CONTEXTO LOCAL proporcionado.\n"
+            "Tu tarea es interpretar, resumir y responder con claridad usando exclusivamente ese contenido.\n"
+            "Responde de forma breve, puntual y útil. Prioriza la respuesta directa antes que la explicación larga.\n"
+            "Si la pregunta pide un dato puntual, responde primero con ese dato en una o dos frases.\n"
+            "Solo añade una breve aclaración extra si realmente mejora la comprensión.\n"
+            "No inventes datos, no completes huecos con conocimiento externo y no afirmes nada que no esté sustentado en el contexto.\n"
+            f"Si el contexto no alcanza para responder, di exactamente: \"{_respuesta_chat_vacio(lang, pregunta)}\"\n"
+            "Si el usuario pide una explicación, puedes reorganizar la información y redactarla de forma más clara, "
+            "pero sin salirte del contenido disponible.\n\n"
+            f"CONTEXTO LOCAL:\n{contexto}\n"
+        )
+        mensajes = [
+            {"role": "system", "content": sistema},
+            {"role": "user", "content": pregunta},
+        ]
+
+        try:
+            respuesta = ollama.limpiar_respuesta(ollama.llamar_ollama(mensajes))
+            respuesta_limpia = (respuesta or "").strip()
+            if not respuesta_limpia:
+                respuesta = _respuesta_chat_vacio(lang, pregunta)
+        except Exception:
+            return jsonify({"error": "Error razonando con la IA sobre el contexto local."}), 500
+
+        respuesta = re.sub(r"\s+", " ", (respuesta or "")).strip()
+        if len(respuesta) > 450:
+            respuesta = respuesta[:450].rsplit(" ", 1)[0].strip() + "..."
+
+        session.agregar_turno(sid, pregunta, respuesta)
+        return jsonify({
+            "response": respuesta,
+            "lang": lang,
+            "general_only": True,
+            "skill_resolution": {
+                "in_scope": None,
+                "primary_skill": None,
+                "matched_skills": [],
+            },
+            "sources": local_result.get("sources", []),
+            "primary_source_type": local_result.get("primary_source_type"),
+        })
 
     # si el usuario responde con un pedido corto, reorganizamos la pregunta para
     # no perder el tema anterior. La función `es_pedido_corto` revisa comandos
@@ -347,11 +787,58 @@ def chat():
             },
         })
 
+    tarifa_result = tarifas.resolve_tariff_query(pregunta)
+    if tarifa_result is not None:
+        if tarifa_result.get("mode") == "answer":
+            respuesta = _respuesta_tarifaria_directa(tarifa_result, lang)
+        else:
+            respuesta = _respuesta_tarifaria_faltante(tarifa_result, lang)
+
+        session.agregar_turno(sid, pregunta, respuesta)
+        return jsonify({
+            "response": respuesta,
+            "lang": lang,
+            "skill_resolution": {
+                "in_scope": skill_resolution["in_scope"],
+                "primary_skill": (
+                    (skill_resolution.get("primary_skill") or {}).get("id")
+                    or "calculadora_tarifas"
+                ),
+                "matched_skills": skill_resolution.get("skill_ids", []),
+            },
+            "sources": tarifa_result.get("sources", []),
+            "primary_source_type": tarifa_result.get("primary_source_type"),
+            "tariff_result": tarifa_result.get("tariff_result"),
+        })
+
     # ── 6. Consulta general → RAG + Ollama
     try:
-        contexto = rag.buscar(pregunta)
+        rag_result = rag.buscar(
+            pregunta,
+            preferred_source_types=capabilities.preferred_sources_for_skill(
+                skill_resolution.get("primary_skill")
+            ),
+        )
+        contexto = rag_result.get("context", "")
     except Exception as e:
         return jsonify({"error": f"Error en búsqueda RAG: {e}"}), 500
+
+    sources = rag_result.get("sources", [])
+    valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
+    if not contexto.strip() or not valid_sources:
+        respuesta = t["sin_info"]
+        session.agregar_turno(sid, pregunta, respuesta)
+        return jsonify({
+            "response": respuesta,
+            "lang": lang,
+            "skill_resolution": {
+                "in_scope": skill_resolution["in_scope"],
+                "primary_skill": (skill_resolution.get("primary_skill") or {}).get("id"),
+                "matched_skills": skill_resolution.get("skill_ids", []),
+            },
+            "sources": sources,
+            "primary_source_type": rag_result.get("primary_source_type"),
+        })
 
     hora     = session.get_hora_bolivia()
     primary_skill = skill_resolution.get("primary_skill") or {}
@@ -362,6 +849,8 @@ def chat():
         t["sin_info"],
         skills_context=capabilities.build_skill_manifest(),
         skill_name=primary_skill.get("nombre", ""),
+        skill_description=primary_skill.get("descripcion", ""),
+        skill_triggers=primary_skill.get("trigger", ""),
     )
     mensajes = [
         {"role": "system", "content": sistema},
@@ -373,6 +862,13 @@ def chat():
         print(f" [{lang}] {pregunta[:60]}")
         respuesta = ollama.llamar_ollama(mensajes)
         respuesta = ollama.limpiar_respuesta(respuesta)
+
+        # Guardia anti-alucinación: si se exige evidencia, solo aceptamos la
+        # respuesta si trae 1-2 citas literales que existan en el contexto RAG.
+        if REQUIRE_EVIDENCE:
+            citas = _extraer_citas_evidencia(respuesta)
+            if not _validar_evidencia_en_contexto(citas, contexto):
+                respuesta = t["sin_info"]
 
         # si el modelo no encontró nada relevante a partir del contexto, a
         # veces devuelve simplemente el system prompt o la frase de
@@ -395,6 +891,8 @@ def chat():
                 "primary_skill": primary_skill.get("id"),
                 "matched_skills": skill_resolution.get("skill_ids", []),
             },
+            "sources": rag_result.get("sources", []),
+            "primary_source_type": rag_result.get("primary_source_type"),
         })
 
     except requests.exceptions.Timeout:
@@ -553,7 +1051,7 @@ def status():
     estado_cap = _estado_capacidades()
     return jsonify({
         "status"          : "ok",
-        "chunks"          : rag.total_chunks(),
+        "chunks"          : _rag_chunks_seguro(),
         "modelo"          : os.environ.get("LLM_MODEL", "correos-bot"),
         "ollama"          : ollama.ollama_disponible(),
         "sesiones_activas": session.total_sesiones(),
@@ -562,6 +1060,7 @@ def status():
         "actualizacion"   : updater.get_estado(),
         "skills"          : estado_cap["skills"],
         "rag"             : estado_cap["rag"],
+        "general_only"    : _modo_general_only(),
     })
 
 
@@ -581,6 +1080,11 @@ def listar_pdfs():
         "pdfs": capabilities.listar_pdfs(),
         "resumen": capabilities.resumen_pdfs(),
     })
+
+
+@bp.route("/api/scraping", methods=["GET"])
+def scraping_info():
+    return jsonify(capabilities.get_scraping_summary())
 
 
 @bp.route("/api/pdfs/upload", methods=["POST"])
@@ -639,6 +1143,23 @@ def actualizar():
     return jsonify({"ok": True, "mensaje": "  Actualización iniciada."})
 
 
+@bp.route("/api/rag/rebuild", methods=["POST"])
+def rebuild_rag():
+    try:
+        print("  Iniciando rebuild limpio del RAG...")
+        exito = reindexar()
+        if not exito:
+            return jsonify({"ok": False, "error": "No se pudieron indexar documentos en el rebuild limpio del RAG."}), 500
+        print(f"  Rebuild limpio del RAG completado ({rag.total_chunks()} chunks).")
+        return jsonify({
+            "ok": True,
+            "mensaje": "Rebuild limpio del RAG completado.",
+            "chunks": rag.total_chunks(),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Error en rebuild limpio del RAG: {e}"}), 500
+
+
 # ─────────────────────────────────────────────
 #  COMPATIBILIDAD / API GENÉRICA
 # ─────────────────────────────────────────────
@@ -657,6 +1178,7 @@ def api_root():
     - GET  /api?action=idiomas     → lista de idiomas
     - POST /api {"action":"translate", ...} → translate_bulk
     - POST /api {"action":"reset"}        → reset
+    - POST /api {"action":"rebuild_rag"}  → rebuild_rag
     - POST /api {"message":...}            → chat
     """
     if request.method == "GET":
@@ -675,6 +1197,8 @@ def api_root():
         return translate_bulk()
     if act == "reset":
         return reset()
+    if act == "rebuild_rag":
+        return rebuild_rag()
     # si el cuerpo contiene 'message' asumimos chat
     if "message" in data:
         return chat()

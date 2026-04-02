@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import unicodedata
+import hashlib
 
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -17,6 +18,13 @@ SKILLS_FILE = os.environ.get("SKILLS_FILE", os.path.join(DATA_DIR, "skills.json"
 PDFS_FILE = os.environ.get("PDFS_FILE", os.path.join(DATA_DIR, "pdfs_contenido.json"))
 PDF_DIR = os.environ.get("PDF_DIR", os.path.join(DATA_DIR, "pdfs_descargados"))
 PDF_REPROCESS_MIN_TEXT = int(os.environ.get("PDF_REPROCESS_MIN_TEXT", "180"))
+SCRAPER_STATS_FILE = os.path.join(DATA_DIR, "estadisticas.json")
+SCRAPER_APLICATIVOS_FILE = os.path.join(DATA_DIR, "aplicativos_detalle.json")
+SCRAPER_SERVICIOS_FILE = os.path.join(DATA_DIR, "aplicaciones_servicios.json")
+SCRAPER_HISTORIA_FILE = os.path.join(DATA_DIR, "historia_institucional.json")
+SCRAPER_NOTICIAS_FILE = os.path.join(DATA_DIR, "noticias_eventos.json")
+SCRAPER_SECCIONES_FILE = os.path.join(DATA_DIR, "secciones_home.json")
+SCRAPER_SUCURSALES_FILE = os.path.join(DATA_DIR, "sucursales_contacto.json")
 
 try:
     import pdfplumber
@@ -352,6 +360,16 @@ def _file_stats(path: str) -> dict:
     }
 
 
+def _pdf_record_id(item: dict) -> str:
+    base = "||".join([
+        str(item.get("nombre_archivo") or ""),
+        str(item.get("url") or ""),
+        str(item.get("pagina_fuente") or ""),
+        str(item.get("archivo_local") or ""),
+    ])
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()[:16]
+
+
 def listar_skills() -> list[dict]:
     skills = [_normalizar_skill(item) for item in _load_catalog(SKILLS_FILE, DEFAULT_SKILLS)]
     return sorted(
@@ -385,11 +403,19 @@ def _normalizar_skill(item: dict) -> dict:
     if isinstance(activa, str):
         activa = activa.strip().lower() not in ("false", "0", "no", "off", "")
     skill["activa"] = bool(activa)
-    skill["trigger_tokens"] = [
-        token.strip()
-        for token in re.split(r"[,;|]", _normalizar_match_text(skill.get("trigger") or ""))
-        if token.strip()
-    ]
+    raw_tokens = re.split(r"[,;|]", skill.get("trigger") or "")
+    trigger_tokens = []
+    trigger_words = set()
+    for token in raw_tokens:
+        limpio = _normalizar_match_text(token)
+        if not limpio:
+            continue
+        trigger_tokens.append(limpio)
+        for word in limpio.split():
+            if len(word) >= 4:
+                trigger_words.add(word)
+    skill["trigger_tokens"] = trigger_tokens
+    skill["trigger_words"] = sorted(trigger_words)
     return skill
 
 
@@ -399,6 +425,7 @@ def get_active_skills() -> list[dict]:
 
 def resolve_skills_for_query(pregunta: str) -> dict:
     texto = _normalizar_match_text(pregunta)
+    palabras = set(texto.split())
     skills = get_active_skills()
     matches = []
 
@@ -406,12 +433,23 @@ def resolve_skills_for_query(pregunta: str) -> dict:
         score = 0
         for token in skill.get("trigger_tokens", []):
             if token and token in texto:
-                score += max(1, len(token.split()))
+                score += max(3, len(token.split()) * 2)
+                continue
+            token_words = [word for word in token.split() if len(word) >= 4]
+            if token_words and all(word in palabras for word in token_words):
+                score += max(2, len(token_words))
+        for word in skill.get("trigger_words", []):
+            if word in palabras:
+                score += 1
         if skill["id"] == "oficinas_contacto" and any(word in texto for word in ("donde", "direccion", "ubicacion", "horario", "telefono")):
             score += 2
-        if skill["id"] == "rastreo_envios" and any(word in texto for word in ("codigo", "guia", "tracking", "seguimiento")):
-            score += 2
+        if skill["id"] == "rastreo_envios" and any(word in texto for word in ("codigo", "guia", "tracking", "seguimiento", "rastreo", "envio", "paquete")):
+            score += 3
         if skill["id"] == "calculadora_tarifas" and any(word in texto for word in ("cuanto cuesta", "cotizacion", "peso")):
+            score += 2
+        if skill["id"] == "servicios_correos" and any(word in texto for word in ("servicio", "ems", "certificado", "ordinario", "encomienda")):
+            score += 2
+        if skill["id"] == "reclamos_quejas" and any(word in texto for word in ("reclamo", "queja", "demora", "extraviado", "perdido")):
             score += 2
         if score > 0:
             item = dict(skill)
@@ -419,6 +457,19 @@ def resolve_skills_for_query(pregunta: str) -> dict:
             matches.append(item)
 
     matches.sort(key=lambda item: (-item["match_score"], -(item.get("prioridad", 3)), item.get("nombre", "")))
+    if matches:
+        top_score = matches[0]["match_score"]
+        filtered = []
+        for idx, item in enumerate(matches):
+            if idx == 0:
+                filtered.append(item)
+                continue
+            if len(filtered) >= 2:
+                break
+            score_gap = top_score - item["match_score"]
+            if item["match_score"] >= 7 and score_gap <= 3:
+                filtered.append(item)
+        matches = filtered
     in_scope = bool(matches) or any(token in texto.split() for token in SKILL_SCOPE_KEYWORDS) or "correos" in texto or "agbc" in texto
 
     return {
@@ -445,6 +496,26 @@ def out_of_scope_response() -> str:
     return OUT_OF_SCOPE_SAMPLES
 
 
+def preferred_sources_for_skill(skill: dict | None) -> list[str]:
+    if not skill:
+        return ["web_main", "section", "branch", "history", "pdf"]
+
+    skill_id = skill.get("id")
+    categoria = skill.get("categoria")
+
+    if skill_id == "historia_correos_bolivia":
+        return ["history", "pdf", "section", "web_main", "branch"]
+    if skill_id == "filatelia_boliviana" or categoria == "documental":
+        return ["pdf", "history", "section", "web_main", "branch"]
+    if skill_id == "oficinas_contacto":
+        return ["branch", "web_main", "section", "history", "pdf"]
+    if skill_id in {"rastreo_envios", "calculadora_tarifas", "servicios_correos", "guia_envio_correcto", "reclamos_quejas"}:
+        return ["web_main", "section", "pdf", "branch", "history"]
+    if skill_id == "estado_plataforma":
+        return ["section", "web_main", "pdf", "branch", "history"]
+    return ["web_main", "section", "branch", "history", "pdf"]
+
+
 def listar_pdfs() -> list[dict]:
     pdfs = _load_catalog(PDFS_FILE, [])
     salida = []
@@ -460,6 +531,7 @@ def listar_pdfs() -> list[dict]:
         if not longitud and pdf.get("texto_extraido"):
             longitud = len(pdf["texto_extraido"])
         pdf["nombre_archivo"] = nombre_archivo
+        pdf["registro_id"] = _pdf_record_id(pdf)
         pdf["archivo_local"] = archivo_local
         pdf["archivo_existe"] = existe
         pdf["ruta_real"] = ruta_real if ruta_real else None
@@ -492,6 +564,73 @@ def _dir_size_kb(path: str) -> float:
                 if os.path.isfile(full):
                     total += os.path.getsize(full)
     return round(total / 1024, 2) if total else 0
+
+
+def get_scraping_summary() -> dict:
+    stats = _load_catalog(SCRAPER_STATS_FILE, {}) if SCRAPER_STATS_FILE.endswith(".json") else {}
+    if not isinstance(stats, dict):
+        stats = {}
+
+    aplicativos_raw = _load_catalog(SCRAPER_APLICATIVOS_FILE, {})
+    servicios_raw = _load_catalog(SCRAPER_SERVICIOS_FILE, {})
+    historia_raw = _load_catalog(SCRAPER_HISTORIA_FILE, [])
+    noticias_raw = _load_catalog(SCRAPER_NOTICIAS_FILE, [])
+    secciones_raw = _load_catalog(SCRAPER_SECCIONES_FILE, {})
+    sucursales_raw = _load_catalog(SCRAPER_SUCURSALES_FILE, [])
+
+    aplicativos_detalle = aplicativos_raw.get("detalle", []) if isinstance(aplicativos_raw, dict) else []
+    aplicativos_resumen = aplicativos_raw.get("resumen", []) if isinstance(aplicativos_raw, dict) else []
+    servicios = servicios_raw.get("servicios", []) if isinstance(servicios_raw, dict) else []
+    aplicaciones = servicios_raw.get("aplicaciones", []) if isinstance(servicios_raw, dict) else []
+    herramientas = servicios_raw.get("herramientas", []) if isinstance(servicios_raw, dict) else []
+    enlaces_externos = servicios_raw.get("enlaces_externos", []) if isinstance(servicios_raw, dict) else []
+
+    return {
+        "stats": stats,
+        "counts": {
+            "paginas_exitosas": stats.get("paginas_exitosas", 0),
+            "paginas_fallidas": stats.get("paginas_fallidas", 0),
+            "caracteres_extraidos": stats.get("caracteres_extraidos", 0),
+            "sucursales": len(sucursales_raw) if isinstance(sucursales_raw, list) else 0,
+            "secciones": len(secciones_raw) if isinstance(secciones_raw, dict) else 0,
+            "aplicativos": len(aplicativos_detalle),
+            "aplicativos_resumen": len(aplicativos_resumen),
+            "servicios": len(servicios),
+            "aplicaciones": len(aplicaciones),
+            "herramientas": len(herramientas),
+            "noticias": len(noticias_raw) if isinstance(noticias_raw, list) else 0,
+            "historia_items": len(historia_raw) if isinstance(historia_raw, list) else 0,
+            "enlaces_externos": len(enlaces_externos),
+            "pdfs": len(_load_catalog(PDFS_FILE, [])),
+        },
+        "samples": {
+            "secciones": list(secciones_raw.keys())[:8] if isinstance(secciones_raw, dict) else [],
+            "aplicativos": [
+                item.get("nombre", "")
+                for item in aplicativos_resumen[:8]
+                if isinstance(item, dict)
+            ],
+            "servicios": [
+                item.get("nombre", "")
+                for item in servicios[:8]
+                if isinstance(item, dict)
+            ],
+            "noticias": [
+                item.get("titulo", "")
+                for item in noticias_raw[:6]
+                if isinstance(item, dict)
+            ],
+        },
+        "files": {
+            "estadisticas": _file_stats(SCRAPER_STATS_FILE),
+            "aplicativos": _file_stats(SCRAPER_APLICATIVOS_FILE),
+            "servicios": _file_stats(SCRAPER_SERVICIOS_FILE),
+            "historia": _file_stats(SCRAPER_HISTORIA_FILE),
+            "noticias": _file_stats(SCRAPER_NOTICIAS_FILE),
+            "secciones": _file_stats(SCRAPER_SECCIONES_FILE),
+            "sucursales": _file_stats(SCRAPER_SUCURSALES_FILE),
+        },
+    }
 
 
 def resumen_rag(chunks: int, embedding_model: str, chroma_path: str) -> dict:
@@ -824,7 +963,7 @@ def eliminar_pdf(nombre_archivo: str) -> dict:
     objetivo = None
     restantes = []
     for item in pdfs:
-        if item.get("nombre_archivo") == nombre_archivo:
+        if item.get("registro_id") == nombre_archivo or item.get("nombre_archivo") == nombre_archivo:
             objetivo = item
             continue
         limpio = _clean_pdf_entry(item)

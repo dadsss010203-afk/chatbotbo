@@ -15,6 +15,49 @@ LLM_MODEL      = os.environ.get("LLM_MODEL",         "correos-bot")
 OLLAMA_URL     = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
 OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except Exception:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return float(raw)
+    except Exception:
+        return default
+
+
+def _default_options() -> dict:
+    """
+    Opciones por defecto (configurables por variables de entorno).
+
+    Nota: `num_ctx` alto ayuda a no truncar instrucciones + contexto RAG,
+    lo cual reduce alucinaciones.
+    """
+    seed = os.environ.get("OLLAMA_SEED")
+    options = {
+        "num_predict": _env_int("OLLAMA_NUM_PREDICT", 200),
+        "temperature": _env_float("OLLAMA_TEMPERATURE", 0.0),
+        "num_ctx": _env_int("OLLAMA_NUM_CTX", 4096),
+        "repeat_penalty": _env_float("OLLAMA_REPEAT_PENALTY", 1.1),
+        "top_p": _env_float("OLLAMA_TOP_P", 0.7),
+        "top_k": _env_int("OLLAMA_TOP_K", 40),
+    }
+    if seed is not None and seed != "":
+        try:
+            options["seed"] = int(seed)
+        except Exception:
+            pass
+    return options
+
 
 # ─────────────────────────────────────────────
 #  LLAMADA AL MODELO
@@ -45,13 +88,7 @@ def llamar_ollama(
         "model"   : modelo or LLM_MODEL,
         "messages": mensajes,
         "stream"  : False,
-        "options" : opciones or {
-            "num_predict"   : 200,
-            "temperature"   : 0,
-            "num_ctx"       : 1500,
-            "repeat_penalty": 1.1,
-            "top_p"         : 0.9,
-        },
+        "options" : {**_default_options(), **(opciones or {})},
     }
 
     resp = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)

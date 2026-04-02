@@ -647,6 +647,7 @@ header::after {
   display: flex;
   gap: 8px;
   animation: msgIn 0.28s cubic-bezier(.22,1,.36,1);
+  max-width: 100%;
 }
 
 .msg.u {
@@ -687,8 +688,11 @@ header::after {
   font-size: 0.81rem;
   line-height: 1.65;
   word-wrap: break-word;
-  max-width: 82%;
-  min-width: fit-content;   /* ← AGREGAR */
+  overflow-wrap: anywhere;
+  display: inline-block;
+  width: fit-content;
+  min-width: 0;
+  max-width: min(88%, 620px);
   white-space: pre-wrap;
   transition: opacity 0.2s;
 }

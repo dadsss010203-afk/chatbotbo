@@ -183,6 +183,7 @@
       width:min(760px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:28px;
       border:1px solid rgba(231,208,140,.86);box-shadow:0 34px 90px rgba(11,31,78,.24);padding:22px
     }
+    .modal-card.detail-wide{width:min(980px,96vw)}
     .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
     .modal-head h4{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:1.45rem}
     .modal-head p{margin:6px 0 0;color:var(--ink-soft);line-height:1.7}
@@ -198,6 +199,30 @@
     .msg.show{display:block}
     .msg.ok{background:rgba(47,143,78,.10);color:var(--ok);border:1px solid rgba(47,143,78,.22)}
     .msg.err{background:rgba(180,66,49,.09);color:var(--danger);border:1px solid rgba(180,66,49,.18)}
+    .detail-layout{display:grid;gap:16px}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .detail-card{background:#fffdf7;border:1px solid rgba(231,208,140,.9);border-radius:18px;padding:16px}
+    .detail-card h5{margin:0 0 10px;color:var(--navy-900);font-size:1rem}
+    .detail-line{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px dashed rgba(122,79,0,.12);font-size:.9rem}
+    .detail-line span:first-child{color:var(--ink-faint)}
+    .detail-line strong{color:var(--ink);text-align:right;word-break:break-word}
+    .detail-text-wrap{background:#fff;border:1px solid rgba(231,208,140,.9);border-radius:18px;padding:0;overflow:hidden}
+    .detail-text-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;background:linear-gradient(180deg,#fff7de 0%,#fff1c0 100%);border-bottom:1px solid rgba(231,208,140,.9)}
+    .detail-text-head h5{margin:0;color:var(--navy-900);font-size:1rem}
+    .detail-text-meta{font-size:.82rem;color:var(--ink-faint)}
+    .detail-text{
+      margin:0;
+      padding:18px;
+      max-height:48vh;
+      overflow:auto;
+      background:#fffef9;
+      color:var(--ink);
+      font: 0.92rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+    .detail-empty{padding:20px;color:var(--ink-soft);line-height:1.7}
     .hidden{display:none!important}
     .view-section{display:none}
     .view-section.active{display:block}
@@ -219,6 +244,7 @@
       .top-strip,
       .section-summary,
       .stats,.resource-grid{grid-template-columns:1fr}
+      .detail-grid{grid-template-columns:1fr}
       .search{min-width:100%}
       th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){display:none}
     }
@@ -235,6 +261,7 @@
         <a class="menu-btn" data-view="overview" href="/gestion/capacidades">Resumen<small>Estado general del sistema</small></a>
         <a class="menu-btn" data-view="skills" href="/gestion/capacidades/skills">Skills<small>Capacidades funcionales</small></a>
         <a class="menu-btn" data-view="pdfs" href="/gestion/capacidades/pdfs">PDFs<small>Extracción y limpieza</small></a>
+        <a class="menu-btn" data-view="scraping" href="/gestion/capacidades/scraping">Web Scraping<small>Contenido recolectado del sitio</small></a>
         <a class="menu-btn" data-view="resources" href="/gestion/capacidades/recursos">Recursos IA<small>Modelos, rutas y configuración</small></a>
       </nav>
       <div class="side-actions">
@@ -263,6 +290,7 @@
           <div class="hero-actions">
             <button class="btn btn-primary" type="button" onclick="loadAll()">Actualizar panel</button>
             <button class="btn btn-primary" type="button" onclick="triggerUpdate()">Actualizar datos IA</button>
+            <button class="btn btn-secondary" type="button" onclick="rebuildRag()">Rebuild limpio RAG</button>
             <button class="btn btn-secondary" type="button" id="hero-create-skill" onclick="openModal('skill')">Nueva Skill</button>
           </div>
         </div>
@@ -332,6 +360,17 @@
           </table>
           <div class="table-footer"><span id="pdfs-count">0 registros</span></div>
         </div>
+      </section>
+
+      <section class="section view-section" id="view-scraping">
+        <div class="section-head">
+          <div>
+            <h3>Web Scraping</h3>
+            <p>Resumen del contenido recolectado desde la web de Correos de Bolivia: páginas, noticias, aplicativos, servicios, secciones y archivos generados.</p>
+          </div>
+        </div>
+        <div class="section-summary" id="scraping-summary"></div>
+        <div class="resource-grid" id="scraping-grid"></div>
       </section>
 
       <section class="section view-section" id="view-resources">
@@ -420,7 +459,9 @@
       </form>
 
       <div id="detail-panel" class="hidden">
-        <pre id="detail-output">Sin detalle cargado.</pre>
+        <div id="detail-output" class="detail-layout">
+          <div class="detail-empty">Sin detalle cargado.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -431,6 +472,7 @@
     const state = {
       capabilities: null,
       pdfsPayload: null,
+      scrapingPayload: null,
       options: null,
       currentModal: null,
       pdfsDataTable: null,
@@ -454,6 +496,7 @@
       topCardUpdate: document.getElementById('top-card-update'),
       skillsSummary: document.getElementById('skills-summary'),
       pdfsSummary: document.getElementById('pdfs-summary'),
+      scrapingSummary: document.getElementById('scraping-summary'),
       skillMsg: document.getElementById('skill-msg'),
       pdfMsg: document.getElementById('pdf-msg'),
       heroRuntime: document.getElementById('hero-runtime'),
@@ -463,6 +506,7 @@
       skillsCount: document.getElementById('skills-count'),
       pdfsCount: document.getElementById('pdfs-count'),
       resourcesGrid: document.getElementById('resources-grid'),
+      scrapingGrid: document.getElementById('scraping-grid'),
       skillMode: document.getElementById('skill-mode'),
       skillCategory: document.getElementById('skill-category'),
       heroCreateSkill: document.getElementById('hero-create-skill'),
@@ -470,6 +514,7 @@
         overview: document.getElementById('view-overview-stats'),
         skills: document.getElementById('view-skills'),
         pdfs: document.getElementById('view-pdfs'),
+        scraping: document.getElementById('view-scraping'),
         resources: document.getElementById('view-resources'),
       }
     };
@@ -488,6 +533,11 @@
       pdfs: {
         title: 'Gestión de PDFs',
         description: 'Supervisa los PDFs descargados por el scraping, el estado de extracción y la limpieza documental del RAG.',
+        showSkillButton: false,
+      },
+      scraping: {
+        title: 'Información de Web Scraping',
+        description: 'Consulta el estado del scraping, el volumen recolectado y muestras del contenido obtenido desde la web institucional.',
         showSkillButton: false,
       },
       resources: {
@@ -661,7 +711,7 @@
           <td>
             <div class="table-actions">
               <button class="mini-btn mini-soft" type="button" onclick="showPdfDetail('${escapeHtml(item.nombre_archivo)}')">Detalle</button>
-              <button class="mini-btn mini-danger" type="button" onclick="deletePdf('${escapeHtml(item.nombre_archivo)}')">Eliminar</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deletePdf('${escapeHtml(item.registro_id || item.nombre_archivo)}','${escapeHtml(item.nombre_archivo)}')">Eliminar</button>
             </div>
           </td>
         </tr>
@@ -673,6 +723,76 @@
         { label: 'Sin texto', value: pdfs.filter(item => !item.texto_disponible).length, note: 'Candidatos a reprocesamiento u OCR.' },
       ]);
       setupPdfsDataTable();
+    }
+
+    function renderScraping() {
+      const payload = state.scrapingPayload || {};
+      const counts = payload.counts || {};
+      const stats = payload.stats || {};
+      const samples = payload.samples || {};
+      const files = payload.files || {};
+
+      renderSummaryCards(els.scrapingSummary, [
+        { label: 'Páginas OK', value: counts.paginas_exitosas ?? 0, note: 'Páginas procesadas correctamente durante el scraping.' },
+        { label: 'Páginas fallidas', value: counts.paginas_fallidas ?? 0, note: 'URLs que fallaron o no pudieron procesarse.' },
+        { label: 'Servicios', value: counts.servicios ?? 0, note: 'Servicios detectados desde páginas y módulos.' },
+        { label: 'Noticias', value: counts.noticias ?? 0, note: 'Noticias y eventos identificados en el sitio.' },
+        { label: 'Aplicativos', value: counts.aplicativos ?? 0, note: 'Aplicativos específicos procesados por el scraper.' },
+        { label: 'Caracteres extraídos', value: counts.caracteres_extraidos ?? 0, note: 'Volumen bruto de texto incorporado desde la web.' },
+      ]);
+
+      const cards = [
+        {
+          title: 'Ejecución',
+          lines: [
+            ['Inicio', stats.inicio || '—'],
+            ['Fin', stats.fin || '—'],
+            ['Duración', `${Math.round(Number(stats.duracion_segundos || 0))} s`],
+            ['Historia', stats.historia_encontrada ? 'Sí' : 'No'],
+          ],
+        },
+        {
+          title: 'Cobertura',
+          lines: [
+            ['Sucursales', counts.sucursales ?? 0],
+            ['Secciones', counts.secciones ?? 0],
+            ['Aplicaciones', counts.aplicaciones ?? 0],
+            ['Herramientas', counts.herramientas ?? 0],
+          ],
+        },
+        {
+          title: 'Muestras',
+          lines: [
+            ['Secciones', (samples.secciones || []).slice(0, 3).join(' | ') || '—'],
+            ['Aplicativos', (samples.aplicativos || []).slice(0, 3).join(' | ') || '—'],
+            ['Servicios', (samples.servicios || []).slice(0, 3).join(' | ') || '—'],
+            ['Noticias', (samples.noticias || []).slice(0, 2).join(' | ') || '—'],
+          ],
+        },
+        {
+          title: 'Archivos',
+          lines: [
+            ['Estadísticas', files.estadisticas?.exists ? 'Sí' : 'No'],
+            ['Aplicativos', files.aplicativos?.exists ? 'Sí' : 'No'],
+            ['Servicios', files.servicios?.exists ? 'Sí' : 'No'],
+            ['Noticias', files.noticias?.exists ? 'Sí' : 'No'],
+          ],
+          note: files.estadisticas?.path || '—',
+        },
+      ];
+
+      els.scrapingGrid.innerHTML = cards.map(card => `
+        <div class="resource-card">
+          <h4>${escapeHtml(card.title)}</h4>
+          ${card.lines.map(line => `
+            <div class="resource-line">
+              <span>${escapeHtml(line[0])}</span>
+              <strong>${escapeHtml(line[1])}</strong>
+            </div>
+          `).join('')}
+          ${card.note ? `<div class="resource-note">${escapeHtml(card.note)}</div>` : ''}
+        </div>
+      `).join('');
     }
 
     function setupGenericDataTable(selector, label, lastColumnIndex) {
@@ -835,6 +955,7 @@
 
     function openModal(type) {
       state.currentModal = type;
+      els.modal.querySelector('#modal-card').classList.toggle('detail-wide', type === 'detail');
       els.skillForm.classList.add('hidden');
       els.pdfForm.classList.add('hidden');
       els.detailPanel.classList.add('hidden');
@@ -876,7 +997,41 @@
 
     function showPdfDetail(nombreArchivo) {
       const item = (state.pdfsPayload?.pdfs || []).find(entry => entry.nombre_archivo === nombreArchivo);
-      els.detailOutput.textContent = item ? JSON.stringify(item, null, 2) : 'PDF no encontrado';
+      if (!item) {
+        els.detailOutput.innerHTML = `<div class="detail-empty">PDF no encontrado.</div>`;
+        openModal('detail');
+        return;
+      }
+      const texto = item.texto_extraido || '';
+      const textoPreview = texto
+        ? escapeHtml(texto)
+        : 'No hay texto extraído disponible para este PDF.';
+      els.detailOutput.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h5>Documento</h5>
+            <div class="detail-line"><span>Archivo</span><strong>${escapeHtml(item.nombre_archivo || '—')}</strong></div>
+            <div class="detail-line"><span>Estado</span><strong>${escapeHtml(item.estado_extraccion || '—')}</strong></div>
+            <div class="detail-line"><span>Método</span><strong>${escapeHtml(item.metodo_extraccion || 'sin método')}</strong></div>
+            <div class="detail-line"><span>Texto extraído</span><strong>${escapeHtml(String(item.longitud_texto || 0))} chars</strong></div>
+            <div class="detail-line"><span>Tamaño</span><strong>${escapeHtml(String(item.tamano_bytes || 0))} bytes</strong></div>
+          </div>
+          <div class="detail-card">
+            <h5>Origen</h5>
+            <div class="detail-line"><span>Página fuente</span><strong>${escapeHtml(item.pagina_fuente || '—')}</strong></div>
+            <div class="detail-line"><span>URL</span><strong>${escapeHtml(item.url || '—')}</strong></div>
+            <div class="detail-line"><span>Guardado físico</span><strong>${item.archivo_guardado === false ? 'No' : 'Sí'}</strong></div>
+            <div class="detail-line"><span>Registro</span><strong>${escapeHtml(item.registro_id || '—')}</strong></div>
+          </div>
+        </div>
+        <div class="detail-text-wrap">
+          <div class="detail-text-head">
+            <h5>Texto extraído</h5>
+            <span class="detail-text-meta">${escapeHtml(item.texto_disponible ? 'Contenido disponible para revisión' : 'Sin contenido utilizable')}</span>
+          </div>
+          <pre class="detail-text">${textoPreview}</pre>
+        </div>
+      `;
       openModal('detail');
     }
 
@@ -890,10 +1045,10 @@
       }
     }
 
-    async function deletePdf(nombreArchivo) {
-      if (!confirm(`Eliminar PDF ${nombreArchivo}?`)) return;
+    async function deletePdf(registroId, nombreArchivo) {
+      if (!confirm(`Eliminar registro PDF ${nombreArchivo || registroId}?`)) return;
       try {
-        await fetchJson(`/api/pdfs/${encodeURIComponent(nombreArchivo)}`, { method: 'DELETE' });
+        await fetchJson(`/api/pdfs/${encodeURIComponent(registroId)}`, { method: 'DELETE' });
         await loadAll();
       } catch (err) {
         alert(err.message);
@@ -912,6 +1067,19 @@
       }
     }
 
+    async function rebuildRag() {
+      if (!confirm('Esto borrará la colección vectorial actual y la reconstruirá desde cero. ¿Continuar?')) return;
+      try {
+        const result = await fetchJson('/api/rag/rebuild', { method: 'POST' });
+        els.detailOutput.textContent = JSON.stringify(result, null, 2);
+        openModal('detail');
+        await loadAll();
+      } catch (err) {
+        els.detailOutput.textContent = err.message;
+        openModal('detail');
+      }
+    }
+
     async function loadOptions() {
       state.options = await fetchJson('/api/capabilities/options');
       document.getElementById('skill-mode').innerHTML = (state.options.modos_skill || []).map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.nombre)}</option>`).join('');
@@ -919,17 +1087,20 @@
     }
 
     async function loadAll() {
-      const [capabilities, pdfs] = await Promise.all([
+      const [capabilities, pdfs, scraping] = await Promise.all([
         fetchJson('/api/capabilities'),
         fetchJson('/api/pdfs'),
+        fetchJson('/api/scraping'),
       ]);
       state.capabilities = capabilities;
       state.pdfsPayload = pdfs;
+      state.scrapingPayload = scraping;
       updateHero(capabilities);
       updateTopStrip(capabilities, pdfs);
       renderStats(capabilities, pdfs);
       renderSkills();
       renderPdfs();
+      renderScraping();
       renderResources(capabilities, pdfs);
     }
 
