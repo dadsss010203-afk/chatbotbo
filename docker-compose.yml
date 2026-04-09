@@ -1,7 +1,7 @@
 services:
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.5.7
     container_name: chatbotbo_ollama
     restart: unless-stopped
     dns:
@@ -19,7 +19,7 @@ services:
       start_period: 30s
 
   ollama-setup:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.5.7
     container_name: chatbotbo_setup
     dns:
       - 8.8.8.8
@@ -36,12 +36,8 @@ services:
       /bin/sh -c "
         echo 'Esperando Ollama...' &&
         sleep 5 &&
-<<<<<<< HEAD
-        ollama pull llama3.2:3b &&
-=======
-        ollama pull llama3.2:1b &&
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
-        ollama create correos-bot -f /Modelfile &&
+        ollama pull phi4-mini &&
+        ollama create phi4-mini-instruct -f /Modelfile &&
         echo 'Modelo listo!'
       "
     restart: "no"
@@ -52,12 +48,12 @@ services:
       dockerfile: ../../Dockerfile
     container_name: chatbotbo_app
     restart: unless-stopped
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
     depends_on:
       ollama:
         condition: service_healthy
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "5000:5000"
     volumes:
@@ -67,15 +63,22 @@ services:
       - ./backend/app:/app
     environment:
       - OLLAMA_URL=http://ollama:11434/api/chat
+      - OLLAMA_FALLBACK_URL=
       - OLLAMA_TIMEOUT=600
-      - LLM_MODEL=correos-bot
+      - REQUIRE_EVIDENCE=false
+      - LLM_MODEL=phi4-mini-instruct
+      - DATABASE_URL=postgresql://postgres:123456@host.docker.internal:5432/bolipost
       - EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2
       - CHROMA_PATH=/app/chroma_db
       - CHUNK_SIZE=600
       - BATCH_SIZE=500
-      - N_RESULTADOS=3
+      - CHATBOT_GENERAL_ONLY=false
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
+      - TARIFF_SKILL_ROOT=/app/skills/skill1
+      - TARIFF_SKILLS_ROOT=/app/skills
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/api/status || exit 1"]
       interval: 30s
@@ -85,8 +88,4 @@ services:
 
 volumes:
   ollama_data:
-<<<<<<< HEAD
   chroma_data:
-=======
-  chroma_data:
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
