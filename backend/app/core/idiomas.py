@@ -30,11 +30,11 @@ IDIOMAS = {
         "nombre"       : "Español",
         "bienvenida"   : (
             "¡Hola! Bienvenido al asistente oficial de la Agencia Boliviana de Correos (AGBC). "
-            "Puedo ayudarte con envíos, tarifas, sucursales, ubicaciones y más. ¿En qué puedo ayudarte hoy?"
+            "Puedo ayudarte con envíos, sucursales, ubicaciones y más. ¿En qué puedo ayudarte hoy?"
         ),
         "saludo"       : (
             "¡Hola! Soy ChatbotBO, el asistente de Correos Bolivia. "
-            "Puedo ayudarte con envíos, tarifas, sucursales y más. ¿En qué puedo ayudarte?"
+            "Puedo ayudarte con envíos, sucursales y más. ¿En qué puedo ayudarte?"
         ),
         "despedida"    : (
             "Ha sido un placer ayudarte. Que tengas un excelente día. "
@@ -49,7 +49,7 @@ IDIOMAS = {
         "nombre"       : "English",
         "bienvenida"   : (
             "Hello! Welcome to the official assistant of the Bolivian Postal Agency (AGBC). "
-            "I can help you with shipments, rates, branches, locations and more. How can I help you today?"
+            "I can help you with shipments, branches, locations and more. How can I help you today?"
         ),
         "saludo"       : "Hello! I am the Correos Bolivia assistant. How can I help you?",
         "despedida"    : (
@@ -65,7 +65,7 @@ IDIOMAS = {
         "nombre"       : "Français",
         "bienvenida"   : (
             "Bonjour! Bienvenue chez l'assistant officiel de l'Agence Bolivienne des Postes (AGBC). "
-            "Je peux vous aider avec les envois, les tarifs, les succursales et plus encore. "
+            "Je peux vous aider avec les envois, les succursales et plus encore. "
             "Comment puis-je vous aider?"
         ),
         "saludo"       : "Bonjour! Je suis l'assistant de Correos Bolivia. Comment puis-je vous aider?",
@@ -82,7 +82,7 @@ IDIOMAS = {
         "nombre"       : "Português",
         "bienvenida"   : (
             "Olá! Bem-vindo ao assistente oficial da Agência Boliviana de Correios (AGBC). "
-            "Posso ajudá-lo com envios, tarifas, agências, localizações e mais. Como posso ajudá-lo hoje?"
+            "Posso ajudá-lo com envios, agências, localizações e mais. Como posso ajudá-lo hoje?"
         ),
         "saludo"       : "Olá! Sou o assistente de Correos Bolivia. Como posso ajudá-lo?",
         "despedida"    : (

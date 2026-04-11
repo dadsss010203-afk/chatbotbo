@@ -11,14 +11,15 @@ import sys
 BASE_DIR = os.path.dirname(__file__)
 sys.path.insert(0, BASE_DIR)
 
-# ── Cargar variables de entorno desde backend/.env
+# ── Cargar variables de entorno priorizando backend/app/.env
 from dotenv import load_dotenv
-load_dotenv(os.path.join(BASE_DIR, "..", ".env"))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+load_dotenv(os.path.join(BASE_DIR, "..", ".env"), override=False)
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-from core import ollama, updater
+from core import ollama, updater, observability
 from chatbots.general import routes as general_routes
 
 # ─────────────────────────────────────────────
@@ -27,6 +28,7 @@ from chatbots.general import routes as general_routes
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "correos-agbc-2026")
 CORS(app)
+observability.init_app(app)
 
 # ── Registrar rutas del chatbot general (/api/*)
 app.register_blueprint(general_routes.bp)
@@ -43,6 +45,13 @@ FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "frontend"))
 def index():
     """Sirve la interfaz principal del chatbot."""
     return send_from_directory(FRONTEND_DIR, "chatbot.html")
+
+
+@app.route("/gestion/capacidades")
+@app.route("/gestion/capacidades/<path:_vista>")
+def gestion_capacidades(_vista=None):
+    """Sirve el panel de gestion de skills, PDFs y recursos del bot."""
+    return send_from_directory(FRONTEND_DIR, "capacidades.html")
 
 @app.route("/widget.js")
 def widget():
@@ -100,6 +109,7 @@ def inicializar():
     print("=" * 50)
     print("  Rutas disponibles:")
     print("  GET  /                  → Interfaz del chatbot")
+    print("  GET  /gestion/capacidades → Panel de gestion")
     print("  GET  /widget.js         → Widget embebible")
     print("  GET  /api/welcome       → Mensaje de bienvenida")
     print("  POST /api/chat          → Enviar mensaje")
@@ -107,13 +117,14 @@ def inicializar():
     print("  GET  /api/sucursales    → Lista de sucursales")
     print("  GET  /api/idiomas       → Idiomas disponibles")
     print("  POST /api/reset         → Limpiar historial")
-<<<<<<< HEAD
-=======
-    print("  GET  /api/capabilities  → Skills, MCPs y estado RAG")
-    print("  GET  /api/mcps          → Lista de MCPs")
-    print("  POST /api/mcps/execute  → Ejecutar MCP interno")
+    print("  GET  /api/capabilities  → Skills y estado RAG")
+    print("  GET  /api/capabilities/options → Opciones para formularios")
+    print("  GET  /api/metrics       → Métricas de observabilidad")
+    print("  POST /api/tarifa        → Cálculo directo de tarifa Hoja 1")
     print("  GET  /api/skills        → Lista de skills")
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
+    print("  POST /api/skills        → Crear o actualizar skill")
+    print("  DELETE /api/skills/<id> → Eliminar skill")
+    print("  POST /api/rag/rebuild   → Rebuild limpio del RAG")
     print("  GET  /api/status        → Estado del sistema")
     print("  POST /api/actualizar    → Forzar actualización")
     print("=" * 50)

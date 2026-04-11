@@ -14,8 +14,9 @@ requests==2.32.3
 # ── RAG / Embeddings
 sentence-transformers==3.4.1
 chromadb==0.5.23
-torch
-transformers
+torch==2.5.1
+# compatible con chromadb==0.5.23 (tokenizers<=0.20.3)
+transformers==4.45.2
 
 # ── Detección de idioma
 langdetect==1.0.9
@@ -33,6 +34,8 @@ lxml==5.3.0
 # ── PDFs
 pdfplumber==0.11.4
 PyPDF2==3.0.1
+pdf2image==1.17.0
+pytesseract==0.3.13
 
 # ── Utilidades
 python-dateutil==2.9.0

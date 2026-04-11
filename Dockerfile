@@ -14,6 +14,9 @@ RUN apt-get update --fix-missing && \
         build-essential \
         curl \
         git \
+        poppler-utils \
+        tesseract-ocr \
+        tesseract-ocr-spa \
     && rm -rf /var/lib/apt/lists/*
 
 # Instalar dependencias Python

@@ -647,6 +647,7 @@ header::after {
   display: flex;
   gap: 8px;
   animation: msgIn 0.28s cubic-bezier(.22,1,.36,1);
+  max-width: 100%;
 }
 
 .msg.u {
@@ -687,8 +688,11 @@ header::after {
   font-size: 0.81rem;
   line-height: 1.65;
   word-wrap: break-word;
-  max-width: 82%;
-  min-width: fit-content;   /* ← AGREGAR */
+  overflow-wrap: anywhere;
+  display: inline-block;
+  width: fit-content;
+  min-width: 0;
+  max-width: min(88%, 620px);
   white-space: pre-wrap;
   transition: opacity 0.2s;
 }
@@ -801,54 +805,10 @@ header::after {
   50%       { transform: translateY(-6px); opacity: 1; }
 }
 
-<<<<<<< HEAD
 /* ─── Form Area ─────────────────────────────────── */
 #form-area {
   background: var(--white);
   border-top: 1.5px solid var(--border);
-=======
-.quick-actions {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-  padding: 10px 11px 0;
-  background: var(--white);
-  border-top: 1px solid rgba(237, 216, 138, 0.5);
-}
-
-.quick-btn {
-  flex: 1 1 calc(50% - 4px);
-  min-width: 0;
-  border: 1.5px solid var(--border);
-  background: linear-gradient(135deg, var(--paper), var(--white));
-  color: var(--b900);
-  border-radius: 12px;
-  padding: 8px 10px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.quick-btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--y500);
-  box-shadow: 0 6px 18px rgba(122, 79, 0, 0.15);
-}
-
-.quick-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* ─── Form Area ─────────────────────────────────── */
-#form-area {
-  background: var(--white);
-  border-top: none;
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
   padding: 10px 11px 9px;
   flex-shrink: 0;
 }
@@ -1214,8 +1174,4 @@ header::after {
   color: var(--ink2);
   box-shadow: var(--shd);
   flex: 1;
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chatbotbo.local/backend/app/skills/skill13/contracts/hoja13_result.schema.json",
+  "title": "Hoja13Result",
+  "type": "object",
+  "required": [
+    "ok"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "precio": {
+      "type": [
+        "number",
+        "integer",
+        "null"
+      ]
+    },
+    "columna": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[C-E]$"
+    },
+    "servicio": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "fila": {
+      "type": [
+        "number",
+        "integer",
+        "null"
+      ]
+    },
+    "rango": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "min_g": {
+          "type": [
+            "number",
+            "integer",
+            "null"
+          ]
+        },
+        "max_g": {
+          "type": [
+            "number",
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "min_g",
+        "max_g"
+      ]
+    },
+    "peso_g": {
+      "type": [
+        "number",
+        "integer",
+        "null"
+      ]
+    },
+    "error": {
+      "type": "string"
+    },
+    "raw": {
+      "type": "string"
+    },
+    "exit_code": {
+      "type": "integer"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "ok": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "precio",
+          "columna",
+          "servicio",
+          "fila",
+          "rango",
+          "peso_g"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "ok": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "error"
+        ]
+      }
+    }
+  ]
+}

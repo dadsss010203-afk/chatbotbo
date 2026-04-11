@@ -114,16 +114,6 @@ let translating = false;
 let ctrl        = null;
 let mapInst     = null;
 
-<<<<<<< HEAD
-=======
-const QUICK_ACTIONS = {
-  generar: 'Genera un resumen breve de tus capacidades actuales en este bot.',
-  mcps: 'Muestra los MCPs configurados en este bot.',
-  skills: 'Muestra las skills configuradas en este bot.',
-  rag: 'Analiza el estado del RAG de este bot.'
-};
-
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 // ─── TEXTOS POR IDIOMA ─────────────────────────────
 const TX = {
   es: {
@@ -131,7 +121,7 @@ const TX = {
     lbl: 'Analizando consulta…',
     bye: 'Conversación finalizada',
     translating: 'Traduciendo conversación…',
-    welcome: 'Hola  Soy chatbotBO asistente de la Agencia Boliviana de Correos. Puedo ayudarle con envíos, tarifas, rastreo de paquetes, sucursales y más. ¿En qué le puedo ayudar?',
+    welcome: 'Hola  Soy chatbotBO asistente de la Agencia Boliviana de Correos. Puedo ayudarle con envíos, rastreo de paquetes, sucursales y más. ¿En qué le puedo ayudar?',
     chips: []
   },
   en: {
@@ -139,7 +129,7 @@ const TX = {
     lbl: 'Processing request…',
     bye: 'Conversation ended',
     translating: 'Translating conversation…',
-    welcome: 'Hello  I am chatboBo the virtual assistant of the Bolivian Postal Agency. I can help you with shipments, rates, package tracking, branches and more. How can I help you?',
+    welcome: 'Hello  I am chatboBo the virtual assistant of the Bolivian Postal Agency. I can help you with shipments, package tracking, branches and more. How can I help you?',
     chips: []
   },
   fr: {
@@ -147,7 +137,7 @@ const TX = {
     lbl: 'Traitement en cours…',
     bye: 'Conversation terminée',
     translating: 'Traduction en cours…',
-    welcome: "Bonjour  Je suis l'assistant virtuel de l'Agence Postale Bolivienne. Je peux vous aider avec les envois, tarifs, suivi de colis, succursales et plus. Comment puis-je vous aider ?",
+    welcome: "Bonjour  Je suis l'assistant virtuel de l'Agence Postale Bolivienne. Je peux vous aider avec les envois, suivi de colis, succursales et plus. Comment puis-je vous aider ?",
     chips: []
   },
   pt: {
@@ -155,7 +145,7 @@ const TX = {
     lbl: 'Processando sua consulta…',
     bye: 'Conversa encerrada',
     translating: 'Traduzindo conversa…',
-    welcome: 'Olá  Sou o assistente virtual da Agência Boliviana de Correios. Posso ajudá-lo com envios, tarifas, rastreamento de pacotes, agências e mais. Como posso ajudá-lo?',
+    welcome: 'Olá  Sou o assistente virtual da Agência Boliviana de Correios. Posso ajudá-lo com envios, rastreamento de pacotes, agências e mais. Como posso ajudá-lo?',
     chips: []
   },
   zh: {
@@ -397,19 +387,68 @@ function showTyping() {
 
 function removeTyping() { document.getElementById('tyEl')?.remove(); }
 
-<<<<<<< HEAD
-=======
-function quickAction(action) {
-  const prompt = QUICK_ACTIONS[action];
-  if (!prompt) return;
-  sendMsg(prompt);
+
+function clearQuickReplies() {
+  document.querySelectorAll('.quick-replies').forEach(el => el.remove());
 }
 
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
+
+function addQuickReplies(options) {
+  if (!Array.isArray(options) || options.length === 0) return;
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg b quick-replies';
+
+  const body = document.createElement('div');
+  body.className = 'chips';
+  body.style.marginLeft = '35px';
+  body.style.marginTop = '2px';
+
+  options.forEach((opt) => {
+    if (!opt || !opt.value) return;
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.type = 'button';
+    btn.textContent = opt.label || opt.value;
+    btn.onclick = () => sendMsg(opt.value);
+    body.appendChild(btn);
+  });
+
+  wrap.appendChild(body);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+
+function quickRepliesFromTarifa(data) {
+  const missing = data && data.tarifa && Array.isArray(data.tarifa.missing) ? data.tarifa.missing : [];
+  if (missing.includes('alcance')) {
+    return [
+      { label: 'Nacional', value: 'nacional' },
+      { label: 'Internacional', value: 'internacional' },
+    ];
+  }
+  if (missing.includes('tipo_nacional')) {
+    return [
+      { label: 'Express Mail Service (EMS)', value: 'ems' },
+      { label: 'Prioritario', value: 'encomienda' },
+    ];
+  }
+  if (missing.includes('tipo_internacional')) {
+    return [
+      { label: 'Express Mail Service (EMS)', value: 'ems' },
+      { label: 'Encomiendas Postales', value: 'encomienda' },
+    ];
+  }
+  return [];
+}
+
+
 // ─── ENVIAR MENSAJE ────────────────────────────────
 async function sendMsg(msg) {
   if (busy || translating || !msg.trim()) return;
   busy = true;
+  clearQuickReplies();
   const inp = document.getElementById('input');
   inp.disabled = true;
   setStop(true);
@@ -427,6 +466,7 @@ async function sendMsg(msg) {
     removeTyping();
     const bye = data.despedida === true;
     addMsg(data.response || data.error || 'Sin respuesta disponible', 'b', bye);
+    addQuickReplies((Array.isArray(data.quick_replies) && data.quick_replies.length > 0) ? data.quick_replies : quickRepliesFromTarifa(data));
     if (bye) {
       inp.disabled = true;
       inp.placeholder = (TX[lang] || TX.es).bye;
@@ -549,8 +589,4 @@ function closeMap() { document.getElementById('mapa-modal').classList.remove('op
 // Cerrar con Escape
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeMap(); if (chatOpen) minimize(); }
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)

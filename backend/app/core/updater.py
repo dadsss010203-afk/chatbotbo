@@ -60,7 +60,13 @@ def actualizar_bd(reindexar_fn=None) -> None:
             sys.path.insert(0, scraper_path)
 
         from runner import ScraperRunner
-        ScraperRunner().run()
+        runner = ScraperRunner()
+        if hasattr(runner, "run"):
+            runner.run()
+        elif hasattr(runner, "ejecutar"):
+            runner.ejecutar()
+        else:
+            raise AttributeError("ScraperRunner no expone run() ni ejecutar()")
         print("  Scraper completado")
 
         if reindexar_fn:

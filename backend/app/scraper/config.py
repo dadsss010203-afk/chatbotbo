@@ -31,6 +31,9 @@ class ScraperConfig:
     MAX_PDFS      = 100
     REQUEST_TIMEOUT = 30
     DELAY_REQUESTS  = 0.2
+    PDF_OCR_DPI     = 260
+    PDF_OCR_MAX_PAGES = 20
+    PDF_TEXTO_MINIMO = 120
 
     # ── Headers HTTP
     HEADERS = {
@@ -58,8 +61,7 @@ class ScraperConfig:
         "/servicios", "/envios-nacionales", "/envios-internacionales",
         "/servicio-telegramas", "/servicio-giros", "/servicio-casillas",
         # Aplicativos y herramientas
-        "/aplicativos", "/calculadora", "/rastreo", "/tracking",
-        "/cotizador", "/tarifas", "/precios",
+        "/aplicativos", "/rastreo", "/tracking",
         # Institucional
         "/historia", "/resena-historica", "/quienes-somos",
         "/mision-vision", "/organigrama", "/autoridades",
@@ -79,7 +81,6 @@ class ScraperConfig:
 
     # ── Aplicativos específicos con sus URLs (de v2)
     APLICATIVOS_ESPECIFICOS = [
-        ("POSTAR - Calculadora",      "https://postar.correos.gob.bo:8104/"),
         ("TrackingBO - Rastreo",      "https://trackingbo.correos.gob.bo:8100/"),
         ("SIRECO - Reclamos",         "https://sireco.correos.gob.bo:8102/"),
         ("UNIENVIO - ECA",            "https://unienvio.correos.gob.bo:8103/"),

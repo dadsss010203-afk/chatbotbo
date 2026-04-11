@@ -115,7 +115,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .chip{background:var(--y100);border:1.5px solid var(--border);color:var(--ink2);padding:5px 11px;border-radius:20px;font-size:0.68rem;font-family:'DM Sans',sans-serif;cursor:pointer;font-weight:500;transition:all 0.22s;outline:none}
 .chip:hover{background:var(--b700);border-color:var(--b700);color:#fff;transform:translateY(-2px);box-shadow:0 4px 14px rgba(22,58,128,0.24)}
 
-.msg{display:flex;gap:8px;animation:msgIn 0.28s cubic-bezier(.22,1,.36,1)}
+.msg{display:flex;gap:8px;animation:msgIn 0.28s cubic-bezier(.22,1,.36,1);max-width:100%}
 .msg.u{align-self:flex-end;flex-direction:row-reverse}
 .msg.b{align-self:flex-start}
 @keyframes msgIn{from{opacity:0;transform:translateY(10px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -125,7 +125,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .msg.u .av svg,.msg.b .av svg{width:13px;height:13px}
 .msg.u .av svg{fill:#fff}
 .msg.b .av svg{fill:var(--b900)}
-.bub{ padding: 9px 13px;border-radius: 14px;font-size: 0.81rem;line-height: 1.65; word-wrap: break-word;max-width: 82%;min-width: fit-content;   /* ← AGREGAR */ white-space: pre-wrap; transition: opacity 0.2s;}
+.bub{padding:9px 13px;border-radius:14px;font-size:0.81rem;line-height:1.65;word-wrap:break-word;overflow-wrap:anywhere;display:inline-block;width:fit-content;min-width:0;max-width:min(88%,620px);white-space:pre-wrap;transition:opacity 0.2s}
 .msg.u .bub{background:linear-gradient(135deg,var(--b500),var(--b900));color:#fff;border-bottom-right-radius:3px;box-shadow:0 3px 12px rgba(22,58,128,0.28);font-weight:500}
 .msg.b .bub{background:var(--white);color:var(--ink2);border:1px solid var(--border);border-bottom-left-radius:3px;box-shadow:var(--shd)}
 .bub.farewell{background:var(--b200);color:var(--b900);border:1px solid rgba(22,58,128,0.22);font-style:italic;font-family:'Playfair Display',serif}
@@ -146,14 +146,6 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .td:nth-child(2){background:var(--b700);animation-delay:0.18s}
 .td:nth-child(3){background:var(--y500);animation-delay:0.36s}
 @keyframes tdBounce{0%,100%{transform:translateY(0);opacity:0.4}50%{transform:translateY(-6px);opacity:1}}
-<<<<<<< HEAD
-=======
-.quick-actions{display:flex;gap:7px;flex-wrap:wrap;padding:10px 11px 0;background:var(--white);border-top:1px solid rgba(237,216,138,0.5)}
-.quick-btn{flex:1 1 calc(50% - 4px);min-width:0;border:1.5px solid var(--border);background:linear-gradient(135deg,var(--paper),var(--white));color:var(--b900);border-radius:12px;padding:8px 10px;font-size:0.68rem;font-weight:700;letter-spacing:0.03em;cursor:pointer;transition:all 0.2s}
-.quick-btn:hover{transform:translateY(-1px);border-color:var(--y500);box-shadow:0 6px 18px rgba(122,79,0,0.15)}
-.quick-btn:disabled{opacity:0.45;cursor:not-allowed;transform:none;box-shadow:none}
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
-
 .scard{background:var(--white);border:1.5px solid var(--border2);border-radius:16px;overflow:hidden;max-width:248px;box-shadow:var(--shd2)}
 .sc-head{background:linear-gradient(135deg,var(--b900),var(--b700));padding:12px 14px;display:flex;align-items:center;gap:10px;position:relative;overflow:hidden}
 .sc-head::after{content:'✦';position:absolute;right:10px;bottom:-10px;font-size:40px;color:rgba(245,166,35,0.20);line-height:1}
@@ -170,11 +162,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .sc-cta:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .sc-cta svg{width:12px;height:12px;fill:var(--b900)}
 
-<<<<<<< HEAD
 #form-area{background:var(--white);border-top:1.5px solid var(--border);padding:10px 11px 9px;flex-shrink:0}
-=======
-#form-area{background:var(--white);border-top:none;padding:10px 11px 9px;flex-shrink:0}
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 #form{display:flex;gap:7px;align-items:center;margin-bottom:5px}
 #input{flex:1;background:var(--cream);border:1.5px solid var(--border);color:var(--ink);padding:9px 13px;border-radius:11px;font-size:0.81rem;font-family:'DM Sans',sans-serif;outline:none;transition:all 0.22s}
 #input:focus{border-color:var(--y500);box-shadow:0 0 0 3px rgba(245,166,35,0.18);background:var(--white)}
@@ -309,21 +297,11 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
     <div class="welcome" id="welcomeCard">
       <div class="wc-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
       <div class="wc-title"> </div>
-      <div class="wc-sub">Consulte sobre envíos, tarifas, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
+      <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
       <div class="wc-sep"><div class="wc-sep-l"></div><div class="wc-sep-d"></div><div class="wc-sep-l"></div></div>
     </div>
   </div>
 
-<<<<<<< HEAD
-=======
-  <div class="quick-actions" aria-label="Acciones del bot">
-    <button type="button" class="quick-btn" onclick="quickAction('generar')">Generar</button>
-    <button type="button" class="quick-btn" onclick="quickAction('mcps')">MCPs</button>
-    <button type="button" class="quick-btn" onclick="quickAction('skills')">Skills</button>
-    <button type="button" class="quick-btn" onclick="quickAction('rag')">Analizar RAG</button>
-  </div>
-
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
   <div id="form-area">
     <form id="form">
       <input id="input" type="text" placeholder="Escriba su consulta aquí…" autocomplete="off"/>
@@ -361,15 +339,6 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 // ─── ESTADO ───────────────────────────────────
 let chatOpen=false, welcomeLoaded=false, busy=false, ctrl=null, lang='es';
 let translating=false; // flag para evitar traducciones simultáneas
-<<<<<<< HEAD
-=======
-const QUICK_ACTIONS={
-  generar:'Genera un resumen breve de tus capacidades actuales en este bot.',
-  mcps:'Muestra los MCPs configurados en este bot.',
-  skills:'Muestra las skills configuradas en este bot.',
-  rag:'Analiza el estado del RAG de este bot.'
-};
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 
 // ─── TEXTOS POR IDIOMA ────────────────────────
 const TX={
@@ -391,7 +360,7 @@ const TX={
   pt:{
     ph:'Digite sua consulta aqui…', lbl:'Processando sua consulta…',
     bye:'Conversa encerrada', translating:'Traduzindo conversa…',
-    chips:['Onde ficam seus escritórios?','Como rastrear meu pacote?','Quais são as tarifas?','Serviços internacionais']
+    chips:['Onde ficam seus escritórios?','Como rastrear meu pacote?','Serviços internacionais','Contato de sucursales']
   },
   zh:{
     ph:'请在此输入您的问题…', lbl:'正在处理您的请求…',
@@ -594,6 +563,56 @@ function showTyping(){
 }
 function removeTyping(){document.getElementById('tyEl')?.remove();}
 
+function clearQuickReplies(){
+  document.querySelectorAll('.quick-replies').forEach(el=>el.remove());
+}
+
+function addQuickReplies(options){
+  if(!Array.isArray(options)||options.length===0)return;
+  const chat=document.getElementById('chat');
+  const wrap=document.createElement('div');
+  wrap.className='msg b quick-replies';
+  const body=document.createElement('div');
+  body.className='chips';
+  body.style.marginLeft='35px';
+  body.style.marginTop='2px';
+  options.forEach(opt=>{
+    if(!opt||!opt.value)return;
+    const btn=document.createElement('button');
+    btn.className='chip';
+    btn.type='button';
+    btn.textContent=opt.label||opt.value;
+    btn.onclick=()=>sendMsg(opt.value);
+    body.appendChild(btn);
+  });
+  wrap.appendChild(body);
+  chat.appendChild(wrap);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+function quickRepliesFromTarifa(data){
+  const missing = data && data.tarifa && Array.isArray(data.tarifa.missing) ? data.tarifa.missing : [];
+  if(missing.includes('alcance')){
+    return [
+      {label:'Nacional',value:'nacional'},
+      {label:'Internacional',value:'internacional'},
+    ];
+  }
+  if(missing.includes('tipo_nacional')){
+    return [
+      {label:'Express Mail Service (EMS)',value:'ems'},
+      {label:'Prioritario',value:'encomienda'},
+    ];
+  }
+  if(missing.includes('tipo_internacional')){
+    return [
+      {label:'Express Mail Service (EMS)',value:'ems'},
+      {label:'Encomiendas Postales',value:'encomienda'},
+    ];
+  }
+  return [];
+}
+
 // ─── WELCOME ──────────────────────────────────
 async function loadWelcome(){
   await new Promise(r=>setTimeout(r,300));
@@ -612,6 +631,7 @@ async function loadWelcome(){
 async function sendMsg(msg){
   if(busy||translating||!msg.trim())return;
   busy=true;
+  clearQuickReplies();
   const inp=document.getElementById('input');
   inp.disabled=true;setStop(true);
   addMsg(msg,'u');showTyping();
@@ -623,6 +643,7 @@ async function sendMsg(msg){
     removeTyping();
     const bye=data.despedida===true;
     addMsg(data.response||data.error||'Sin respuesta disponible','b',bye,data.ubicacion||null,data.no_translate);
+    addQuickReplies((Array.isArray(data.quick_replies)&&data.quick_replies.length>0)?data.quick_replies:quickRepliesFromTarifa(data));
     if(bye){
       inp.disabled=true;inp.placeholder=(TX[lang]||TX.es).bye;
       setStop(false);document.getElementById('send').disabled=true;return;
@@ -635,14 +656,6 @@ async function sendMsg(msg){
 }
 
 function suggest(btn){sendMsg(btn.textContent);}
-<<<<<<< HEAD
-=======
-function quickAction(action){
-  const prompt=QUICK_ACTIONS[action];
-  if(!prompt)return;
-  sendMsg(prompt);
-}
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)
 
 // ─── LIMPIAR CONVERSACIÓN ─────────────────────
 function clearConv(){document.getElementById('confirm-bar').classList.add('open');}
@@ -658,7 +671,7 @@ async function doClear(){
   wc.innerHTML=`
     <div class="wc-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
     <div class="wc-title"> </div>
-    <div class="wc-sub">Consulte sobre envíos, tarifas, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
+    <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
     <div class="wc-sep"><div class="wc-sep-l"></div><div class="wc-sep-d"></div><div class="wc-sep-l"></div></div>
     <div class="chips" id="chips-container">
       ${t.chips.map(c=>`<button class="chip" onclick="suggest(this)">${c}</button>`).join('')}
@@ -710,8 +723,4 @@ document.getElementById('mapa-modal').addEventListener('click',e=>{if(e.target==
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMap();if(chatOpen)minimize();}});
 </script>
 </body>
-<<<<<<< HEAD
 </html>
-=======
-</html>
->>>>>>> cdeda2d (feat: agregar mcp skills y mejoras rag del chatbot)

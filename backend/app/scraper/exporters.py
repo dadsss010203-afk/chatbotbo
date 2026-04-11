@@ -93,13 +93,50 @@ def guardar_noticias(noticias: list) -> None:
         )
 
 
+def _pdf_key(item: dict) -> str:
+    nombre = (item.get("nombre_archivo") or "").strip().lower()
+    url = (item.get("url") or "").strip().lower()
+    pagina = (item.get("pagina_fuente") or "").strip().lower()
+    return "||".join([nombre, url, pagina])
+
+
 def guardar_pdfs(pdfs: list) -> None:
-    if pdfs:
-        _guardar_json(
-            ScraperConfig.PDFS_FILE,
-            pdfs,
-            f"pdfs_contenido.json ({len(pdfs)} PDFs)"
-        )
+    """
+    Guarda PDFs del scraper, preservando PDFs subidos manualmente.
+    Esto evita que /api/actualizar borre uploads previos.
+    """
+    if not pdfs:
+        return
+
+    existentes = []
+    if os.path.exists(ScraperConfig.PDFS_FILE):
+        try:
+            with open(ScraperConfig.PDFS_FILE, "r", encoding="utf-8") as f:
+                existentes = json.load(f) or []
+        except Exception:
+            existentes = []
+
+    manuales = []
+    for item in existentes:
+        if isinstance(item, dict) and item.get("subido_manual"):
+            manuales.append(item)
+
+    dedupe = {}
+    for item in pdfs:
+        if isinstance(item, dict):
+            dedupe[_pdf_key(item)] = item
+    for item in manuales:
+        if isinstance(item, dict):
+            key = _pdf_key(item)
+            if key not in dedupe:
+                dedupe[key] = item
+
+    merged = list(dedupe.values())
+    _guardar_json(
+        ScraperConfig.PDFS_FILE,
+        merged,
+        f"pdfs_contenido.json ({len(merged)} PDFs)"
+    )
 
 
 def guardar_enlaces(enlaces: list) -> None:
