@@ -15,6 +15,7 @@ from flask import session
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
 MAX_HISTORIAL = int(os.environ.get("MAX_HISTORIAL", "6"))
+MAX_HISTORY_CHARS = int(os.environ.get("MAX_HISTORY_CHARS", "3200"))
 SESSION_TTL_MINUTES = int(os.environ.get("SESSION_TTL_MINUTES", "180"))
 MAX_SESIONES_MEMORIA = int(os.environ.get("MAX_SESIONES_MEMORIA", "2000"))
 
@@ -148,6 +149,22 @@ def clear_pendiente_tarifa(sid: str) -> None:
         _enforce_max_sesiones()
 
 
+def _trim_history_by_chars(history: list[dict], max_chars: int) -> list[dict]:
+    if not history:
+        return history
+    if sum(len(entry.get("content", "")) for entry in history) <= max_chars:
+        return history
+    trimmed = []
+    chars = 0
+    for entry in reversed(history):
+        content = entry.get("content", "")
+        if chars + len(content) > max_chars and trimmed:
+            break
+        trimmed.append(entry)
+        chars += len(content)
+    return list(reversed(trimmed))
+
+
 def historial_reciente(sid: str) -> list:
     """
     Devuelve los últimos MAX_HISTORIAL mensajes del historial.
@@ -158,7 +175,8 @@ def historial_reciente(sid: str) -> list:
         hist = historiales.setdefault(sid, [])
         _ultimo_acceso[sid] = _ahora_ts()
         _enforce_max_sesiones()
-        return hist[-MAX_HISTORIAL:]
+        trimmed = hist[-MAX_HISTORIAL:]
+        return _trim_history_by_chars(trimmed, MAX_HISTORY_CHARS)
 
 
 def total_sesiones() -> int:

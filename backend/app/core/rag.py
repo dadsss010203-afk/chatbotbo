@@ -48,12 +48,13 @@ from chromadb.config import Settings
 # ─────────────────────────────────────────────
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
 CHROMA_PATH     = os.environ.get("CHROMA_PATH",     "chroma_db")
-CHUNK_SIZE      = int(os.environ.get("CHUNK_SIZE",   "600"))
-CHUNK_OVERLAP   = int(os.environ.get("CHUNK_OVERLAP", "120"))
-BATCH_SIZE      = int(os.environ.get("BATCH_SIZE",   "500"))
-N_RESULTADOS    = int(os.environ.get("N_RESULTADOS",  "3"))
-MAX_CONTEXT_CHARS = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
-MIN_CHUNK_CHARS   = int(os.environ.get("MIN_CHUNK_CHARS", "40"))
+CHUNK_SIZE         = int(os.environ.get("CHUNK_SIZE",   "450"))
+CHUNK_OVERLAP      = int(os.environ.get("CHUNK_OVERLAP", "80"))
+BATCH_SIZE         = int(os.environ.get("BATCH_SIZE",   "500"))
+N_RESULTADOS       = int(os.environ.get("N_RESULTADOS",  "3"))
+MAX_CONTEXT_CHARS  = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
+MAX_CONTEXT_TOKENS = int(os.environ.get("MAX_CONTEXT_TOKENS", "900"))
+MIN_CHUNK_CHARS    = int(os.environ.get("MIN_CHUNK_CHARS", "40"))
 
 # ─────────────────────────────────────────────
 #  ESTADO GLOBAL
@@ -248,6 +249,36 @@ def _normalizar_metadata(metadata_base: dict | None, prefijo: str) -> dict:
     meta.setdefault("source_path", "")
     meta.setdefault("source_page", "")
     return meta
+
+
+def _approximate_tokens(texto: str) -> int:
+    """Estimación rápida de tokens a partir de palabras y puntuación."""
+    if not texto:
+        return 0
+    return len(re.findall(r"\w+|[^\s\w]", texto))
+
+
+def _truncate_context_by_tokens(contexto_partes: list[str], max_tokens: int) -> str:
+    contexto = []
+    total = 0
+    for parte in contexto_partes:
+        tokens = _approximate_tokens(parte)
+        if total + tokens > max_tokens:
+            break
+        contexto.append(parte)
+        total += tokens
+    if not contexto and contexto_partes:
+        # Si una sola parte excede el límite, recortamos el texto directamente.
+        texto = contexto_partes[0]
+        palabras = texto.split()
+        limite = max(1, int(len(palabras) * max_tokens / max(1, _approximate_tokens(texto))))
+        return " ".join(palabras[:limite])
+    return "\n\n".join(contexto)
+
+
+def estimate_tokens(texto: str) -> int:
+    """Estimación rápida de tokens para texto compartido por el backend."""
+    return _approximate_tokens(texto)
 
 
 def documento_a_chunks(
@@ -567,7 +598,7 @@ def buscar(
     col = get_collection()
     emb = get_embedder()
     n = n_resultados or N_RESULTADOS
-    n_query = max(n * 4, 8)
+    n_query = min(max(n * 5, 8), 24)
 
     # Pre-calcular embedding para evitar timeout en ChromaDB
     vector = emb.encode([pregunta]).tolist()
@@ -596,7 +627,7 @@ def buscar(
         metadata = metadatas[idx] if idx < len(metadatas) else {}
         distance = distances[idx] if idx < len(distances) else 99
         source_type = (metadata or {}).get("source_type")
-        length_penalty = 0.4 if len(texto) > CHUNK_SIZE * 1.4 else 0
+        length_penalty = 0.3 if len(texto) > CHUNK_SIZE * 1.2 else 0
         source_bonus = _source_preference_bonus(source_type, preferred_source_types)
         score = distance - (_prioridad_fuente(source_type) * 0.08) - source_bonus + length_penalty
 
@@ -612,15 +643,11 @@ def buscar(
     seleccionados = candidatos[:n]
 
     contexto_partes = []
-    chars = 0
     for item in seleccionados:
         bloque = f"[Fuente: {_formatear_fuente(item['metadata'])}]\n{item['texto']}"
-        if chars + len(bloque) > MAX_CONTEXT_CHARS and contexto_partes:
-            break
         contexto_partes.append(bloque)
-        chars += len(bloque) + 2
 
-    contexto = "\n\n".join(contexto_partes)
+    contexto = _truncate_context_by_tokens(contexto_partes, MAX_CONTEXT_TOKENS)
     if len(contexto) > MAX_CONTEXT_CHARS:
         contexto = contexto[:MAX_CONTEXT_CHARS].rsplit(" ", 1)[0]
 

@@ -529,12 +529,13 @@ def resolve_skills_for_query(pregunta: str) -> dict:
 
 def build_skill_manifest(skills: list[dict] | None = None) -> str:
     active = skills or get_active_skills()
-    lineas = []
+    if not active:
+        return "Sin skills activas."
+    lineas = ["Skills activas:"]
     for item in active:
         lineas.append(
-            f"- {item['nombre']} ({item['id']}): "
-            f"categoria={item.get('categoria','custom')}, prioridad={item.get('prioridad',3)}, "
-            f"trigger={item.get('trigger','sin trigger')}."
+            f"- {item['nombre']}: {item.get('descripcion', 'Sin descripción.')} "
+            f"(categoria: {item.get('categoria', 'custom')}, prioridad: {item.get('prioridad', 3)})"
         )
     return "\n".join(lineas)
 
@@ -726,8 +727,18 @@ def get_runtime_capabilities(
         item["automatizable"] = item.get("modo") in {"rag+llm", "translation", "internal"}
         skills.append(item)
 
+    skills_summary = {
+        "total": len(skills),
+        "activas": sum(1 for item in skills if item.get("estado") == "activa"),
+        "categorias": {},
+    }
+    for item in skills:
+        cat = item.get("categoria", "custom")
+        skills_summary["categorias"][cat] = skills_summary["categorias"].get(cat, 0) + 1
+
     return {
         "skills": skills,
+        "skills_summary": skills_summary,
         "rag": rag,
         "runtime": {
             "ollama": ollama_ok,
@@ -741,7 +752,6 @@ def get_runtime_capabilities(
             "llm": {
                 "modelo": modelo,
                 "ollama_disponible": ollama_ok,
-                "ollama_url": os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/chat"),
                 "timeout_segundos": int(os.environ.get("OLLAMA_TIMEOUT", "600")),
             },
             "embeddings": {
@@ -768,7 +778,6 @@ def get_runtime_capabilities(
                 "skills_registradas": len(skills),
             },
             "pdfs": resumen_pdfs(),
-            "observability": observability.get_observability_snapshot(),
         },
     }
 
@@ -809,10 +818,10 @@ def _render_skills(skills: list[dict]) -> str:
 
 def render_generar(runtime_capabilities: dict) -> str:
     return (
-        "Puedo generar respuestas con el modelo local, consultar el RAG institucional y usar skills internas.\n"
-        f"Skills: {len(runtime_capabilities['skills'])}. "
+        "Puedo generar respuestas usando el modelo local y el RAG institucional.\n"
+        f"Skills activas: {runtime_capabilities['skills_summary']['activas']} de {runtime_capabilities['skills_summary']['total']}. "
         f"Chunks RAG: {runtime_capabilities['rag']['chunks']}.\n"
-        "Usa Skills o Analizar RAG para inspeccionar cada capacidad."
+        "Respondo mejor si la pregunta está dentro del dominio postal de Correos de Bolivia."
     )
 
 

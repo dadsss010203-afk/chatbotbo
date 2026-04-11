@@ -6,14 +6,21 @@ Compartido por todos los chatbots.
 
 import os
 import re
+import time
 import requests
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
-LLM_MODEL      = os.environ.get("LLM_MODEL",         "correos-bot")
-OLLAMA_URL     = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
-OLLAMA_TIMEOUT = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
+LLM_MODEL             = os.environ.get("LLM_MODEL",         "correos-bot")
+OLLAMA_URL            = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
+OLLAMA_TIMEOUT        = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
+OLLAMA_RETRIES        = int(os.environ.get("OLLAMA_RETRIES", "2"))
+OLLAMA_RETRY_BACKOFF  = float(os.environ.get("OLLAMA_RETRY_BACKOFF", "0.5"))
+OLLAMA_MAX_TOKENS     = os.environ.get("OLLAMA_MAX_TOKENS")
+OLLAMA_PROMPT_MAX_TOKENS = int(os.environ.get("OLLAMA_PROMPT_MAX_TOKENS", "3600"))
+
+_SESSION = requests.Session()
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
@@ -56,6 +63,8 @@ def _default_options() -> dict:
             options["seed"] = int(seed)
         except Exception:
             pass
+    if OLLAMA_MAX_TOKENS is not None and OLLAMA_MAX_TOKENS != "":
+        options["max_tokens"] = _env_int("OLLAMA_MAX_TOKENS", 0)
     return options
 
 
@@ -75,7 +84,7 @@ def llamar_ollama(
         mensajes : lista de {"role": "system/user/assistant", "content": "..."}
         modelo   : nombre del modelo (por defecto LLM_MODEL del .env)
         opciones : parámetros del modelo. Por defecto:
-                   num_predict=200, temperature=0, num_ctx=1500
+                   num_predict=200, temperature=0, num_ctx=4096
 
     Returns:
         Texto de la respuesta del modelo.
@@ -91,9 +100,19 @@ def llamar_ollama(
         "options" : {**_default_options(), **(opciones or {})},
     }
 
-    resp = requests.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
-    resp.raise_for_status()
-    return resp.json()["message"]["content"]
+    last_exception = None
+    for attempt in range(1, OLLAMA_RETRIES + 2):
+        try:
+            resp = _SESSION.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
+            resp.raise_for_status()
+            data = resp.json()
+            return data["message"]["content"]
+        except requests.exceptions.RequestException as exc:
+            last_exception = exc
+            if attempt > OLLAMA_RETRIES:
+                raise
+            time.sleep(OLLAMA_RETRY_BACKOFF * attempt)
+    raise last_exception
 
 
 # ─────────────────────────────────────────────

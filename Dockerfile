@@ -40,4 +40,4 @@ ENV FLASK_ENV=production \
     N_RESULTADOS=3 \
     OLLAMA_TIMEOUT=600
 
-CMD ["python", "main.py"]
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "120", "wsgi:application"]

@@ -160,6 +160,30 @@ def _modo_general_only() -> bool:
     return CHATBOT_GENERAL_ONLY
 
 
+def _estimate_message_tokens(message: dict) -> int:
+    texto = (message.get("content") or "").strip()
+    if not texto:
+        return 0
+    return rag.estimate_tokens(texto) + 4
+
+
+def _trim_messages_to_token_budget(messages: list[dict], max_tokens: int) -> list[dict]:
+    if not messages:
+        return messages
+    system_message = messages[0]
+    remaining = messages[1:]
+    current_tokens = _estimate_message_tokens(system_message)
+    trimmed = []
+    for message in reversed(remaining):
+        tokens = _estimate_message_tokens(message)
+        if current_tokens + tokens > max_tokens:
+            break
+        trimmed.append(message)
+        current_tokens += tokens
+    trimmed = list(reversed(trimmed))
+    return [system_message] + trimmed
+
+
 def _refresh_pdfs_after_start() -> None:
     """Revisa PDFs heredados después del arranque para no bloquear Flask."""
     try:
@@ -1388,7 +1412,7 @@ def chat():
         contexto,
         hora,
         t["sin_info"],
-        skills_context=capabilities.build_skill_manifest(),
+        skills_context="",
         skill_name=primary_skill.get("nombre", ""),
         skill_description=primary_skill.get("descripcion", ""),
         skill_triggers=primary_skill.get("trigger", ""),
@@ -1398,11 +1422,30 @@ def chat():
         *session.historial_reciente(sid),
         {"role": "user",   "content": pregunta},
     ]
+    mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
+    prompt_tokens = sum(_estimate_message_tokens(m) for m in mensajes)
+    observability.log_event(
+        "llm.request",
+        lang=lang,
+        model=ollama.LLM_MODEL,
+        primary_skill=primary_skill.get("id"),
+        prompt_tokens=prompt_tokens,
+        source_type=rag_result.get("primary_source_type"),
+        source_count=len(sources),
+    )
 
     try:
         print(f" [{lang}] {pregunta[:60]}")
         respuesta = ollama.llamar_ollama(mensajes)
         respuesta = ollama.limpiar_respuesta(respuesta)
+        observability.log_event(
+            "llm.response",
+            lang=lang,
+            model=ollama.LLM_MODEL,
+            primary_skill=primary_skill.get("id"),
+            response_chars=len(respuesta),
+            prompt_tokens=prompt_tokens,
+        )
 
         # Guardia anti-alucinación: si se exige evidencia, solo aceptamos la
         # respuesta si trae 1-2 citas literales que existan en el contexto RAG.
