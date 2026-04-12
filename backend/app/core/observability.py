@@ -12,7 +12,7 @@ import time
 from collections import Counter, defaultdict, deque
 from datetime import datetime, timezone
 
-from flask import g, request
+from fastapi import Request, Response
 
 
 _logger = logging.getLogger("chatbotbo.observability")
@@ -176,17 +176,12 @@ def get_observability_snapshot() -> dict:
 
 
 def init_app(app) -> None:
-    @app.before_request
-    def _obs_before_request():
-        g._obs_start_time = time.perf_counter()
-
-    @app.after_request
-    def _obs_after_request(response):
-        start = getattr(g, "_obs_start_time", None)
-        if start is None:
-            return response
-        latency_ms = (time.perf_counter() - start) * 1000.0
-        endpoint = request.endpoint or request.path or "unknown"
+    @app.middleware("http")
+    async def observability_middleware(request: Request, call_next):
+        start_time = time.perf_counter()
+        response = await call_next(request)
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+        endpoint = request.url.path
         record_http(
             endpoint=endpoint,
             method=request.method,

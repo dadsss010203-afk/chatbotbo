@@ -16,22 +16,29 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 load_dotenv(os.path.join(BASE_DIR, "..", ".env"), override=False)
 
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 
 from core import ollama, updater, observability
 from chatbots.general import routes as general_routes
 
 # ─────────────────────────────────────────────
-#  APP FLASK
+#  APP FASTAPI
 # ─────────────────────────────────────────────
-app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "correos-agbc-2026")
-CORS(app)
+app = FastAPI(title="ChatbotBO", description="Agencia Boliviana de Correos")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 observability.init_app(app)
 
 # ── Registrar rutas del chatbot general (/api/*)
-app.register_blueprint(general_routes.bp)
+app.include_router(general_routes.router)
 
 # ── Directorio del frontend
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "frontend"))
@@ -41,47 +48,51 @@ FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "frontend"))
 #  RUTAS ESTÁTICAS
 # ─────────────────────────────────────────────
 
-@app.route("/")
-def index():
+@app.get("/")
+async def index():
     """Sirve la interfaz principal del chatbot."""
-    return send_from_directory(FRONTEND_DIR, "chatbot.html")
+    return FileResponse(os.path.join(FRONTEND_DIR, "chatbot.html"), media_type="text/html")
 
 
-@app.route("/gestion/capacidades")
-@app.route("/gestion/capacidades/<path:_vista>")
-def gestion_capacidades(_vista=None):
+@app.get("/gestion/capacidades")
+@app.get("/gestion/capacidades/{path:path}")
+async def gestion_capacidades(path: str = None):
     """Sirve el panel de gestion de skills, PDFs y recursos del bot."""
-    return send_from_directory(FRONTEND_DIR, "capacidades.html")
+    return FileResponse(os.path.join(FRONTEND_DIR, "capacidades.html"), media_type="text/html")
 
-@app.route("/widget.js")
-def widget():
-    return send_from_directory(FRONTEND_DIR, "widget.js", mimetype="application/javascript")
 
-@app.route("/widget.css")
-def widget_css():
-    return send_from_directory(FRONTEND_DIR, "widget.css", mimetype="text/css")
+@app.get("/widget.js")
+async def widget():
+    return FileResponse(os.path.join(FRONTEND_DIR, "widget.js"), media_type="application/javascript")
 
-@app.route("/widget.html")
-def widget_html():
-    return send_from_directory(FRONTEND_DIR, "widget.html", mimetype="text/html")
 
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(FRONTEND_DIR, "favicon.ico"), 204
+@app.get("/widget.css")
+async def widget_css():
+    return FileResponse(os.path.join(FRONTEND_DIR, "widget.css"), media_type="text/css")
+
+
+@app.get("/widget.html")
+async def widget_html():
+    return FileResponse(os.path.join(FRONTEND_DIR, "widget.html"), media_type="text/html")
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse(os.path.join(FRONTEND_DIR, "favicon.ico"), media_type="image/x-icon")
 
 
 # ─────────────────────────────────────────────
 #  MANEJO DE ERRORES
 # ─────────────────────────────────────────────
 
-@app.errorhandler(404)
-def not_found(e):
-    return jsonify({"error": "Ruta no encontrada"}), 404
+@app.exception_handler(404)
+async def not_found(request: Request, exc: HTTPException):
+    return JSONResponse(status_code=404, content={"error": "Ruta no encontrada"})
 
 
-@app.errorhandler(500)
-def server_error(e):
-    return jsonify({"error": "Error interno del servidor"}), 500
+@app.exception_handler(500)
+async def server_error(request: Request, exc: HTTPException):
+    return JSONResponse(status_code=500, content={"error": "Error interno del servidor"})
 
 
 # ─────────────────────────────────────────────
@@ -144,15 +155,11 @@ if __name__ == "__main__":
     print(f"   Debug: {DEBUG}")
     print(f"   Presiona Ctrl+C para detener\n")
 
-    try:
-        app.run(
-            host  = "0.0.0.0",
-            port  = PORT,
-            debug = DEBUG,
-            use_reloader = False,   # evita doble inicialización en debug
-        )
-    except KeyboardInterrupt:
-        print("\n Deteniendo servidor...")
-    finally:
-        updater.detener_scheduler()
-        print(" Servidor detenido correctamente")
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=PORT,
+        reload=DEBUG,
+        log_level="info" if DEBUG else "warning",
+    )

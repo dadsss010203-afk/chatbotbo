@@ -9,7 +9,6 @@ import threading
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
-from flask import session
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
@@ -68,11 +67,9 @@ def _enforce_max_sesiones() -> None:
 def get_sid() -> str:
     """
     Obtiene o crea el session_id del usuario actual.
-    Requiere contexto de Flask activo.
+    Para FastAPI, usa un ID fijo por ahora.
     """
-    if "session_id" not in session:
-        session["session_id"] = str(uuid.uuid4())
-    sid = session["session_id"]
+    sid = "test_session"
     with _lock:
         _purgar_sesiones_expiradas()
         _ultimo_acceso[sid] = _ahora_ts()

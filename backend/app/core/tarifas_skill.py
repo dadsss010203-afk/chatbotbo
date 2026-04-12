@@ -17,6 +17,7 @@ import subprocess
 import time
 import unicodedata
 from dataclasses import dataclass
+from core.cache import get_tariff, set_tariff
 
 
 BASE_APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -1050,7 +1051,7 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
     if columna not in allowed_cols:
         return {"ok": False, "error": f"Columna inválida para EMS {scope}: {columna}"}
 
-    cached = _cache_get(scope, peso, columna, xlsx)
+    cached = get_tariff(scope, peso, columna, xlsx)
     if cached is not None:
         return {**cached, "cached": True}
 
@@ -1081,7 +1082,7 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
         if parsed.get("ok"):
             parsed["scope"] = scope
             parsed["skill_id"] = cfg["skill_id"]
-            _cache_set(scope, peso, columna, xlsx, parsed)
+            set_tariff(scope, peso, columna, parsed, xlsx)
             return parsed
         last = parsed
 

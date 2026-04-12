@@ -9,6 +9,9 @@ import re
 import hashlib
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qmodels
+from core.cache import get_embedding, set_embedding, get_rag_search, set_rag_search
 
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "FALSE")
 
@@ -40,9 +43,6 @@ try:
 except Exception:
     pass
 
-import chromadb
-from chromadb.config import Settings
-
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
@@ -55,6 +55,12 @@ N_RESULTADOS       = int(os.environ.get("N_RESULTADOS",  "3"))
 MAX_CONTEXT_CHARS  = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
 MAX_CONTEXT_TOKENS = int(os.environ.get("MAX_CONTEXT_TOKENS", "900"))
 MIN_CHUNK_CHARS    = int(os.environ.get("MIN_CHUNK_CHARS", "40"))
+RAG_VECTOR_STORE   = os.environ.get("RAG_VECTOR_STORE", "qdrant").lower()
+QDRANT_URL         = os.environ.get("QDRANT_URL", "http://qdrant:6333")
+QDRANT_COLLECTION  = os.environ.get("QDRANT_COLLECTION", "correos")
+USE_TRITON         = os.environ.get("USE_TRITON", "false").lower() in ("1", "true", "yes")
+TRITON_URL         = os.environ.get("TRITON_URL", "http://triton:8000")
+TRITON_EMBEDDING_MODEL = os.environ.get("TRITON_EMBEDDING_MODEL", "embedding_model")
 
 # ─────────────────────────────────────────────
 #  ESTADO GLOBAL
@@ -63,6 +69,18 @@ _embedder   = None
 _client     = None
 _collection = None
 _collection_name = None
+
+
+def _use_qdrant() -> bool:
+    return RAG_VECTOR_STORE == "qdrant"
+
+
+def _use_triton() -> bool:
+    return USE_TRITON and bool(TRITON_URL)
+
+
+def _qdrant_client() -> QdrantClient:
+    return QdrantClient(url=QDRANT_URL, prefer_grpc=False)
 
 
 # ─────────────────────────────────────────────
@@ -97,31 +115,65 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
     _embedder = SentenceTransformer(modelo, **kwargs)
     print(" Modelo de embeddings cargado (con ignore_mismatched_sizes)")
 
-    client      = chromadb.PersistentClient(
-        path=path,
-        settings=Settings(anonymized_telemetry=False),
-    )
-    _client = client
-    _collection_name = collection_name
-    _collection = client.get_or_create_collection(name=collection_name)
-    print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
+    if _use_qdrant():
+        client = _qdrant_client()
+        _client = client
+        _collection_name = collection_name
+        vector_size = _embedder.encode([""], show_progress_bar=False).shape[1]
+        try:
+            collections = [c.name for c in client.get_collections().collections]
+        except Exception:
+            collections = []
+        if collection_name not in collections:
+            client.create_collection(
+                collection_name=collection_name,
+                vectors_config=qmodels.VectorParams(size=vector_size, distance=qmodels.Distance.COSINE),
+            )
+            print(f" Qdrant collection '{collection_name}' creada con vector_size={vector_size}")
+        _collection = collection_name
+        count = client.count(collection_name=collection_name).count
+        print(f" Qdrant listo en '{QDRANT_URL}' ({count} chunks en '{collection_name}')")
+    else:
+        import chromadb
+        from chromadb.config import Settings
+        client      = chromadb.PersistentClient(
+            path=path,
+            settings=Settings(anonymized_telemetry=False),
+        )
+        _client = client
+        _collection_name = collection_name
+        def embed_function(texts):
+            return _embedder.encode(texts, show_progress_bar=False).tolist()
+        _collection = client.get_or_create_collection(name=collection_name, embedding_function=embed_function)
+        print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
 
     return _embedder, _collection
 
 
 def reset_collection() -> bool:
-    """Elimina y recrea la colección actual de ChromaDB."""
+    """Elimina y recrea la colección actual del store de vectores."""
     global _collection
 
     if _client is None or not _collection_name:
         raise RuntimeError("RAG no inicializado. Llama a rag.inicializar() primero.")
 
-    try:
-        _client.delete_collection(name=_collection_name)
-    except Exception:
-        pass
-
-    _collection = _client.get_or_create_collection(name=_collection_name)
+    if _use_qdrant():
+        try:
+            _client.delete_collection(collection_name=_collection_name)
+        except Exception:
+            pass
+        vector_size = _embedder.encode([""], show_progress_bar=False).shape[1]
+        _client.recreate_collection(
+            collection_name=_collection_name,
+            vectors_config=qmodels.VectorParams(size=vector_size, distance=qmodels.Distance.COSINE),
+        )
+        _collection = _collection_name
+    else:
+        try:
+            _client.delete_collection(name=_collection_name)
+        except Exception:
+            pass
+        _collection = _client.get_or_create_collection(name=_collection_name)
     return True
 
 
@@ -139,6 +191,8 @@ def get_embedder():
 
 def total_chunks() -> int:
     """Devuelve la cantidad de chunks indexados actualmente."""
+    if _use_qdrant():
+        return _client.count(collection_name=_collection_name).count
     return get_collection().count()
 
 
@@ -443,13 +497,20 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
 
     # Limpiar BD anterior
     if limpiar:
-        try:
-            todos = col.get()
-            if todos and todos.get("ids"):
-                col.delete(ids=todos["ids"])
-                print(f"   🗑️  {len(todos['ids'])} chunks anteriores eliminados")
-        except Exception as e:
-            print(f"      Error al limpiar: {e}")
+        if _use_qdrant():
+            try:
+                reset_collection()
+                print("   🗑️  Colección Qdrant reiniciada")
+            except Exception as e:
+                print(f"      Error al reiniciar Qdrant: {e}")
+        else:
+            try:
+                todos = col.get()
+                if todos and todos.get("ids"):
+                    col.delete(ids=todos["ids"])
+                    print(f"   🗑️  {len(todos['ids'])} chunks anteriores eliminados")
+            except Exception as e:
+                print(f"      Error al limpiar: {e}")
 
     # Calcular embeddings
     print(f"  {len(chunks)} chunks — calculando embeddings...")
@@ -458,16 +519,39 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
 
     # Insertar en lotes
     for i in tqdm(range(0, len(chunks), BATCH_SIZE), total=total_lotes, desc="Indexando"):
-        payload = {
-            "documents": chunks[i:i + BATCH_SIZE],
-            "embeddings": embeddings[i:i + BATCH_SIZE].tolist(),
-            "ids": chunk_ids[i:i + BATCH_SIZE],
-        }
-        if metadatas:
-            payload["metadatas"] = metadatas[i:i + BATCH_SIZE]
-        col.add(**payload)
+        batch_chunks = chunks[i:i + BATCH_SIZE]
+        batch_ids = chunk_ids[i:i + BATCH_SIZE]
+        batch_embeddings = embeddings[i:i + BATCH_SIZE].tolist()
+        batch_metadata = metadatas[i:i + BATCH_SIZE] if metadatas else None
 
-    print(f" {len(chunks)} chunks indexados en ChromaDB")
+        if _use_qdrant():
+            points = []
+            for idx_chunk, chunk_id in enumerate(batch_ids):
+                payload = {"text": batch_chunks[idx_chunk]}
+                if batch_metadata:
+                    payload.update(batch_metadata[idx_chunk] or {})
+                points.append(
+                    qmodels.PointStruct(
+                        id=chunk_id,
+                        vector=batch_embeddings[idx_chunk],
+                        payload=payload,
+                    )
+                )
+            _client.upsert(collection_name=_collection_name, points=points)
+        else:
+            payload = {
+                "documents": batch_chunks,
+                "embeddings": batch_embeddings,
+                "ids": batch_ids,
+            }
+            if batch_metadata:
+                payload["metadatas"] = batch_metadata
+            col.add(**payload)
+
+    if _use_qdrant():
+        print(f" {len(chunks)} chunks indexados en Qdrant")
+    else:
+        print(f" {len(chunks)} chunks indexados en ChromaDB")
     return True
 
 
@@ -487,17 +571,29 @@ def reemplazar_por_source_type(
     # 1) localizar y eliminar IDs existentes del source_type
     removed = 0
     try:
-        existentes = col.get(include=["metadatas"])
-        ids = existentes.get("ids") or []
-        metas = existentes.get("metadatas") or []
-        ids_a_borrar = []
-        for idx, item_id in enumerate(ids):
-            meta = metas[idx] if idx < len(metas) else {}
-            if (meta or {}).get("source_type") == source_type:
-                ids_a_borrar.append(item_id)
-        if ids_a_borrar:
-            col.delete(ids=ids_a_borrar)
-            removed = len(ids_a_borrar)
+        if _use_qdrant():
+            filter_expr = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="source_type",
+                        match=qmodels.MatchValue(value=source_type),
+                    )
+                ]
+            )
+            _client.delete(collection_name=_collection_name, filter=filter_expr)
+            removed = -1
+        else:
+            existentes = col.get(include=["metadatas"])
+            ids = existentes.get("ids") or []
+            metas = existentes.get("metadatas") or []
+            ids_a_borrar = []
+            for idx, item_id in enumerate(ids):
+                meta = metas[idx] if idx < len(metas) else {}
+                if (meta or {}).get("source_type") == source_type:
+                    ids_a_borrar.append(item_id)
+            if ids_a_borrar:
+                col.delete(ids=ids_a_borrar)
+                removed = len(ids_a_borrar)
     except Exception as exc:
         print(f"   Error eliminando subset '{source_type}': {exc}")
 
@@ -532,14 +628,34 @@ def reemplazar_por_source_type(
     embeddings = emb.encode(dedup_chunks, show_progress_bar=False, batch_size=64)
     total_lotes = (len(dedup_chunks) + BATCH_SIZE - 1) // BATCH_SIZE
     for i in tqdm(range(0, len(dedup_chunks), BATCH_SIZE), total=total_lotes, desc=f"Indexando {source_type}"):
-        payload = {
-            "documents": dedup_chunks[i : i + BATCH_SIZE],
-            "embeddings": embeddings[i : i + BATCH_SIZE].tolist(),
-            "ids": dedup_ids[i : i + BATCH_SIZE],
-        }
-        if dedup_meta:
-            payload["metadatas"] = dedup_meta[i : i + BATCH_SIZE]
-        col.add(**payload)
+        batch_chunks = dedup_chunks[i : i + BATCH_SIZE]
+        batch_ids = dedup_ids[i : i + BATCH_SIZE]
+        batch_embeddings = embeddings[i : i + BATCH_SIZE].tolist()
+        batch_meta = dedup_meta[i : i + BATCH_SIZE] if dedup_meta else None
+
+        if _use_qdrant():
+            points = []
+            for idx_chunk, chunk_id in enumerate(batch_ids):
+                payload = {"text": batch_chunks[idx_chunk]}
+                if batch_meta:
+                    payload.update(batch_meta[idx_chunk] or {})
+                points.append(
+                    qmodels.PointStruct(
+                        id=chunk_id,
+                        vector=batch_embeddings[idx_chunk],
+                        payload=payload,
+                    )
+                )
+            _client.upsert(collection_name=_collection_name, points=points)
+        else:
+            payload = {
+                "documents": batch_chunks,
+                "embeddings": batch_embeddings,
+                "ids": batch_ids,
+            }
+            if batch_meta:
+                payload["metadatas"] = batch_meta
+            col.add(**payload)
 
     return {"ok": True, "removed": removed, "added": len(dedup_chunks)}
 
@@ -600,17 +716,44 @@ def buscar(
     n = n_resultados or N_RESULTADOS
     n_query = min(max(n * 5, 8), 24)
 
-    # Pre-calcular embedding para evitar timeout en ChromaDB
-    vector = emb.encode([pregunta]).tolist()
-    results = col.query(
-        query_embeddings=vector,
-        n_results=min(n_query, max(col.count(), 1)),
-        include=["documents", "metadatas", "distances"],
-    )
+    # Cache de búsqueda RAG completa para preguntas repetidas
+    cached_search = get_rag_search(pregunta)
+    if cached_search is not None:
+        return cached_search
 
-    documents = (results.get("documents") or [[]])[0]
-    metadatas = (results.get("metadatas") or [[]])[0]
-    distances = (results.get("distances") or [[]])[0]
+    # Pre-calcular embedding para evitar timeout en ChromaDB
+    cached_vector = get_embedding(pregunta)
+    if cached_vector is not None:
+        vector = cached_vector
+    else:
+        vector = emb.encode([pregunta]).tolist()
+        set_embedding(pregunta, vector)
+
+    if _use_qdrant():
+        search_results = _client.search(
+            collection_name=_collection_name,
+            query_vector=vector[0],
+            limit=min(n_query, max(_client.count(collection_name=_collection_name).count, 1)),
+            with_payload=True,
+        )
+        documents = []
+        metadatas = []
+        distances = []
+        for hit in search_results:
+            payload = hit.payload or {}
+            documents.append(payload.get("text", ""))
+            metadatas.append(payload)
+            distances.append(getattr(hit, "score", 0.0) or 0.0)
+    else:
+        results = col.query(
+            query_embeddings=vector,
+            n_results=min(n_query, max(col.count(), 1)),
+            include=["documents", "metadatas", "distances"],
+        )
+
+        documents = (results.get("documents") or [[]])[0]
+        metadatas = (results.get("metadatas") or [[]])[0]
+        distances = (results.get("distances") or [[]])[0]
 
     candidatos = []
     vistos = set()
@@ -676,9 +819,10 @@ def buscar(
             }
         )
 
-    primary_source_type = sources[0]["source_type"] if sources else None
-    return {
+    result = {
         "context": contexto,
         "sources": sources,
         "primary_source_type": primary_source_type,
     }
+    set_rag_search(pregunta, result)
+    return result

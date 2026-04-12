@@ -25,7 +25,10 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copiar proyecto
-COPY . .
+COPY backend/app /app
+
+# Cambiar al directorio de la app
+WORKDIR /app
 
 EXPOSE 5000
 
@@ -40,4 +43,4 @@ ENV FLASK_ENV=production \
     N_RESULTADOS=3 \
     OLLAMA_TIMEOUT=600
 
-CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:5000", "--timeout", "120", "wsgi:application"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]

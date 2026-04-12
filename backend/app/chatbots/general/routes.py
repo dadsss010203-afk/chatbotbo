@@ -1,6 +1,6 @@
 """
 chatbots/general/routes.py
-Rutas Flask del chatbot general. Usa el core/ para toda la lógica.
+Rutas FastAPI del chatbot general. Usa el core/ para toda la lógica.
 
 GET  /api/welcome
 POST /api/chat
@@ -21,9 +21,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 import requests
 import json
-from flask import Blueprint, request, jsonify
+from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, Form
+from fastapi.responses import JSONResponse
+from celery.result import AsyncResult
 
 from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, tarifas_skill
+from celery_app import celery
+from tasks import rebuild_rag_task, run_update_task
 from chatbots.general.chat_helpers import (
     buscar_contexto_local_minimo,
     extraer_citas_evidencia,
@@ -37,9 +41,9 @@ from chatbots.general.config import (
 )
 
 # ─────────────────────────────────────────────
-#  BLUEPRINT
+#  ROUTER
 # ─────────────────────────────────────────────
-bp = Blueprint("general", __name__)   # sin prefix → rutas en /api/*
+router = APIRouter(prefix="/api")   # rutas en /api/*
 
 SUCURSALES: list = []
 CHATBOT_GENERAL_ONLY = os.environ.get("CHATBOT_GENERAL_ONLY", "false").strip().lower() in ("1", "true", "yes")
@@ -1129,23 +1133,22 @@ def inicializar():
 #  RUTAS
 # ─────────────────────────────────────────────
 
-@bp.route("/api/welcome", methods=["GET"])
-def welcome():
-    lang = request.args.get("lang", idiomas.IDIOMA_DEFAULT)
+@router.get("/welcome")
+async def welcome(lang: str = idiomas.IDIOMA_DEFAULT):
     if lang not in idiomas.IDIOMAS:
         lang = idiomas.IDIOMA_DEFAULT
-    return jsonify({"response": idiomas.IDIOMAS[lang]["bienvenida"], "lang": lang})
+    return {"response": idiomas.IDIOMAS[lang]["bienvenida"], "lang": lang}
 
 
-@bp.route("/api/chat", methods=["POST"])
-def chat():
+@router.post("/chat")
+async def chat(request: Request):
     sid = session.get_sid()
 
-    data     = request.get_json(silent=True) or {}
+    data = await request.json()
     pregunta = data.get("message", "").strip()
 
     if not pregunta:
-        return jsonify({"error": "Pregunta vacía"}), 400
+        raise HTTPException(status_code=400, detail="Pregunta vacía")
 
     # resolver el idioma lo antes posible para usarlo también en respuestas
     lang = idiomas.resolver_idioma(data.get("lang"), pregunta)
@@ -1186,7 +1189,7 @@ def chat():
     tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta, tarifa_req)
     if tarifa_payload is not None:
         tarifa_payload["lang"] = lang
-        return jsonify(tarifa_payload)
+        return tarifa_payload
 
     # traducción automática: el frontend envía un mensaje como
     # "Traduce EXACTAMENTE este texto al <idioma>...". No queremos aplicar
@@ -1199,9 +1202,9 @@ def chat():
                 {"role": "user", "content": pregunta}
             ])
             respuesta = ollama.limpiar_respuesta(respuesta)
-            return jsonify({"response": respuesta, "lang": lang})
+            return {"response": respuesta, "lang": lang}
         except Exception as e:
-            return jsonify({"error": f"Error traduciéndose: {e}"}), 500
+            raise HTTPException(status_code=500, detail=f"Error traduciéndose: {e}")
 
     if _modo_general_only():
         local_result = buscar_contexto_local_minimo(pregunta, DATA_FILE, HISTORIA_FILE)
@@ -1231,7 +1234,7 @@ def chat():
             if not respuesta_limpia:
                 respuesta = respuesta_chat_vacio(lang, pregunta)
         except Exception:
-            return jsonify({"error": "Error razonando con la IA sobre el contexto local."}), 500
+            raise HTTPException(status_code=500, detail="Error razonando con la IA sobre el contexto local.")
 
         # conservar saltos de línea para que el frontend pueda mostrar la
         # respuesta completa con mejor legibilidad.
@@ -1240,7 +1243,7 @@ def chat():
             respuesta = respuesta[:CHAT_RESPONSE_MAX_CHARS].rsplit(" ", 1)[0].strip() + "..."
 
         session.agregar_turno(sid, pregunta, respuesta)
-        return jsonify({
+        return {
             "response": respuesta,
             "lang": lang,
             "general_only": True,
@@ -1251,7 +1254,7 @@ def chat():
             },
             "sources": local_result.get("sources", []),
             "primary_source_type": local_result.get("primary_source_type"),
-        })
+        }
 
     # si el usuario responde con un pedido corto, reorganizamos la pregunta para
     # no perder el tema anterior. La función `es_pedido_corto` revisa comandos
@@ -1278,7 +1281,7 @@ def chat():
         resultado = capabilities.execute_special_query(consulta_especial, estado)
         respuesta = resultado["response"]
         session.agregar_turno(sid, pregunta, respuesta)
-        return jsonify(
+        return (
             {
                 "response": respuesta,
                 "lang": lang,
@@ -1289,22 +1292,22 @@ def chat():
 
     # ── 1. Saludo → sin Ollama
     if intents.es_saludo(pregunta):
-        return jsonify({"response": t["saludo"], "lang": lang})
+        return {"response": t["saludo"], "lang": lang}
 
     # ── 1.5 Presentación
     if intents.es_presentacion(pregunta):
-        return jsonify({
+        return {
             "response": (
                 "Soy ChatbotBO, el asistente virtual de la Agencia Boliviana de "
                 "Correos. ¿En qué puedo ayudarte?"
             ),
             "lang": lang,
-        })
+        }
 
     # ── 2. Despedida
     if intents.es_despedida(pregunta):
         session.limpiar_historial(sid)
-        return jsonify({"response": t["despedida"], "despedida": True, "lang": lang})
+        return {"response": t["despedida"], "despedida": True, "lang": lang}
 
     # ── 3. ¿Solo nombre de ciudad?
     geo = intents.detectar_solo_ciudad(pregunta, SUCURSALES)
@@ -1326,7 +1329,7 @@ def chat():
             else:
                 mensaje = mensaje.format(ciudades=nombres)
 
-            return jsonify({
+            return ({
                 "response": mensaje,
                 "lang"    : lang,
                 "no_translate": True,   # no traducir esta frase cuando el usuario cambie idioma
@@ -1361,12 +1364,12 @@ def chat():
                 "lng"      : lng,
                 "maps_url" : maps_url,
             }
-        return jsonify(resp_json)
+        return (resp_json)
 
     if not skill_resolution["in_scope"]:
         respuesta = capabilities.out_of_scope_response()
         session.agregar_turno(sid, pregunta, respuesta)
-        return jsonify({
+        return ({
             "response": respuesta,
             "lang": lang,
             "skill_resolution": {
@@ -1386,14 +1389,14 @@ def chat():
         )
         contexto = rag_result.get("context", "")
     except Exception as e:
-        return jsonify({"error": f"Error en búsqueda RAG: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error en búsqueda RAG: {e}")
 
     sources = rag_result.get("sources", [])
     valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
     if not contexto.strip() or not valid_sources:
         respuesta = t["sin_info"]
         session.agregar_turno(sid, pregunta, respuesta)
-        return jsonify({
+        return ({
             "response": respuesta,
             "lang": lang,
             "skill_resolution": {
@@ -1467,7 +1470,7 @@ def chat():
 
         session.agregar_turno(sid, pregunta, respuesta)
         print(f" [{lang}] {len(respuesta)} chars")
-        return jsonify({
+        return ({
             "response": respuesta,
             "lang": lang,
             "skill_resolution": {
@@ -1480,16 +1483,16 @@ def chat():
         })
 
     except requests.exceptions.Timeout:
-        return jsonify({"error": "El modelo tardó demasiado. Intenta de nuevo."}), 504
+        raise HTTPException(status_code=504, detail="El modelo tardó demasiado. Intenta de nuevo.")
     except Exception as e:
-        return jsonify({"error": f"Error generando respuesta: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error generando respuesta: {e}")
 
 # ─────────────────────────────────────────────
 #  TRADUCCIÓN POR LOTES
 # ─────────────────────────────────────────────
 
-@bp.route("/api/translate", methods=["POST"])
-def translate_bulk():
+@router.post("/translate")
+async def translate_bulk(request: Request):
     """
     Traduce texto(s) a un idioma objetivo.
 
@@ -1502,7 +1505,7 @@ def translate_bulk():
 
     Devuelve: { "translations": ["texto1", "texto2", ...], "lang": lang }
     """
-    data = request.get_json(silent=True) or {}
+    data = await request.json()
     lang = data.get("lang", idiomas.IDIOMA_DEFAULT)
 
     # 1. Preparar lista inicial de textos a traducir. El frontend puede
@@ -1516,7 +1519,7 @@ def translate_bulk():
         sid = session.get_sid()
         historial = session.get_historial(sid)
         if not historial:
-            return jsonify({"translations": [], "lang": lang})
+            return ({"translations": [], "lang": lang})
 
         textos_a_traducir = []
         for entry in historial:
@@ -1526,7 +1529,7 @@ def translate_bulk():
             textos_a_traducir.append(content)
 
         if not textos_a_traducir:
-            return jsonify({"translations": [], "lang": lang})
+            return ({"translations": [], "lang": lang})
 
     print(f"🔤 Traducción solicitada ({lang}) para {len(textos_a_traducir)} textos")
     try:
@@ -1537,34 +1540,34 @@ def translate_bulk():
             texts=len(textos_a_traducir),
             backend=backend,
         )
-        return jsonify({"translations": traducciones, "lang": lang, "backend": backend})
+        return ({"translations": traducciones, "lang": lang, "backend": backend})
     except Exception as e:
         print(f"  Error en traducción por lotes: {e}")
-        return jsonify({"error": f"Error en traducción: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error en traducción: {e}")
 
 
-@bp.route("/api/sucursales", methods=["GET"])
-def listar_sucursales():
-    return jsonify({"sucursales": [location.sucursal_a_dict(s) for s in SUCURSALES]})
+@router.get("/sucursales")
+async def listar_sucursales():
+    return {"sucursales": [location.sucursal_a_dict(s) for s in SUCURSALES]}
 
 
-@bp.route("/api/idiomas", methods=["GET"])
-def listar_idiomas():
-    return jsonify({
+@router.get("/idiomas")
+async def listar_idiomas():
+    return {
         "idiomas": [{"code": c, "nombre": d["nombre"]} for c, d in idiomas.IDIOMAS.items()]
-    })
+    }
 
 
-@bp.route("/api/reset", methods=["POST"])
-def reset():
+@router.post("/reset")
+async def reset(request: Request):
     session.limpiar_historial(session.get_sid())
-    return jsonify({"ok": True})
+    return {"ok": True}
 
 
-@bp.route("/api/status", methods=["GET"])
+@router.get("/status")
 def status():
     estado_cap = _estado_capacidades()
-    return jsonify({
+    return ({
         "status"          : "ok",
         "chunks"          : _rag_chunks_seguro(),
         "modelo"          : os.environ.get("LLM_MODEL", "correos-bot"),
@@ -1579,41 +1582,56 @@ def status():
     })
 
 
-@bp.route("/api/metrics", methods=["GET"])
+@router.get("/tasks/{task_id}")
+def task_status(task_id: str):
+    resultado = AsyncResult(task_id, app=celery)
+    return {
+        "task_id": task_id,
+        "status": resultado.status,
+        "ready": resultado.ready(),
+        "failed": resultado.failed(),
+        "result": resultado.result if resultado.ready() else None,
+    }
+
+
+@router.get("/metrics")
 def metrics():
-    return jsonify(observability.get_observability_snapshot())
+    return (observability.get_observability_snapshot())
 
 
-@bp.route("/api/capabilities", methods=["GET"])
+@router.get("/capabilities")
 def listar_capacidades():
-    return jsonify(_estado_capacidades())
+    return (_estado_capacidades())
 
 
-@bp.route("/api/capabilities/options", methods=["GET"])
+@router.get("/capabilities/options")
 def listar_opciones_capacidades():
-    return jsonify(capabilities.management_options())
+    return (capabilities.management_options())
 
 
-@bp.route("/api/pdfs", methods=["GET"])
+@router.get("/pdfs")
 def listar_pdfs():
-    return jsonify({
+    return ({
         "pdfs": capabilities.listar_pdfs(),
         "resumen": capabilities.resumen_pdfs(),
     })
 
 
-@bp.route("/api/scraping", methods=["GET"])
+@router.get("/scraping")
 def scraping_info():
-    return jsonify(capabilities.get_scraping_summary())
+    return (capabilities.get_scraping_summary())
 
 
-@bp.route("/api/pdfs/upload", methods=["POST"])
-def subir_pdf():
-    archivo = request.files.get("file")
-    fuente_url = request.form.get("fuente_url", "")
-    pagina_fuente = request.form.get("pagina_fuente", "")
-    clean_mode = request.form.get("clean_mode", "")
+@router.post("/pdfs/upload")
+async def subir_pdf(
+    file: UploadFile = File(...),
+    fuente_url: str = Form(""),
+    pagina_fuente: str = Form(""),
+    clean_mode: str = Form(""),
+):
     try:
+        # Convert UploadFile to file-like object for compatibility
+        archivo = file.file
         resultado = capabilities.guardar_pdf_subido(
             archivo,
             fuente_url=fuente_url,
@@ -1621,82 +1639,82 @@ def subir_pdf():
             clean_mode=clean_mode,
         )
         resultado["reindex_started"] = _programar_reindex_debounced("pdf_upload", mode="pdf_only")
-        return jsonify(resultado), 201 if resultado.get("created") else 200
+        return JSONResponse(content=resultado, status_code=201 if resultado.get("created") else 200)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        return jsonify({"error": f"Error subiendo PDF: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error subiendo PDF: {e}")
 
 
-@bp.route("/api/pdfs/<path:nombre_archivo>", methods=["DELETE"])
-def eliminar_pdf(nombre_archivo: str):
+@router.delete("/pdfs/{nombre_archivo:path}")
+def eliminar_pdf(nombre_archivo: str = Path(..., description="Nombre del archivo PDF a eliminar")):
     try:
         resultado = capabilities.eliminar_pdf(nombre_archivo)
         resultado["reindex_started"] = _programar_reindex_debounced("pdf_delete", mode="pdf_only")
-        return jsonify(resultado)
+        return resultado
     except FileNotFoundError as e:
-        return jsonify({"error": str(e)}), 404
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        return jsonify({"error": f"Error eliminando PDF: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error eliminando PDF: {e}")
 
 
-@bp.route("/api/pdfs/<path:nombre_archivo>", methods=["PUT"])
-def editar_pdf_texto(nombre_archivo: str):
-    data = request.get_json(silent=True) or {}
+@router.put("/pdfs/{nombre_archivo:path}")
+async def editar_pdf_texto(request: Request, nombre_archivo: str = Path(..., description="Nombre del archivo PDF a editar")):
+    data = await request.json()
     texto_extraido = data.get("texto_extraido", "")
     if texto_extraido is not None and not isinstance(texto_extraido, str):
-        return jsonify({"error": "texto_extraido debe ser string"}), 400
+        raise HTTPException(status_code=400, detail="texto_extraido debe ser string")
     try:
         resultado = capabilities.actualizar_texto_pdf(nombre_archivo, texto_extraido)
         resultado["reindex_started"] = _programar_reindex_debounced("pdf_manual_edit", mode="pdf_only")
-        return jsonify(resultado)
+        return resultado
     except FileNotFoundError as e:
-        return jsonify({"error": str(e)}), 404
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
-        return jsonify({"error": f"Error editando PDF: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error editando PDF: {e}")
 
 
-@bp.route("/api/skills", methods=["GET"])
+@router.get("/skills")
 def listar_skills():
-    return jsonify({"skills": _estado_capacidades()["skills"]})
+    return ({"skills": _estado_capacidades()["skills"]})
 
 
-@bp.route("/api/skills", methods=["POST"])
-def guardar_skill():
-    data = request.get_json(silent=True) or {}
+@router.post("/skills")
+async def guardar_skill(request: Request):
+    data = await request.json()
     try:
         resultado = capabilities.guardar_skill(data)
         # skills afectan resolución/prompt, no requieren reindex vectorial
         resultado["reindex_started"] = False
-        return jsonify(resultado), 201 if resultado["created"] else 200
+        return JSONResponse(content=resultado, status_code=201 if resultado["created"] else 200)
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        return jsonify({"error": f"Error guardando skill: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error guardando skill: {e}")
 
 
-@bp.route("/api/skills/<skill_id>", methods=["DELETE"])
-def eliminar_skill(skill_id: str):
+@router.delete("/skills/{skill_id}")
+def eliminar_skill(skill_id: str = Path(..., description="ID del skill a eliminar")):
     if capabilities.eliminar_skill(skill_id):
-        return jsonify({
+        return {
             "ok": True,
             "id": skill_id,
             "reindex_started": False,
-        })
-    return jsonify({"error": "Skill no encontrada"}), 404
+        }
+    raise HTTPException(status_code=404, detail="Skill no encontrada")
 
 
-@bp.route("/api/actualizar", methods=["POST"])
+@router.post("/actualizar")
 def actualizar():
     if updater.estado["en_proceso"]:
-        return jsonify({"ok": False, "mensaje": "  Actualización ya en proceso."}), 409
-    updater.disparar_manual(reindexar_fn=reindexar)
-    return jsonify({"ok": True, "mensaje": "  Actualización iniciada."})
+        raise HTTPException(status_code=409, detail="  Actualización ya en proceso.")
+    task = run_update_task.delay()
+    return {"ok": True, "mensaje": "Actualización encolada.", "task_id": task.id}
 
 
-@bp.route("/api/tarifa", methods=["POST"])
-def calcular_tarifa():
-    data = request.get_json(silent=True) or {}
+@router.post("/tarifa")
+async def calcular_tarifa(request: Request):
+    data = await request.json()
     peso = (data.get("peso") or "").strip()
     scope = tarifas_skill.resolve_scope(data.get("scope") or data.get("alcance") or data.get("tipo"))
     columna = tarifas_skill.resolve_columna(data.get("columna"), scope=scope) or ""
@@ -1721,12 +1739,12 @@ def calcular_tarifa():
             columna = (req.columna or "").upper()
 
     if not scope:
-        return jsonify({"ok": False, "error": tarifas_skill.missing_message(["alcance"])}), 400
+        raise HTTPException(status_code=400, detail=tarifas_skill.missing_message(["alcance"]))
 
     if not peso:
-        return jsonify({"ok": False, "error": tarifas_skill.missing_message(["peso"])}), 400
+        raise HTTPException(status_code=400, detail=tarifas_skill.missing_message(["peso"]))
     if not columna:
-        return jsonify({"ok": False, "error": tarifas_skill.missing_message(["destino"])}), 400
+        raise HTTPException(status_code=400, detail=tarifas_skill.missing_message(["destino"]))
 
     resultado = tarifas_skill.ejecutar_tarifa(
         peso=peso,
@@ -1735,24 +1753,21 @@ def calcular_tarifa():
         xlsx=(data.get("xlsx") or "").strip() or None,
     )
     status = 200 if resultado.get("ok") else 422
-    return jsonify(resultado), status
+    return (resultado), status
 
 
-@bp.route("/api/rag/rebuild", methods=["POST"])
-def rebuild_rag():
+@router.post("/rag/rebuild")
+async def rebuild_rag():
     try:
-        print("  Iniciando rebuild limpio del RAG...")
-        exito = reindexar()
-        if not exito:
-            return jsonify({"ok": False, "error": "No se pudieron indexar documentos en el rebuild limpio del RAG."}), 500
-        print(f"  Rebuild limpio del RAG completado ({rag.total_chunks()} chunks).")
-        return jsonify({
+        print("  Encolando rebuild limpio del RAG...")
+        task = rebuild_rag_task.delay()
+        return {
             "ok": True,
-            "mensaje": "Rebuild limpio del RAG completado.",
-            "chunks": rag.total_chunks(),
-        })
+            "mensaje": "Rebuild limpio del RAG encolado.",
+            "task_id": task.id,
+        }
     except Exception as e:
-        return jsonify({"ok": False, "error": f"Error en rebuild limpio del RAG: {e}"}), 500
+        raise HTTPException(status_code=500, detail=f"Error en rebuild limpio del RAG: {e}")
 
 
 # ─────────────────────────────────────────────
@@ -1763,8 +1778,8 @@ def rebuild_rag():
 # ha dividido esto en rutas REST más explícitas, pero mantener un
 # manejador genérico ayuda a que integraciones existentes no se rompan.
 
-@bp.route("/api", methods=["GET", "POST"])
-def api_root():
+@router.api_route("/api", methods=["GET", "POST"])
+async def api_root(request: Request):
     """Ruteador ligero para compatibilidad con versiones antiguas del
     widget y otros clientes que envían `action` en vez de llamar a
     subrutas específicas.
@@ -1777,24 +1792,24 @@ def api_root():
     - POST /api {"message":...}            → chat
     """
     if request.method == "GET":
-        act = request.args.get("action")
+        act = request.query_params.get("action")
         if act == "sucursales":
-            return listar_sucursales()
+            return await listar_sucursales()
         if act == "idiomas":
-            return listar_idiomas()
-        return jsonify({"error": "action no soportada"}), 400
+            return await listar_idiomas()
+        raise HTTPException(status_code=400, detail="action no soportada")
 
     # POST
-    data = request.get_json(silent=True) or {}
+    data = await request.json()
     act = data.get("action")
     if act == "translate":
         # el método translate_bulk espera 'lang' y 'texts' opcionales
-        return translate_bulk()
+        return await translate_bulk(request)
     if act == "reset":
-        return reset()
+        return await reset(request)
     if act == "rebuild_rag":
-        return rebuild_rag()
+        return await rebuild_rag()
     # si el cuerpo contiene 'message' asumimos chat
     if "message" in data:
         return chat()
-    return jsonify({"error": "requisição inválida"}), 400
+    raise HTTPException(status_code=400, detail="requisição inválida")

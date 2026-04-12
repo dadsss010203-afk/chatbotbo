@@ -42,6 +42,61 @@ services:
       "
     restart: "no"
 
+  redis:
+    image: redis:7-alpine
+    container_name: chatbotbo_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: chatbotbo_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 5 bash -c '</dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery_worker:
+    build:
+      context: ./backend/app
+      dockerfile: ../../Dockerfile
+    container_name: chatbotbo_celery
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+      - REDIS_URL=redis://redis:6379/0
+      - RAG_VECTOR_STORE=qdrant
+      - QDRANT_URL=http://qdrant:6333
+      - TRITON_URL=http://triton:8000
+      - USE_TRITON=false
+      - EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+      - CHROMA_PATH=/app/chroma_db
+      - CHUNK_SIZE=600
+      - BATCH_SIZE=500
+      - N_RESULTADOS=3
+    command: celery -A celery_app worker --loglevel=info
+
   chatbot:
     build:
       context: ./backend/app
@@ -54,6 +109,8 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "5000:5000"
     volumes:
@@ -63,9 +120,16 @@ services:
       - ./backend/app:/app
     environment:
       - OLLAMA_URL=http://ollama:11434/api/chat
-      - OLLAMA_TIMEOUT=600
+      - OLLAMA_TIMEOUT=120
+      - REDIS_URL=redis://redis:6379/0
+      - REDIS_CACHE_TTL=3600
+      - REDIS_EMBEDDING_CACHE=true
       - LLM_MODEL=correos-bot
       - EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2
+      - RAG_VECTOR_STORE=qdrant
+      - QDRANT_URL=http://qdrant:6333
+      - TRITON_URL=http://triton:8000
+      - USE_TRITON=false
       - CHROMA_PATH=/app/chroma_db
       - CHUNK_SIZE=600
       - BATCH_SIZE=500
@@ -74,6 +138,7 @@ services:
       - PYTHONUNBUFFERED=1
       - TARIFF_SKILL_ROOT=/app/skills/skill1
       - TARIFF_SKILLS_ROOT=/app/skills
+      - UVICORN_WORKERS=4
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/api/status || exit 1"]
       interval: 30s
@@ -84,3 +149,5 @@ services:
 volumes:
   ollama_data:
   chroma_data:
+  redis_data:
+  qdrant_data:
