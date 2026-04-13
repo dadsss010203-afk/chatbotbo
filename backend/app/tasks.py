@@ -8,6 +8,10 @@ def rebuild_rag_task(self):
     """Reconstruye el índice RAG en segundo plano."""
     try:
         from chatbots.general import routes as general_routes
+        from core import rag
+
+        # Initialize RAG before reindexing
+        rag.inicializar(collection_name="general")
 
         success = general_routes.reindexar()
         return {"ok": bool(success), "reindexed": bool(success)}

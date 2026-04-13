@@ -102,6 +102,7 @@ function initWidget(s) {
   }, 200);
 
   if (lang !== 'es') setLang(lang);
+  setTarifaModeUI();
 
   console.log('Chat Bubble Widget - Correos de Bolivia cargado');
 }
@@ -113,6 +114,8 @@ let busy        = false;
 let translating = false;
 let ctrl        = null;
 let mapInst     = null;
+let tarifaMode  = false;
+let sid         = localStorage.getItem('chat_sid') || '';
 
 // ─── TEXTOS POR IDIOMA ─────────────────────────────
 const TX = {
@@ -170,6 +173,58 @@ const TX = {
 function setStop(v) {
   document.getElementById('stop').classList.toggle('vis', v);
   document.getElementById('send').style.display = v ? 'none' : 'flex';
+}
+
+function setTarifaModeUI() {
+  const btn = document.getElementById('tarifa-toggle');
+  if (!btn) return;
+  btn.classList.toggle('active', tarifaMode);
+  btn.textContent = tarifaMode ? 'Cancelar tarifa' : 'Tarifas';
+}
+
+async function cancelTarifaMode(notify = true) {
+  tarifaMode = false;
+  setTarifaModeUI();
+  try {
+    const res = await fetch(`${API_URL}/tarifa/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid }),
+    });
+    const data = await res.json();
+    if (data && data.sid) {
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+  } catch (e) {
+    console.warn('No se pudo cancelar flujo tarifa:', e);
+  }
+  if (notify) addMsg('Modo tarifas cancelado. Volviste al chat general.', 'b', false, null);
+}
+
+async function toggleTarifaMode() {
+  if (tarifaMode) {
+    await cancelTarifaMode(true);
+    return;
+  }
+  tarifaMode = true;
+  setTarifaModeUI();
+  try {
+    const res = await fetch(`${API_URL}/tarifa/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid, lang }),
+    });
+    const data = await res.json();
+    if (data && data.sid) {
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+    addMsg(data.response || '¿Qué servicio quieres usar?', 'b', false, data.conversation_log_id || null);
+    addQuickReplies(Array.isArray(data.quick_replies) ? data.quick_replies : []);
+  } catch (e) {
+    addMsg('Modo tarifas activado. ¿Qué servicio quieres usar?', 'b', false, null);
+  }
 }
 
 function now() {
@@ -266,6 +321,21 @@ function mkAv(t) {
   return a;
 }
 
+async function rateConversation(logId, rating, likeBtn, dislikeBtn) {
+  if (!logId) return;
+  try {
+    await fetch(`${API_URL}/conversations/${encodeURIComponent(String(logId))}/rating`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating }),
+    });
+    if (likeBtn) likeBtn.classList.toggle('active-like', rating === 'like');
+    if (dislikeBtn) dislikeBtn.classList.toggle('active-dislike', rating === 'dislike');
+  } catch (e) {
+    console.warn('No se pudo guardar rating:', e);
+  }
+}
+
 // ─── MENSAJE DE BIENVENIDA (burbuja fija, no desaparece) ───
 function addWelcomeMsg(text) {
   const chat = document.getElementById('chat');
@@ -302,7 +372,7 @@ function addWelcomeMsg(text) {
 }
 
 // ─── AÑADIR MENSAJE ────────────────────────────────
-function addMsg(text, type, bye = false) {
+function addMsg(text, type, bye = false, conversationLogId = null) {
   // Solo eliminar el card de chips, la burbuja de bienvenida (welcomeMsg) se queda
   document.getElementById('welcomeCard')?.remove();
 
@@ -327,9 +397,24 @@ function addMsg(text, type, bye = false) {
   if (!bye && type === 'b') {
     const acts = document.createElement('div');
     acts.className = 'msg-actions';
-    const btn = document.createElement('button');
-    
-    acts.appendChild(btn);
+    if (conversationLogId) {
+      const likeBtn = document.createElement('button');
+      likeBtn.className = 'btn-rate';
+      likeBtn.type = 'button';
+      likeBtn.title = 'Me gustó esta respuesta';
+      likeBtn.textContent = '👍';
+      likeBtn.onclick = () => rateConversation(conversationLogId, 'like', likeBtn, dislikeBtn);
+
+      const dislikeBtn = document.createElement('button');
+      dislikeBtn.className = 'btn-rate';
+      dislikeBtn.type = 'button';
+      dislikeBtn.title = 'No me gustó esta respuesta';
+      dislikeBtn.textContent = '👎';
+      dislikeBtn.onclick = () => rateConversation(conversationLogId, 'dislike', likeBtn, dislikeBtn);
+
+      acts.appendChild(likeBtn);
+      acts.appendChild(dislikeBtn);
+    }
     body.appendChild(acts);
   }
 
@@ -459,13 +544,21 @@ async function sendMsg(msg) {
     const res  = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, lang }),
+      body: JSON.stringify({ message: msg, lang, sid, tarifa_mode: tarifaMode }),
       signal: ctrl.signal
     });
     const data = await res.json();
+    if (data && data.sid) {
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
     removeTyping();
     const bye = data.despedida === true;
-    addMsg(data.response || data.error || 'Sin respuesta disponible', 'b', bye);
+    addMsg(data.response || data.error || 'Sin respuesta disponible', 'b', bye, data.conversation_log_id || null);
+    if (data?.tarifa?.requires_mode) {
+      tarifaMode = false;
+      setTarifaModeUI();
+    }
     addQuickReplies((Array.isArray(data.quick_replies) && data.quick_replies.length > 0) ? data.quick_replies : quickRepliesFromTarifa(data));
     if (bye) {
       inp.disabled = true;
@@ -495,10 +588,16 @@ function closeConf() { document.getElementById('confirm-bar').classList.remove('
 async function doClear() {
   closeConf();
   try {
-    await fetch(`${API_URL}/reset`, {
+    const res = await fetch(`${API_URL}/reset`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid }),
     });
+    const data = await res.json();
+    if (data && data.sid) {
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
   } catch (e) {}
 
   const chat = document.getElementById('chat');
@@ -524,6 +623,8 @@ async function doClear() {
   inp.disabled    = false;
   inp.placeholder = t.ph;
   document.getElementById('send').disabled = false;
+  tarifaMode = false;
+  setTarifaModeUI();
   busy = false;
   setStop(false);
 }

@@ -95,7 +95,13 @@ services:
       - CHUNK_SIZE=600
       - BATCH_SIZE=500
       - N_RESULTADOS=3
-    command: celery -A celery_app worker --loglevel=info
+      - PYTHONPATH=/app
+      - HF_HOME=/tmp/huggingface_cache
+    volumes:
+      - ./backend/app/data:/app/data
+    healthcheck:
+      disable: true
+    command: celery -A celery_app:celery worker --loglevel=info --uid=nobody --gid=nogroup
 
   chatbot:
     build:
@@ -111,16 +117,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      qdrant:
+        condition: service_healthy
     ports:
       - "5000:5000"
     volumes:
       - chroma_data:/app/chroma_db
       - ./backend/app/data:/app/data
-      - ./frontend:/frontend
-      - ./backend/app:/app
+      - ./frontend:/frontend:ro
     environment:
       - OLLAMA_URL=http://ollama:11434/api/chat
-      - OLLAMA_TIMEOUT=120
+      - OLLAMA_TIMEOUT=240
+      - OLLAMA_NUM_PREDICT=120
+      - OLLAMA_RETRIES=1
       - REDIS_URL=redis://redis:6379/0
       - REDIS_CACHE_TTL=3600
       - REDIS_EMBEDDING_CACHE=true
@@ -133,12 +142,14 @@ services:
       - CHROMA_PATH=/app/chroma_db
       - CHUNK_SIZE=600
       - BATCH_SIZE=500
-      - N_RESULTADOS=3
-      - FLASK_ENV=production
+      - N_RESULTADOS=2
       - PYTHONUNBUFFERED=1
-      - TARIFF_SKILL_ROOT=/app/skills/skill1
-      - TARIFF_SKILLS_ROOT=/app/skills
-      - UVICORN_WORKERS=4
+      - UVICORN_WORKERS=1
+      - PYTHONPATH=/app
+      - CHATBOT_GENERAL_ONLY=false
+      - REQUIRE_EVIDENCE=false
+      - CHAT_RESPONSE_MAX_CHARS=300
+    command: sh -c "uvicorn main:app --host 0.0.0.0 --port 5000 --workers $${UVICORN_WORKERS:-1}"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/api/status || exit 1"]
       interval: 30s

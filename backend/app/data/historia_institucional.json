@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "titulo": "Historia de Correos Bolivia",
+    "url": "",
+    "contenido": "La historia del servicio postal en Bolivia se remonta a los inicios de la República. En 1886, Bolivia se integra a la Unión Postal Universal (UPU). En 1990, se crea ECOBOL, que opera por décadas hasta su cierre en 2018 debido a problemas financieros y administrativos. Ese mismo año, nace la Agencia Boliviana de Correos (AGBC) mediante el Decreto Supremo N° 3495, como operador público designado para garantizar el servicio postal universal, cobertura nacional, vinculación internacional y modernización operativa. En 2026, se consolida la identidad institucional bajo el nombre Correos de Bolivia, manteniendo su misión de conectar territorios y personas en el país y con el extranjero.",
+    "anos_mencionados": [1886, 1990, 2018, 2026]
+  }
+]

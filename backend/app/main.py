@@ -28,6 +28,11 @@ from chatbots.general import routes as general_routes
 #  APP FASTAPI
 # ─────────────────────────────────────────────
 app = FastAPI(title="ChatbotBO", description="Agencia Boliviana de Correos")
+_APP_INITIALIZED = False
+
+@app.on_event("startup")
+def startup_event():
+    inicializar()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -107,6 +112,10 @@ def inicializar():
     3. Indexa datos del scraper (si la BD está vacía)
     4. Inicia el scheduler de actualización automática
     """
+    global _APP_INITIALIZED
+    if _APP_INITIALIZED:
+        return
+
     print("\n" + "=" * 50)
     print("   ChatbotBO — Agencia Boliviana de Correos")
     print("=" * 50)
@@ -139,6 +148,7 @@ def inicializar():
     print("  GET  /api/status        → Estado del sistema")
     print("  POST /api/actualizar    → Forzar actualización")
     print("=" * 50)
+    _APP_INITIALIZED = True
 
 
 # ─────────────────────────────────────────────

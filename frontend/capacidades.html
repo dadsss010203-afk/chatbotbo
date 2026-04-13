@@ -283,8 +283,12 @@
         <a class="menu-btn" data-view="overview" href="/gestion/capacidades">Resumen<small>Estado general del sistema</small></a>
         <a class="menu-btn" data-view="skills" href="/gestion/capacidades/skills">Skills<small>Capacidades funcionales</small></a>
         <a class="menu-btn" data-view="pdfs" href="/gestion/capacidades/pdfs">PDFs<small>Extracción y limpieza</small></a>
+        <a class="menu-btn" data-view="data" href="/gestion/capacidades/data">Datos JSON<small>Archivos operativos en data/</small></a>
         <a class="menu-btn" data-view="scraping" href="/gestion/capacidades/scraping">Web Scraping<small>Contenido recolectado del sitio</small></a>
         <a class="menu-btn" data-view="resources" href="/gestion/capacidades/recursos">Recursos IA<small>Modelos, rutas y configuración</small></a>
+        <a class="menu-btn" data-view="cache" href="/gestion/capacidades/cache">Cache Redis<small>Memoria, claves y namespaces</small></a>
+        <a class="menu-btn" data-view="conversations" href="/gestion/capacidades/conversaciones">Conversaciones<small>Log persistente en base de datos</small></a>
+        <a class="menu-btn" data-view="tariff-conversations" href="/gestion/capacidades/conversaciones-tarifas">Conversaciones Tarifas<small>Flujos determinísticos separados</small></a>
       </nav>
       <div class="side-actions">
         <a class="side-link" href="/">Volver al chat</a>
@@ -384,6 +388,32 @@
         </div>
       </section>
 
+      <section class="section view-section" id="view-data">
+        <div class="section-head">
+          <div>
+            <h3>Datos JSON</h3>
+            <p>Administra los JSON del directorio data (enlaces, aplicativos, noticias, estadísticas y otros). Puedes revisar y editar su contenido con reindexado automático.</p>
+          </div>
+        </div>
+        <div class="section-summary" id="data-summary"></div>
+        <div class="table-wrap">
+          <table id="data-table">
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>Estado</th>
+                <th>Tipo</th>
+                <th>Entradas</th>
+                <th>Tamaño</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="data-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="data-count">0 registros</span></div>
+        </div>
+      </section>
+
       <section class="section view-section" id="view-scraping">
         <div class="section-head">
           <div>
@@ -403,6 +433,108 @@
           </div>
         </div>
         <div class="resource-grid" id="resources-grid"></div>
+      </section>
+
+      <section class="section view-section" id="view-cache">
+        <div class="section-head">
+          <div>
+            <h3>Cache Redis</h3>
+            <p>Vista operativa de memoria y distribución de claves para RAG, embeddings y tarifas.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-danger" type="button" onclick="clearResponseCache()">Limpiar cache respuestas</button>
+          </div>
+        </div>
+        <div class="section-summary" id="cache-summary"></div>
+        <div class="resource-grid" id="cache-grid"></div>
+        <div class="table-wrap" style="margin-top:14px;">
+          <table id="cache-responses-table">
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>Respuesta</th>
+                <th>Lang</th>
+                <th>Skill</th>
+                <th>Fuente</th>
+                <th>Creado</th>
+                <th>TTL</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="cache-responses-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="cache-responses-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-conversations">
+        <div class="section-head">
+          <div>
+            <h3>Conversaciones</h3>
+            <p>Log persistente en SQLite. Es independiente del RAG y no se usa como contexto para el LLM.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-danger" type="button" onclick="clearConversations()">Limpiar log</button>
+          </div>
+        </div>
+        <div class="section-summary" id="conversations-summary"></div>
+        <div class="table-wrap">
+          <table id="conversations-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Pregunta</th>
+                <th>Respuesta</th>
+                <th>Lang</th>
+                <th>Skill</th>
+                <th>Fuente</th>
+                <th>Cache</th>
+                <th>Calificación</th>
+                <th>Latencia</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="conversations-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="conversations-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-tariff-conversations">
+        <div class="section-head">
+          <div>
+            <h3>Conversaciones Tarifas</h3>
+            <p>Log separado para el flujo determinístico de tarifas. Cada fila guarda una consulta completa (inicio a cierre).</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-danger" type="button" onclick="clearTariffConversations()">Limpiar log tarifas</button>
+          </div>
+        </div>
+        <div class="section-summary" id="tariff-conversations-summary"></div>
+        <div class="table-wrap">
+          <table id="tariff-conversations-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Scope</th>
+                <th>Peso</th>
+                <th>Columna</th>
+                <th>Precio</th>
+                <th>Flujo</th>
+                <th>Latencia</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="tariff-conversations-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="tariff-conversations-count">0 registros</span></div>
+        </div>
       </section>
     </main>
   </div>
@@ -502,7 +634,13 @@
     const state = {
       capabilities: null,
       pdfsPayload: null,
+      dataJsonPayload: null,
+      dataJsonDetailCache: {},
       scrapingPayload: null,
+      cachePayload: null,
+      responseCachePayload: null,
+      conversationsPayload: null,
+      tariffConversationsPayload: null,
       options: null,
       currentModal: null,
       pdfsDataTable: null,
@@ -526,17 +664,30 @@
       topCardUpdate: document.getElementById('top-card-update'),
       skillsSummary: document.getElementById('skills-summary'),
       pdfsSummary: document.getElementById('pdfs-summary'),
+      dataSummary: document.getElementById('data-summary'),
       scrapingSummary: document.getElementById('scraping-summary'),
+      cacheSummary: document.getElementById('cache-summary'),
+      conversationsSummary: document.getElementById('conversations-summary'),
+      tariffConversationsSummary: document.getElementById('tariff-conversations-summary'),
       skillMsg: document.getElementById('skill-msg'),
       pdfMsg: document.getElementById('pdf-msg'),
       heroRuntime: document.getElementById('hero-runtime'),
       statsGrid: document.getElementById('view-overview-stats'),
       skillsBody: document.getElementById('skills-body'),
       pdfsBody: document.getElementById('pdfs-body'),
+      dataBody: document.getElementById('data-body'),
       skillsCount: document.getElementById('skills-count'),
       pdfsCount: document.getElementById('pdfs-count'),
+      dataCount: document.getElementById('data-count'),
       resourcesGrid: document.getElementById('resources-grid'),
       scrapingGrid: document.getElementById('scraping-grid'),
+      cacheGrid: document.getElementById('cache-grid'),
+      cacheResponsesBody: document.getElementById('cache-responses-body'),
+      cacheResponsesCount: document.getElementById('cache-responses-count'),
+      conversationsBody: document.getElementById('conversations-body'),
+      conversationsCount: document.getElementById('conversations-count'),
+      tariffConversationsBody: document.getElementById('tariff-conversations-body'),
+      tariffConversationsCount: document.getElementById('tariff-conversations-count'),
       skillMode: document.getElementById('skill-mode'),
       skillCategory: document.getElementById('skill-category'),
       heroCreateSkill: document.getElementById('hero-create-skill'),
@@ -544,8 +695,12 @@
         overview: document.getElementById('view-overview-stats'),
         skills: document.getElementById('view-skills'),
         pdfs: document.getElementById('view-pdfs'),
+        data: document.getElementById('view-data'),
         scraping: document.getElementById('view-scraping'),
         resources: document.getElementById('view-resources'),
+        cache: document.getElementById('view-cache'),
+        conversations: document.getElementById('view-conversations'),
+        'tariff-conversations': document.getElementById('view-tariff-conversations'),
       }
     };
 
@@ -565,6 +720,11 @@
         description: 'Supervisa los PDFs descargados por el scraping, el estado de extracción y la limpieza documental del RAG.',
         showSkillButton: false,
       },
+      data: {
+        title: 'Gestión de Datos JSON',
+        description: 'Administra los archivos JSON del directorio data, revisa su estructura y actualiza contenido con reindexado automático.',
+        showSkillButton: false,
+      },
       scraping: {
         title: 'Información de Web Scraping',
         description: 'Consulta el estado del scraping, el volumen recolectado y muestras del contenido obtenido desde la web institucional.',
@@ -573,6 +733,21 @@
       resources: {
         title: 'Recursos de IA',
         description: 'Consulta modelos, rutas, configuración del RAG y archivos críticos usados por el sistema.',
+        showSkillButton: false,
+      },
+      cache: {
+        title: 'Cache Redis',
+        description: 'Consulta en tiempo real memoria y claves de caché para RAG, embeddings y cálculo de tarifas.',
+        showSkillButton: false,
+      },
+      conversations: {
+        title: 'Log de Conversaciones',
+        description: 'Historial persistente en base de datos, gestionable desde panel y aislado del contexto usado por el modelo.',
+        showSkillButton: false,
+      },
+      'tariff-conversations': {
+        title: 'Log de Tarifas Determinísticas',
+        description: 'Flujos completos de tarifas en una tabla independiente, separados del log conversacional general.',
         showSkillButton: false,
       }
     };
@@ -588,9 +763,27 @@
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
         ...options
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+      const raw = await response.text();
+      let data = {};
+      if (raw) {
+        try {
+          data = JSON.parse(raw);
+        } catch (_) {
+          data = { raw };
+        }
+      }
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || data.raw || `HTTP ${response.status}`);
+      }
       return data;
+    }
+
+    function formatBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (value <= 0) return '0 B';
+      if (value < 1024) return `${value} B`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+      return `${(value / (1024 * 1024)).toFixed(2)} MB`;
     }
 
     function renderSummaryCards(target, items) {
@@ -608,6 +801,8 @@
       const last = parts[parts.length - 1];
       if (!last || last === 'capacidades') return 'overview';
       if (last === 'recursos') return 'resources';
+      if (last === 'conversaciones') return 'conversations';
+      if (last === 'conversaciones-tarifas') return 'tariff-conversations';
       return viewConfig[last] ? last : 'overview';
     }
 
@@ -753,6 +948,37 @@
         { label: 'Sin texto', value: pdfs.filter(item => !item.texto_disponible).length, note: 'Candidatos a reprocesamiento u OCR.' },
       ]);
       setupPdfsDataTable();
+    }
+
+    function renderDataJsons() {
+      const payload = state.dataJsonPayload || {};
+      const items = payload.items || [];
+      const resumen = payload.resumen || {};
+
+      els.dataBody.innerHTML = items.map(item => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(item.nombre_archivo)}</span></td>
+          <td><span class="pill ${item.estado === 'ok' ? 'ok' : 'warn'}">${escapeHtml(item.estado || '—')}</span></td>
+          <td>${escapeHtml(item.tipo || '—')}</td>
+          <td>${escapeHtml(String(item.entradas ?? 0))}</td>
+          <td>${escapeHtml(formatBytes(item.tamano_bytes || 0))}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showDataJsonDetail('${escapeHtml(item.nombre_archivo)}')">Detalle</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      els.dataCount.textContent = `${items.length} registros`;
+      renderSummaryCards(els.dataSummary, [
+        { label: 'Total JSON', value: resumen.total ?? items.length, note: 'Archivos JSON gestionables desde data/.' },
+        { label: 'Válidos', value: resumen.validos ?? 0, note: 'JSON parseables y listos para indexación.' },
+        { label: 'Inválidos', value: resumen.invalidos ?? 0, note: 'Archivos con estructura JSON rota o inválida.' },
+        { label: 'Entradas', value: resumen.total_entradas ?? 0, note: 'Suma de elementos detectados en arrays/objetos.' },
+        { label: 'Peso total', value: `${resumen.tamano_total_kb ?? 0} KB`, note: 'Tamaño combinado de los JSON gestionables.' },
+      ]);
+      setupGenericDataTable('#data-table', 'archivos JSON', 5);
     }
 
     function renderScraping() {
@@ -964,6 +1190,164 @@
       `).join('');
     }
 
+    function renderCache() {
+      const payload = state.cachePayload || {};
+      const responseItems = state.responseCachePayload?.items || [];
+      const available = !!payload.available;
+      const namespaces = payload.namespaces || {};
+      const features = payload.features || {};
+      const usedMemory = Number(payload.used_memory_mb || 0);
+      const totalKeys = Number(payload.keys || 0);
+
+      renderSummaryCards(els.cacheSummary, [
+        { label: 'Redis', value: available ? 'Disponible' : 'No disponible', note: available ? 'Conectado y operativo para caché distribuida.' : (payload.error || 'No se pudo consultar Redis.') },
+        { label: 'Memoria usada', value: `${usedMemory.toFixed(2)} MB`, note: 'Memoria total consumida en la base de Redis usada por el proyecto.' },
+        { label: 'Claves totales', value: totalKeys, note: 'Cantidad de claves presentes en la DB actual de Redis.' },
+        { label: 'TTL respuestas', value: `${Number(features.response_cache_ttl_seconds || 0)} s`, note: 'Tiempo de vida de respuestas completas para preguntas repetidas.' },
+        { label: 'Respuestas cacheadas', value: responseItems.length, note: 'Registros auditables y eliminables desde esta tabla.' },
+      ]);
+
+      const cards = [
+        {
+          title: 'Namespaces',
+          lines: [
+            ['RAG', namespaces.rag ?? 0],
+            ['Embeddings', namespaces.embeddings ?? 0],
+            ['Tarifas', namespaces.tarifas ?? 0],
+            ['Respuestas', namespaces.respuestas ?? 0],
+            ['Otros', namespaces.otros ?? 0],
+          ],
+        },
+        {
+          title: 'Evicción y expiración',
+          lines: [
+            ['Expired keys', payload.expired_keys ?? 0],
+            ['Evicted keys', payload.evicted_keys ?? 0],
+          ],
+        },
+        {
+          title: 'Flags de caché',
+          lines: [
+            ['Embeddings', features.embedding_cache_enabled ? 'Activado' : 'Desactivado'],
+            ['Tarifas', features.tariff_cache_enabled ? 'Activado' : 'Desactivado'],
+            ['Respuestas', features.response_cache_enabled ? 'Activado' : 'Desactivado'],
+          ],
+        },
+      ];
+
+      els.cacheGrid.innerHTML = cards.map(card => `
+        <div class="resource-card">
+          <h4>${escapeHtml(card.title)}</h4>
+          ${card.lines.map(line => `
+            <div class="resource-line">
+              <span>${escapeHtml(line[0])}</span>
+              <strong>${escapeHtml(line[1])}</strong>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+
+      renderResponseCacheTable(responseItems);
+    }
+
+    function truncateText(value, max = 120) {
+      const text = String(value || '');
+      if (text.length <= max) return text;
+      return `${text.slice(0, max).trim()}...`;
+    }
+
+    function renderResponseCacheTable(items) {
+      els.cacheResponsesBody.innerHTML = items.map(item => `
+        <tr>
+          <td title="${escapeHtml(item.question || '')}">${escapeHtml(truncateText(item.question, 140))}</td>
+          <td title="${escapeHtml(item.response || '')}">${escapeHtml(truncateText(item.response, 180))}</td>
+          <td>${escapeHtml(item.lang || '—')}</td>
+          <td>${escapeHtml(item.skill_id || '—')}</td>
+          <td>${escapeHtml(item.primary_source_type || '—')}</td>
+          <td>${escapeHtml(item.created_at || '—')}</td>
+          <td>${escapeHtml(String(item.ttl_seconds ?? -1))} s</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-danger" type="button" onclick="deleteResponseCache('${escapeHtml(item.cache_id || '')}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.cacheResponsesCount.textContent = `${items.length} registros`;
+      setupGenericDataTable('#cache-responses-table', 'respuestas cacheadas', 7);
+    }
+
+    function renderConversations() {
+      const payload = state.conversationsPayload || {};
+      const items = payload.items || [];
+      const stats = payload.stats || {};
+
+      renderSummaryCards(els.conversationsSummary, [
+        { label: 'Total logs', value: stats.total ?? items.length, note: 'Registros guardados en la base de datos local.' },
+        { label: 'Cache hits', value: stats.cache_hits ?? 0, note: 'Conversaciones servidas desde caché de respuesta.' },
+        { label: 'Likes', value: stats.likes ?? 0, note: 'Respuestas marcadas como útiles por usuarios.' },
+        { label: 'Dislikes', value: stats.dislikes ?? 0, note: 'Respuestas marcadas como no útiles por usuarios.' },
+        { label: 'Latencia promedio', value: `${Number(stats.avg_latency_ms || 0).toFixed(1)} ms`, note: 'Tiempo medio desde llegada de pregunta hasta respuesta.' },
+      ]);
+
+      els.conversationsBody.innerHTML = items.map(item => `
+        <tr>
+          <td>${escapeHtml(String(item.id || ''))}</td>
+          <td>${escapeHtml(item.created_at || '—')}</td>
+          <td title="${escapeHtml(item.question || '')}">${escapeHtml(truncateText(item.question, 120))}</td>
+          <td title="${escapeHtml(item.response || '')}">${escapeHtml(truncateText(item.response, 160))}</td>
+          <td>${escapeHtml(item.lang || '—')}</td>
+          <td>${escapeHtml(item.skill_id || '—')}</td>
+          <td>${escapeHtml(item.primary_source_type || '—')}</td>
+          <td><span class="pill ${item.cache_hit ? 'ok' : 'info'}">${item.cache_hit ? 'Sí' : 'No'}</span></td>
+          <td>${item.rating === 1 ? '👍 Like' : (item.rating === -1 ? '👎 Dislike' : '—')}</td>
+          <td>${escapeHtml(String(item.latency_ms ?? 0))} ms</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-danger" type="button" onclick="deleteConversation(${Number(item.id || 0)})">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.conversationsCount.textContent = `${items.length} registros`;
+      setupGenericDataTable('#conversations-table', 'conversaciones', 10);
+    }
+
+    function renderTariffConversations() {
+      const payload = state.tariffConversationsPayload || {};
+      const items = payload.items || [];
+      const stats = payload.stats || {};
+
+      renderSummaryCards(els.tariffConversationsSummary, [
+        { label: 'Total flujos', value: stats.total ?? items.length, note: 'Consultas determinísticas de tarifas guardadas como flujo completo.' },
+        { label: 'Completados', value: stats.completed ?? 0, note: 'Flujos que llegaron a precio final.' },
+        { label: 'Cancelados', value: stats.cancelled ?? 0, note: 'Flujos detenidos por el usuario.' },
+        { label: 'Reseteados', value: stats.reset ?? 0, note: 'Flujos reiniciados durante la interacción.' },
+        { label: 'Latencia promedio', value: `${Number(stats.avg_latency_ms || 0).toFixed(1)} ms`, note: 'Tiempo medio de todo el flujo, no solo de un turno.' },
+      ]);
+
+      els.tariffConversationsBody.innerHTML = items.map(item => `
+        <tr>
+          <td>${escapeHtml(String(item.id || ''))}</td>
+          <td>${escapeHtml(item.created_at || '—')}</td>
+          <td><span class="pill ${item.status === 'completed' ? 'ok' : 'warn'}">${escapeHtml(item.status || '—')}</span></td>
+          <td>${escapeHtml(item.scope || '—')}</td>
+          <td>${escapeHtml(item.peso || '—')}</td>
+          <td>${escapeHtml(item.columna || '—')}</td>
+          <td>${escapeHtml(item.precio ? `${item.precio} ${item.moneda || 'Bs'}` : '—')}</td>
+          <td title="${escapeHtml(item.flow_text || '')}">${escapeHtml(truncateText(item.flow_text, 180))}</td>
+          <td>${escapeHtml(String(item.latency_ms ?? 0))} ms</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-danger" type="button" onclick="deleteTariffConversation(${Number(item.id || 0)})">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.tariffConversationsCount.textContent = `${items.length} registros`;
+      setupGenericDataTable('#tariff-conversations-table', 'flujos de tarifas', 9);
+    }
+
     function showMsg(target, text, type = 'ok') {
       target.textContent = text;
       target.className = `msg show ${type}`;
@@ -1072,6 +1456,44 @@
       openModal('detail');
     }
 
+    async function showDataJsonDetail(nombreArchivo) {
+      try {
+        els.detailOutput.innerHTML = `<div class="detail-empty">Cargando detalle de ${escapeHtml(nombreArchivo)}...</div>`;
+        openModal('detail');
+        const item = await fetchJson(`/api/data-jsons/${encodeURIComponent(nombreArchivo)}`);
+        state.dataJsonDetailCache[nombreArchivo] = item;
+        els.detailOutput.innerHTML = `
+          <div class="detail-grid">
+            <div class="detail-card">
+              <h5>Archivo JSON</h5>
+              <div class="detail-line"><span>Nombre</span><strong>${escapeHtml(item.nombre_archivo || nombreArchivo)}</strong></div>
+              <div class="detail-line"><span>Tamaño</span><strong>${escapeHtml(formatBytes(item.tamano_bytes || 0))}</strong></div>
+              <div class="detail-line"><span>Modificado</span><strong>${escapeHtml(item.modificado_en || '—')}</strong></div>
+            </div>
+            <div class="detail-card">
+              <h5>Ruta</h5>
+              <div class="detail-line"><span>Ubicación</span><strong>${escapeHtml(item.ruta || '—')}</strong></div>
+            </div>
+          </div>
+          <div class="detail-text-wrap">
+            <div class="detail-text-head">
+              <h5>Contenido JSON</h5>
+              <span class="detail-text-meta">Editar y guardar reindexará el RAG en modo completo</span>
+            </div>
+            <textarea id="data-json-editor" class="detail-textarea" placeholder="Contenido JSON...">${escapeHtml(item.content_pretty || '')}</textarea>
+            <div class="detail-text-actions">
+              <span id="data-json-msg" class="detail-text-msg"></span>
+              <button class="btn btn-secondary" type="button" onclick="resetDataJsonEditor('${escapeHtml(nombreArchivo)}')">Revertir</button>
+              <button class="btn btn-primary" type="button" onclick="saveDataJson('${escapeHtml(nombreArchivo)}')">Guardar JSON</button>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        els.detailOutput.innerHTML = `<div class="detail-empty">Error cargando JSON: ${escapeHtml(err.message)}</div>`;
+        openModal('detail');
+      }
+    }
+
     function resetPdfTextEditor(registroId) {
       const item = (state.pdfsPayload?.pdfs || []).find(entry => (entry.registro_id || entry.nombre_archivo) === registroId);
       const editor = document.getElementById('pdf-text-editor');
@@ -1097,6 +1519,39 @@
             ? 'Texto guardado. Reindex incremental en curso.'
             : 'Texto guardado.';
         }
+        await loadAll();
+      } catch (err) {
+        if (msg) msg.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function resetDataJsonEditor(nombreArchivo) {
+      const item = state.dataJsonDetailCache[nombreArchivo];
+      const editor = document.getElementById('data-json-editor');
+      const msg = document.getElementById('data-json-msg');
+      if (!editor || !item) return;
+      editor.value = item.content_pretty || '';
+      if (msg) msg.textContent = '';
+    }
+
+    async function saveDataJson(nombreArchivo) {
+      const editor = document.getElementById('data-json-editor');
+      const msg = document.getElementById('data-json-msg');
+      if (!editor) return;
+      const content = editor.value || '';
+      try {
+        if (msg) msg.textContent = 'Guardando...';
+        const result = await fetchJson(`/api/data-jsons/${encodeURIComponent(nombreArchivo)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ content }),
+        });
+        state.dataJsonDetailCache[nombreArchivo] = result;
+        if (msg) {
+          msg.textContent = result.reindex_started
+            ? 'JSON guardado. Reindex completo en curso.'
+            : 'JSON guardado.';
+        }
+        editor.value = result.content_pretty || content;
         await loadAll();
       } catch (err) {
         if (msg) msg.textContent = `Error: ${err.message}`;
@@ -1148,6 +1603,69 @@
       }
     }
 
+    async function deleteResponseCache(cacheId) {
+      if (!cacheId) return;
+      if (!confirm(`Eliminar respuesta cacheada ${cacheId}?`)) return;
+      try {
+        await fetchJson(`/api/cache/responses/${encodeURIComponent(cacheId)}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearResponseCache() {
+      if (!confirm('Esto eliminará toda la caché de respuestas generadas. ¿Continuar?')) return;
+      try {
+        await fetchJson('/api/cache/responses/clear', { method: 'POST' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteConversation(id) {
+      if (!id) return;
+      if (!confirm(`Eliminar conversación #${id}?`)) return;
+      try {
+        await fetchJson(`/api/conversations/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearConversations() {
+      if (!confirm('Esto eliminará todo el log conversacional persistente. ¿Continuar?')) return;
+      try {
+        await fetchJson('/api/conversations/clear', { method: 'POST' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteTariffConversation(id) {
+      if (!id) return;
+      if (!confirm(`Eliminar flujo tarifario #${id}?`)) return;
+      try {
+        await fetchJson(`/api/conversations/tarifas/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearTariffConversations() {
+      if (!confirm('Esto eliminará todo el log de flujos tarifarios. ¿Continuar?')) return;
+      try {
+        await fetchJson('/api/conversations/tarifas/clear', { method: 'POST' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
     async function loadOptions() {
       state.options = await fetchJson('/api/capabilities/options');
       document.getElementById('skill-mode').innerHTML = (state.options.modos_skill || []).map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.nombre)}</option>`).join('');
@@ -1167,21 +1685,35 @@
     }
 
     async function loadAll() {
-      const [capabilities, pdfs, scraping] = await Promise.all([
+      const [capabilities, pdfs, dataJsons, scraping, cacheStats, cacheResponses, conversations, tariffConversations] = await Promise.all([
         fetchJson('/api/capabilities'),
         fetchJson('/api/pdfs'),
+        fetchJson('/api/data-jsons'),
         fetchJson('/api/scraping'),
+        fetchJson('/api/cache/stats'),
+        fetchJson('/api/cache/responses?limit=250'),
+        fetchJson('/api/conversations?limit=500'),
+        fetchJson('/api/conversations/tarifas?limit=500'),
       ]);
       state.capabilities = capabilities;
       state.pdfsPayload = pdfs;
+      state.dataJsonPayload = dataJsons;
       state.scrapingPayload = scraping;
+      state.cachePayload = cacheStats;
+      state.responseCachePayload = cacheResponses;
+      state.conversationsPayload = conversations;
+      state.tariffConversationsPayload = tariffConversations;
       updateHero(capabilities);
       updateTopStrip(capabilities, pdfs);
       renderStats(capabilities, pdfs);
       renderSkills();
       renderPdfs();
+      renderDataJsons();
       renderScraping();
       renderResources(capabilities, pdfs);
+      renderCache();
+      renderConversations();
+      renderTariffConversations();
     }
 
     els.skillForm.addEventListener('submit', async (event) => {

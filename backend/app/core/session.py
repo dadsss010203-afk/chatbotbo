@@ -13,7 +13,7 @@ from datetime import datetime, timezone, timedelta
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
-MAX_HISTORIAL = int(os.environ.get("MAX_HISTORIAL", "6"))
+MAX_HISTORIAL = int(os.environ.get("MAX_HISTORIAL", "3"))
 MAX_HISTORY_CHARS = int(os.environ.get("MAX_HISTORY_CHARS", "3200"))
 SESSION_TTL_MINUTES = int(os.environ.get("SESSION_TTL_MINUTES", "180"))
 MAX_SESIONES_MEMORIA = int(os.environ.get("MAX_SESIONES_MEMORIA", "2000"))
@@ -25,6 +25,7 @@ MAX_SESIONES_MEMORIA = int(os.environ.get("MAX_SESIONES_MEMORIA", "2000"))
 historiales: dict = {}
 _ultimo_acceso: dict = {}
 _pendiente_tarifa: dict = {}
+_flujo_tarifa: dict = {}
 _lock = threading.Lock()
 
 
@@ -36,6 +37,7 @@ def _eliminar_sid(sid: str) -> None:
     historiales.pop(sid, None)
     _ultimo_acceso.pop(sid, None)
     _pendiente_tarifa.pop(sid, None)
+    _flujo_tarifa.pop(sid, None)
 
 
 def _purgar_sesiones_expiradas() -> None:
@@ -67,9 +69,9 @@ def _enforce_max_sesiones() -> None:
 def get_sid() -> str:
     """
     Obtiene o crea el session_id del usuario actual.
-    Para FastAPI, usa un ID fijo por ahora.
+    Genera un UUID único para cada sesión.
     """
-    sid = "test_session"
+    sid = str(uuid.uuid4())
     with _lock:
         _purgar_sesiones_expiradas()
         _ultimo_acceso[sid] = _ahora_ts()
@@ -142,6 +144,94 @@ def clear_pendiente_tarifa(sid: str) -> None:
     """Limpia el estado temporal de tarifa de la sesión."""
     with _lock:
         _pendiente_tarifa.pop(sid, None)
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+
+
+def start_tarifa_flow(sid: str, metadata: dict | None = None) -> None:
+    """Inicia (o reinicia) el flujo determinístico de tarifas para una sesión."""
+    with _lock:
+        _purgar_sesiones_expiradas()
+        _flujo_tarifa[sid] = {
+            "started_at_ts": _ahora_ts(),
+            "messages": [],
+            "metadata": dict(metadata or {}),
+        }
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+
+
+def tarifa_flow_active(sid: str) -> bool:
+    with _lock:
+        _purgar_sesiones_expiradas()
+        _ultimo_acceso[sid] = _ahora_ts()
+        return sid in _flujo_tarifa
+
+
+def append_tarifa_flow_turn(
+    sid: str,
+    *,
+    user_text: str,
+    assistant_text: str,
+    stage: str = "",
+    meta: dict | None = None,
+) -> None:
+    """Agrega un turno user+assistant al flujo de tarifas."""
+    user_msg = (user_text or "").strip()
+    assistant_msg = (assistant_text or "").strip()
+    if not user_msg and not assistant_msg:
+        return
+    with _lock:
+        _purgar_sesiones_expiradas()
+        flow = _flujo_tarifa.setdefault(
+            sid,
+            {"started_at_ts": _ahora_ts(), "messages": [], "metadata": {}},
+        )
+        if user_msg:
+            flow["messages"].append({"role": "user", "content": user_msg, "stage": stage or ""})
+        if assistant_msg:
+            flow["messages"].append({"role": "assistant", "content": assistant_msg, "stage": stage or ""})
+        if meta and isinstance(meta, dict):
+            existing = flow.get("metadata") or {}
+            existing.update(meta)
+            flow["metadata"] = existing
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+
+
+def peek_tarifa_flow(sid: str) -> dict | None:
+    with _lock:
+        _purgar_sesiones_expiradas()
+        _ultimo_acceso[sid] = _ahora_ts()
+        flow = _flujo_tarifa.get(sid)
+        if not isinstance(flow, dict):
+            return None
+        return {
+            "started_at_ts": float(flow.get("started_at_ts") or _ahora_ts()),
+            "messages": list(flow.get("messages") or []),
+            "metadata": dict(flow.get("metadata") or {}),
+        }
+
+
+def pop_tarifa_flow(sid: str) -> dict | None:
+    """Obtiene y elimina el flujo de tarifas activo de la sesión."""
+    with _lock:
+        _purgar_sesiones_expiradas()
+        flow = _flujo_tarifa.pop(sid, None)
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+        if not isinstance(flow, dict):
+            return None
+        return {
+            "started_at_ts": float(flow.get("started_at_ts") or _ahora_ts()),
+            "messages": list(flow.get("messages") or []),
+            "metadata": dict(flow.get("metadata") or {}),
+        }
+
+
+def clear_tarifa_flow(sid: str) -> None:
+    with _lock:
+        _flujo_tarifa.pop(sid, None)
         _ultimo_acceso[sid] = _ahora_ts()
         _enforce_max_sesiones()
 

@@ -8,6 +8,7 @@ import os
 import re
 import unicodedata
 import hashlib
+from datetime import datetime
 
 from core import observability
 from core.capabilities_pdf import (
@@ -36,6 +37,7 @@ SCRAPER_HISTORIA_FILE = os.path.join(DATA_DIR, "historia_institucional.json")
 SCRAPER_NOTICIAS_FILE = os.path.join(DATA_DIR, "noticias_eventos.json")
 SCRAPER_SECCIONES_FILE = os.path.join(DATA_DIR, "secciones_home.json")
 SCRAPER_SUCURSALES_FILE = os.path.join(DATA_DIR, "sucursales_contacto.json")
+EXCLUDED_MANAGED_JSON_FILES = {"pdfs_contenido.json", "skills.json"}
 
 DEFAULT_SKILLS = [
     {
@@ -546,22 +548,22 @@ def out_of_scope_response() -> str:
 
 def preferred_sources_for_skill(skill: dict | None) -> list[str]:
     if not skill:
-        return ["web_main", "section", "branch", "history", "pdf"]
+        return ["pdf", "history", "json_data", "web_main", "section", "branch"]
 
     skill_id = skill.get("id")
     categoria = skill.get("categoria")
 
     if skill_id == "historia_correos_bolivia":
-        return ["history", "pdf", "section", "web_main", "branch"]
+        return ["pdf", "history", "json_data", "section", "web_main", "branch"]
     if skill_id == "filatelia_boliviana" or categoria == "documental":
-        return ["pdf", "history", "section", "web_main", "branch"]
+        return ["pdf", "json_data", "history", "section", "web_main", "branch"]
     if skill_id == "oficinas_contacto":
-        return ["branch", "web_main", "section", "history", "pdf"]
+        return ["pdf", "branch", "web_main", "section", "history", "json_data"]
     if skill_id in {"rastreo_envios", "servicios_correos", "guia_envio_correcto", "reclamos_quejas"}:
-        return ["web_main", "section", "pdf", "branch", "history"]
+        return ["pdf", "web_main", "section", "json_data", "branch", "history"]
     if skill_id == "estado_plataforma":
-        return ["section", "web_main", "pdf", "branch", "history"]
-    return ["web_main", "section", "branch", "history", "pdf"]
+        return ["pdf", "section", "web_main", "json_data", "branch", "history"]
+    return ["pdf", "history", "json_data", "web_main", "section", "branch"]
 
 
 def listar_pdfs() -> list[dict]:
@@ -610,6 +612,103 @@ def resumen_pdfs() -> dict:
         "pdfs_file": _file_stats(PDFS_FILE),
         "pdf_dir": _file_stats(PDF_DIR),
     }
+
+
+def _managed_data_json_paths() -> list[str]:
+    if not os.path.isdir(DATA_DIR):
+        return []
+    paths = []
+    for name in sorted(os.listdir(DATA_DIR)):
+        if not name.endswith(".json"):
+            continue
+        if name in EXCLUDED_MANAGED_JSON_FILES:
+            continue
+        paths.append(os.path.join(DATA_DIR, name))
+    return paths
+
+
+def _safe_data_json_path(nombre_archivo: str) -> str:
+    filename = os.path.basename((nombre_archivo or "").strip())
+    if not filename.endswith(".json"):
+        raise ValueError("El archivo debe tener extensión .json")
+    if filename in EXCLUDED_MANAGED_JSON_FILES:
+        raise ValueError(f"{filename} se administra por su módulo específico")
+    path = os.path.join(DATA_DIR, filename)
+    if not os.path.exists(path):
+        raise FileNotFoundError("Archivo JSON no encontrado")
+    return path
+
+
+def listar_data_jsons() -> list[dict]:
+    salida: list[dict] = []
+    for path in _managed_data_json_paths():
+        nombre = os.path.basename(path)
+        info = {
+            "nombre_archivo": nombre,
+            "ruta": path,
+            "tamano_bytes": os.path.getsize(path) if os.path.exists(path) else 0,
+            "modificado_en": datetime.fromtimestamp(os.path.getmtime(path)).isoformat() if os.path.exists(path) else None,
+            "estado": "ok",
+            "tipo": "unknown",
+            "entradas": 0,
+        }
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            if isinstance(data, list):
+                info["tipo"] = "array"
+                info["entradas"] = len(data)
+            elif isinstance(data, dict):
+                info["tipo"] = "object"
+                info["entradas"] = len(data)
+            else:
+                info["tipo"] = type(data).__name__
+                info["entradas"] = 1
+        except Exception:
+            info["estado"] = "error"
+            info["tipo"] = "invalid_json"
+            info["entradas"] = 0
+        salida.append(info)
+    return salida
+
+
+def resumen_data_jsons() -> dict:
+    items = listar_data_jsons()
+    total_bytes = sum(int(item.get("tamano_bytes") or 0) for item in items)
+    return {
+        "total": len(items),
+        "validos": sum(1 for item in items if item.get("estado") == "ok"),
+        "invalidos": sum(1 for item in items if item.get("estado") != "ok"),
+        "total_entradas": sum(int(item.get("entradas") or 0) for item in items),
+        "tamano_total_kb": round(total_bytes / 1024, 2) if total_bytes else 0,
+    }
+
+
+def obtener_data_json(nombre_archivo: str) -> dict:
+    path = _safe_data_json_path(nombre_archivo)
+    with open(path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    return {
+        "nombre_archivo": os.path.basename(path),
+        "ruta": path,
+        "tamano_bytes": os.path.getsize(path),
+        "modificado_en": datetime.fromtimestamp(os.path.getmtime(path)).isoformat(),
+        "content": data,
+        "content_pretty": json.dumps(data, ensure_ascii=False, indent=2),
+    }
+
+
+def actualizar_data_json(nombre_archivo: str, content) -> dict:
+    path = _safe_data_json_path(nombre_archivo)
+    parsed = content
+    if isinstance(content, str):
+        parsed = json.loads(content)
+    if not isinstance(parsed, (dict, list)):
+        raise ValueError("El contenido JSON debe ser objeto o arreglo")
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump(parsed, fh, ensure_ascii=False, indent=2)
+        fh.write("\n")
+    return obtener_data_json(os.path.basename(path))
 
 
 def _dir_size_kb(path: str) -> float:

@@ -7,6 +7,7 @@ Compartido por todos los chatbots.
 import os
 import re
 import hashlib
+import uuid
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
@@ -81,6 +82,14 @@ def _use_triton() -> bool:
 
 def _qdrant_client() -> QdrantClient:
     return QdrantClient(url=QDRANT_URL, prefer_grpc=False)
+
+
+def _qdrant_point_id(raw_id: str) -> str:
+    """
+    Qdrant reciente acepta IDs uint64 o UUID.
+    Convertimos IDs legibles (txt_0, pdf_x_1, etc.) a UUID determinístico.
+    """
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, str(raw_id)))
 
 
 # ─────────────────────────────────────────────
@@ -532,7 +541,7 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
                     payload.update(batch_metadata[idx_chunk] or {})
                 points.append(
                     qmodels.PointStruct(
-                        id=chunk_id,
+                        id=_qdrant_point_id(chunk_id),
                         vector=batch_embeddings[idx_chunk],
                         payload=payload,
                     )
@@ -641,7 +650,7 @@ def reemplazar_por_source_type(
                     payload.update(batch_meta[idx_chunk] or {})
                 points.append(
                     qmodels.PointStruct(
-                        id=chunk_id,
+                        id=_qdrant_point_id(chunk_id),
                         vector=batch_embeddings[idx_chunk],
                         payload=payload,
                     )
@@ -666,12 +675,13 @@ def reemplazar_por_source_type(
 
 def _prioridad_fuente(source_type: str) -> int:
     prioridades = {
+        "pdf": 6,
         "history": 5,
         "branch": 5,
         "section": 4,
         "web_main": 4,
         "service": 4,
-        "pdf": 3,
+        "json_data": 3,
         "file": 2,
     }
     return prioridades.get(source_type or "", 1)
@@ -687,6 +697,7 @@ def _formatear_fuente(metadata: dict | None) -> str:
         "branch": "Sucursal",
         "section": "Seccion",
         "web_main": "Sitio web",
+        "json_data": "Datos JSON",
         "pdf": "PDF",
         "file": "Archivo",
     }.get(source_type, "Fuente")
@@ -717,7 +728,7 @@ def buscar(
     n_query = min(max(n * 5, 8), 24)
 
     # Cache de búsqueda RAG completa para preguntas repetidas
-    cached_search = get_rag_search(pregunta)
+    cached_search = get_rag_search(pregunta, preferred_source_types)
     if cached_search is not None:
         return cached_search
 
@@ -730,12 +741,53 @@ def buscar(
         set_embedding(pregunta, vector)
 
     if _use_qdrant():
-        search_results = _client.search(
-            collection_name=_collection_name,
-            query_vector=vector[0],
-            limit=min(n_query, max(_client.count(collection_name=_collection_name).count, 1)),
-            with_payload=True,
-        )
+        qdrant_limit = min(n_query, max(_client.count(collection_name=_collection_name).count, 1))
+
+        def _qdrant_search_by_type(source_type: str | None = None):
+            kwargs = {
+                "collection_name": _collection_name,
+                "query_vector": vector[0],
+                "limit": qdrant_limit,
+                "with_payload": True,
+            }
+            if source_type:
+                kwargs["query_filter"] = qmodels.Filter(
+                    must=[
+                        qmodels.FieldCondition(
+                            key="source_type",
+                            match=qmodels.MatchValue(value=source_type),
+                        )
+                    ]
+                )
+            return _client.search(**kwargs)
+
+        search_results = []
+        seen_ids = set()
+        # 1) Traer primero candidatos de fuentes preferidas (si hay)
+        if preferred_source_types:
+            for st in preferred_source_types:
+                try:
+                    for hit in _qdrant_search_by_type(st):
+                        hit_id = str(getattr(hit, "id", ""))
+                        if hit_id and hit_id in seen_ids:
+                            continue
+                        if hit_id:
+                            seen_ids.add(hit_id)
+                        search_results.append(hit)
+                except Exception:
+                    continue
+
+        # 2) Completar con búsqueda global para no perder cobertura
+        for hit in _qdrant_search_by_type(None):
+            hit_id = str(getattr(hit, "id", ""))
+            if hit_id and hit_id in seen_ids:
+                continue
+            if hit_id:
+                seen_ids.add(hit_id)
+            search_results.append(hit)
+            if len(search_results) >= qdrant_limit:
+                break
+
         documents = []
         metadatas = []
         distances = []
@@ -772,7 +824,12 @@ def buscar(
         source_type = (metadata or {}).get("source_type")
         length_penalty = 0.3 if len(texto) > CHUNK_SIZE * 1.2 else 0
         source_bonus = _source_preference_bonus(source_type, preferred_source_types)
-        score = distance - (_prioridad_fuente(source_type) * 0.08) - source_bonus + length_penalty
+        if _use_qdrant():
+            # En Qdrant, score mayor significa mejor similitud.
+            score = distance + (_prioridad_fuente(source_type) * 0.08) + source_bonus - length_penalty
+        else:
+            # En Chroma, distance menor significa mejor similitud.
+            score = distance - (_prioridad_fuente(source_type) * 0.08) - source_bonus + length_penalty
 
         candidatos.append(
             {
@@ -782,8 +839,38 @@ def buscar(
             }
         )
 
-    candidatos.sort(key=lambda item: item["score"])
-    seleccionados = candidatos[:n]
+    if _use_qdrant():
+        candidatos.sort(key=lambda item: item["score"], reverse=True)  # Mayor score = mejor similitud
+    else:
+        candidatos.sort(key=lambda item: item["score"])  # Menor score = mejor (distancia)
+
+    # Si hay tipos preferidos, priorizamos de forma fuerte esos source_type
+    # antes de completar con el resto. Esto evita que, por ejemplo, una skill
+    # de historia termine respondiendo solo con PDFs genéricos.
+    seleccionados = []
+    if preferred_source_types:
+        usados = set()
+        for st in preferred_source_types:
+            for idx, item in enumerate(candidatos):
+                if idx in usados:
+                    continue
+                if (item.get("metadata") or {}).get("source_type") != st:
+                    continue
+                seleccionados.append(item)
+                usados.add(idx)
+                if len(seleccionados) >= n:
+                    break
+            if len(seleccionados) >= n:
+                break
+        if len(seleccionados) < n:
+            for idx, item in enumerate(candidatos):
+                if idx in usados:
+                    continue
+                seleccionados.append(item)
+                if len(seleccionados) >= n:
+                    break
+    else:
+        seleccionados = candidatos[:n]
 
     contexto_partes = []
     for item in seleccionados:
@@ -819,10 +906,11 @@ def buscar(
             }
         )
 
+    primary_source_type = seleccionados[0]["metadata"].get("source_type", "unknown") if seleccionados else "unknown"
     result = {
         "context": contexto,
         "sources": sources,
         "primary_source_type": primary_source_type,
     }
-    set_rag_search(pregunta, result)
+    set_rag_search(pregunta, result, preferred_source_types)
     return result

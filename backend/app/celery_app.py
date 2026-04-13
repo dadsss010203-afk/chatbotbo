@@ -13,6 +13,7 @@ celery = Celery(
     "chatbotbo",
     broker=CELERY_BROKER_URL,
     backend=CELERY_RESULT_BACKEND,
+    include=["tasks"],
 )
 
 celery.conf.update(
@@ -23,4 +24,5 @@ celery.conf.update(
     task_soft_time_limit=600,
     result_expires=3600,
     timezone="UTC",
+    broker_connection_retry_on_startup=True,
 )

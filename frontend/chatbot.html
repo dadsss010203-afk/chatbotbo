@@ -137,6 +137,10 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .btn-translate{background:none;border:1px solid var(--border);border-radius:6px;padding:2px 7px;font-size:0.58rem;color:var(--ink3);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.18s;display:flex;align-items:center;gap:3px;white-space:nowrap}
 .btn-translate:hover{background:var(--b700);color:#fff;border-color:var(--b700)}
 .btn-translate.loading{opacity:0.5;pointer-events:none}
+.btn-rate{background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;font-size:0.64rem;color:var(--ink3);cursor:pointer;transition:all 0.18s}
+.btn-rate:hover{background:#f2f5fb;border-color:#c9d3ea}
+.btn-rate.active-like{background:rgba(47,143,78,.12);border-color:rgba(47,143,78,.35);color:#2f8f4e}
+.btn-rate.active-dislike{background:rgba(180,66,49,.10);border-color:rgba(180,66,49,.30);color:#b44231}
 
 .typing .bub{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--white);border:1px solid var(--border)}
 .t-lbl{font-size:0.64rem;color:var(--ink3);font-style:italic}
@@ -182,6 +186,8 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .f-hint{font-size:0.56rem;color:var(--ink4);letter-spacing:0.03em}
 .f-brand{font-size:0.56rem;color:var(--ink4);letter-spacing:0.04em}
 .f-brand b{color:var(--y700);font-weight:700}
+.tarifa-toggle{border:1px solid var(--border);background:var(--white);color:var(--b900);border-radius:9px;padding:5px 10px;font-size:0.62rem;font-weight:700;cursor:pointer}
+.tarifa-toggle.active{background:#fff2ef;border-color:rgba(180,66,49,.35);color:#b44231}
 
 #confirm-bar{display:none;background:var(--paper);border-top:1.5px solid var(--border);padding:10px 12px;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;animation:barIn 0.18s ease}
 @keyframes barIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
@@ -310,6 +316,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
     </form>
     <div class="f-meta">
       <span class="f-hint">Enter para enviar</span>
+      <button type="button" id="tarifa-toggle" class="tarifa-toggle" onclick="toggleTarifaMode()">Tarifas</button>
       <span class="f-brand">Powered by <b>AGBC IA</b></span>
     </div>
   </div>
@@ -339,6 +346,8 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 // ─── ESTADO ───────────────────────────────────
 let chatOpen=false, welcomeLoaded=false, busy=false, ctrl=null, lang='es';
 let translating=false; // flag para evitar traducciones simultáneas
+let tarifaMode=false;
+let sid = localStorage.getItem('chat_sid') || '';
 
 // ─── TEXTOS POR IDIOMA ────────────────────────
 const TX={
@@ -464,6 +473,59 @@ function setStop(v){document.getElementById('stop').classList.toggle('vis',v);do
 function stopResp(){if(ctrl){ctrl.abort();ctrl=null;}}
 function minimize(){document.getElementById('chat-window').classList.remove('open');chatOpen=false;}
 function now(){return new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});}
+function setTarifaModeUI(){
+  const btn=document.getElementById('tarifa-toggle');
+  if(!btn) return;
+  btn.classList.toggle('active', tarifaMode);
+  btn.textContent = tarifaMode ? 'Cancelar tarifa' : 'Tarifas';
+}
+
+async function cancelTarifaMode(notify=true){
+  tarifaMode=false;
+  setTarifaModeUI();
+  try{
+    const res = await fetch('/api/tarifa/cancel',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sid}),
+    });
+    const data = await res.json();
+    if(data && data.sid){
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+  }catch(e){
+    console.warn('No se pudo cancelar flujo tarifa:', e);
+  }
+  if(notify){
+    addMsg('Modo tarifas cancelado. Volviste al chat general.','b',false,null,true,null);
+  }
+}
+
+async function toggleTarifaMode(){
+  if(tarifaMode){
+    await cancelTarifaMode(true);
+    return;
+  }
+  tarifaMode=true;
+  setTarifaModeUI();
+  try{
+    const res = await fetch('/api/tarifa/start',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sid,lang}),
+    });
+    const data = await res.json();
+    if(data && data.sid){
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+    addMsg(data.response||'¿Qué servicio quieres usar?','b',false,null,true,data.conversation_log_id||null);
+    addQuickReplies(Array.isArray(data.quick_replies) ? data.quick_replies : []);
+  }catch(e){
+    addMsg('Modo tarifas activado. ¿Qué servicio quieres usar?','b',false,null,true,null);
+  }
+}
 
 function toggleChat(){
   chatOpen=!chatOpen;
@@ -485,7 +547,22 @@ function mkAv(t){
 }
 
 // ─── AÑADIR MENSAJE ───────────────────────────
-function addMsg(text,type,bye=false,loc=null,noTranslate=false){
+async function rateConversation(logId, rating, likeBtn, dislikeBtn){
+  if(!logId) return;
+  try{
+    await fetch(`/api/conversations/${encodeURIComponent(String(logId))}/rating`,{
+      method:'PUT',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({rating}),
+    });
+    likeBtn?.classList.toggle('active-like', rating==='like');
+    dislikeBtn?.classList.toggle('active-dislike', rating==='dislike');
+  }catch(e){
+    console.warn('No se pudo guardar rating:', e);
+  }
+}
+
+function addMsg(text,type,bye=false,loc=null,noTranslate=false,conversationLogId=null){
   document.getElementById('welcomeCard')?.remove();
   const chat=document.getElementById('chat');
   const wrap=document.createElement('div');wrap.className=`msg ${type}`;
@@ -523,8 +600,24 @@ function addMsg(text,type,bye=false,loc=null,noTranslate=false){
     // Botón de traducción individual (solo para burbujas normales)
     if(!bye && !noTranslate){
       const acts=document.createElement('div'); acts.className='msg-actions';
-      const btn = document.createElement('button');
-      acts.appendChild(btn);
+      if(type==='b' && conversationLogId){
+        const likeBtn=document.createElement('button');
+        likeBtn.className='btn-rate';
+        likeBtn.type='button';
+        likeBtn.title='Me gustó esta respuesta';
+        likeBtn.textContent='👍';
+        likeBtn.onclick=()=>rateConversation(conversationLogId,'like',likeBtn,dislikeBtn);
+
+        const dislikeBtn=document.createElement('button');
+        dislikeBtn.className='btn-rate';
+        dislikeBtn.type='button';
+        dislikeBtn.title='No me gustó esta respuesta';
+        dislikeBtn.textContent='👎';
+        dislikeBtn.onclick=()=>rateConversation(conversationLogId,'dislike',likeBtn,dislikeBtn);
+
+        acts.appendChild(likeBtn);
+        acts.appendChild(dislikeBtn);
+      }
       body.appendChild(acts);
     }
     wrap.appendChild(mkAv(type));wrap.appendChild(body);
@@ -638,11 +731,26 @@ async function sendMsg(msg){
   ctrl=new AbortController();
   try{
     const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,lang}),signal:ctrl.signal});
+      body:JSON.stringify({message:msg,lang,sid,tarifa_mode:tarifaMode}),signal:ctrl.signal});
     const data=await res.json();
+    if(data && data.sid){
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
     removeTyping();
     const bye=data.despedida===true;
-    addMsg(data.response||data.error||'Sin respuesta disponible','b',bye,data.ubicacion||null,data.no_translate);
+    addMsg(
+      data.response||data.error||'Sin respuesta disponible',
+      'b',
+      bye,
+      data.ubicacion||null,
+      data.no_translate,
+      data.conversation_log_id||null
+    );
+    if(data?.tarifa?.requires_mode){
+      tarifaMode=false;
+      setTarifaModeUI();
+    }
     addQuickReplies((Array.isArray(data.quick_replies)&&data.quick_replies.length>0)?data.quick_replies:quickRepliesFromTarifa(data));
     if(bye){
       inp.disabled=true;inp.placeholder=(TX[lang]||TX.es).bye;
@@ -663,7 +771,18 @@ function closeConf(){document.getElementById('confirm-bar').classList.remove('op
 
 async function doClear(){
   closeConf();
-  try{await fetch('/api/reset',{method:'POST'});}catch{}
+  try{
+    const res = await fetch('/api/reset',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sid}),
+    });
+    const data = await res.json();
+    if(data && data.sid){
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+  }catch{}
   const chat=document.getElementById('chat');
   chat.innerHTML='';
   const t=TX[lang]||TX.es;
@@ -680,6 +799,7 @@ async function doClear(){
   const inp=document.getElementById('input');
   inp.disabled=false;inp.placeholder=t.ph;
   document.getElementById('send').disabled=false;
+  tarifaMode=false;setTarifaModeUI();
   busy=false;setStop(false);welcomeLoaded=true;loadWelcome();
 }
 
@@ -721,6 +841,7 @@ async function openMap(){
 function closeMap(){document.getElementById('mapa-modal').classList.remove('open');}
 document.getElementById('mapa-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMap();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMap();if(chatOpen)minimize();}});
+setTarifaModeUI();
 </script>
 </body>
 </html>

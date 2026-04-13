@@ -16,6 +16,8 @@ import os
 import threading
 import re
 import hashlib
+import asyncio
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
@@ -25,7 +27,7 @@ from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, F
 from fastapi.responses import JSONResponse
 from celery.result import AsyncResult
 
-from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, tarifas_skill
+from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, tarifas_skill, cache, conversation_logs, conversation_logs_tarifas
 from celery_app import celery
 from tasks import rebuild_rag_task, run_update_task
 from chatbots.general.chat_helpers import (
@@ -50,6 +52,7 @@ CHATBOT_GENERAL_ONLY = os.environ.get("CHATBOT_GENERAL_ONLY", "false").strip().l
 REINDEX_DEBOUNCE_SECONDS = int(os.environ.get("REINDEX_DEBOUNCE_SECONDS", "30"))
 CHAT_RESPONSE_MAX_CHARS = int(os.environ.get("CHAT_RESPONSE_MAX_CHARS", "0"))
 LLM_TARIFF_ORCHESTRATOR = os.environ.get("LLM_TARIFF_ORCHESTRATOR", "true").strip().lower() in ("1", "true", "yes")
+TARIFF_DETERMINISTIC_ONLY = os.environ.get("TARIFF_DETERMINISTIC_ONLY", "true").strip().lower() in ("1", "true", "yes")
 GENERAL_SYSTEM_PROMPT = (
     "Eres un asistente conversacional general, útil, claro y profesional. "
     "No afirmes tener acceso a bases de datos, documentos, skills, RAG, PDFs, scraping o contexto institucional "
@@ -81,6 +84,16 @@ def _safe_json_object(text: str) -> dict | None:
         return data if isinstance(data, dict) else None
     except Exception:
         return None
+
+
+def _resolve_sid_from_request(request: Request, data: dict | None = None) -> str:
+    payload = data or {}
+    sid = str(payload.get("sid") or request.headers.get("X-Session-Id") or "").strip()
+    if sid:
+        # toca/crea la sesión para mantener consistencia interna
+        session.get_historial(sid)
+        return sid
+    return session.get_sid()
 
 
 def _llm_orquestar_tarifa(pregunta: str, pendiente: dict | None = None) -> dict | None:
@@ -188,6 +201,36 @@ def _trim_messages_to_token_budget(messages: list[dict], max_tokens: int) -> lis
     return [system_message] + trimmed
 
 
+def _postprocess_llm_response(texto: str, sin_info: str) -> str:
+    respuesta = (texto or "").strip()
+    if not respuesta:
+        return sin_info
+
+    # Evita fuga de plantilla interna en la respuesta final.
+    bloqueados = (
+        "SKILL PRINCIPAL PARA ESTA CONSULTA",
+        "DESCRIPCIÓN DE LA SKILL PRINCIPAL",
+        "DISPARADORES DE LA SKILL PRINCIPAL",
+        "INFORMACIÓN OFICIAL",
+        "INSTRUCCIONES:",
+        "Desciende a continuación la información",
+    )
+    lineas = [ln.strip() for ln in respuesta.splitlines() if ln.strip()]
+    lineas = [ln for ln in lineas if not any(tag.lower() in ln.lower() for tag in bloqueados)]
+    if not lineas:
+        return sin_info
+    respuesta = "\n".join(lineas).strip()
+
+    # Si parece cortada, recorta al último final de frase conocido.
+    if respuesta and respuesta[-1] not in ".!?\"”":
+        candidatos = [respuesta.rfind("."), respuesta.rfind("!"), respuesta.rfind("?")]
+        corte = max(candidatos)
+        if corte > 40:
+            respuesta = respuesta[: corte + 1].strip()
+
+    return respuesta or sin_info
+
+
 def _refresh_pdfs_after_start() -> None:
     """Revisa PDFs heredados después del arranque para no bloquear Flask."""
     try:
@@ -227,6 +270,67 @@ def _estado_capacidades() -> dict:
         sesiones_activas=session.total_sesiones(),
         sucursales=SUCURSALES,
         actualizacion=updater.get_estado(),
+    )
+
+
+def _finalizar_chat_response(
+    *,
+    sid: str,
+    pregunta: str,
+    payload: dict,
+    started_at: float,
+    skip_general_log: bool = False,
+) -> dict:
+    """Persistir log conversacional (DB separada) y devolver payload."""
+    log_id = None
+    try:
+        response_text = (payload or {}).get("response")
+        if (not skip_general_log) and isinstance(response_text, str) and response_text.strip():
+            skill_resolution = (payload or {}).get("skill_resolution") or {}
+            log_id = conversation_logs.log_conversation(
+                session_id=sid,
+                question=pregunta,
+                response=response_text,
+                lang=(payload or {}).get("lang", ""),
+                skill_id=skill_resolution.get("primary_skill") or "",
+                primary_source_type=(payload or {}).get("primary_source_type", ""),
+                cache_hit=bool((payload or {}).get("cache_hit", False)),
+                latency_ms=int((time.perf_counter() - started_at) * 1000),
+            )
+    except Exception as e:
+        print(f"   Error guardando log conversacional: {e}")
+    if isinstance(payload, dict):
+        payload["sid"] = sid
+        if log_id:
+            payload["conversation_log_id"] = int(log_id)
+    return payload
+
+
+def _persistir_flujo_tarifa(
+    sid: str,
+    *,
+    status: str,
+    scope: str = "",
+    peso: str = "",
+    columna: str = "",
+    servicio: str = "",
+    precio: str = "",
+) -> int | None:
+    flow = session.pop_tarifa_flow(sid)
+    if not flow:
+        return None
+    started_at_ts = float(flow.get("started_at_ts") or time.time())
+    latency_ms = max(int((time.time() - started_at_ts) * 1000), 0)
+    return conversation_logs_tarifas.log_tarifa_flow(
+        session_id=sid,
+        status=status,
+        flow_messages=flow.get("messages") or [],
+        scope=scope,
+        peso=peso,
+        columna=columna,
+        servicio=servicio,
+        precio=precio,
+        latency_ms=latency_ms,
     )
 
 
@@ -650,9 +754,14 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
     en caso contrario retorna None para seguir flujo normal.
     """
     pendiente = session.get_pendiente_tarifa(sid) or {}
+    if not session.tarifa_flow_active(sid):
+        session.start_tarifa_flow(sid, metadata={"mode": "deterministic_tarifa"})
+
     if pendiente and _wants_reset_tarifa(pregunta):
         session.clear_pendiente_tarifa(sid)
         msg = "Listo, reinicié el cálculo de tarifa. Indícame peso y destino/servicio."
+        session.append_tarifa_flow_turn(sid, user_text=pregunta, assistant_text=msg, stage="reset")
+        _persistir_flujo_tarifa(sid, status="reset")
         session.agregar_turno(sid, pregunta, msg)
         return {"response": msg, "tarifa": {"ok": False, "pending": False, "reset": True}}
 
@@ -758,6 +867,13 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
             },
         )
         msg = tarifas_skill.missing_message(missing)
+        session.append_tarifa_flow_turn(
+            sid,
+            user_text=pregunta,
+            assistant_text=msg,
+            stage="missing",
+            meta={"scope": scope or "", "peso": peso or "", "columna": columna or "", "family": family or ""},
+        )
         session.agregar_turno(sid, pregunta, msg)
         return {
             "response": msg,
@@ -789,6 +905,13 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
         msg = "Peso fuera de rango para este tarifario."
         if alternativas:
             msg += " Puedes probar otro servicio del mismo alcance."
+        session.append_tarifa_flow_turn(
+            sid,
+            user_text=pregunta,
+            assistant_text=msg,
+            stage="out_of_range",
+            meta={"scope": scope or "", "peso": peso or "", "columna": ""},
+        )
         session.set_pendiente_tarifa(
             sid,
             {
@@ -814,7 +937,29 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
 
     respuesta_tarifa = tarifas_skill.format_tarifa_response(resultado_tarifa)
     primary_skill = resultado_tarifa.get("skill_id") or "tarifa_ems"
+    session.append_tarifa_flow_turn(
+        sid,
+        user_text=pregunta,
+        assistant_text=respuesta_tarifa,
+        stage="completed",
+        meta={
+            "scope": scope or "",
+            "peso": peso or "",
+            "columna": (columna or "").upper(),
+            "servicio": resultado_tarifa.get("servicio") or "",
+            "precio": str(resultado_tarifa.get("precio") or ""),
+        },
+    )
     session.clear_pendiente_tarifa(sid)
+    _persistir_flujo_tarifa(
+        sid,
+        status="completed",
+        scope=scope or "",
+        peso=peso or "",
+        columna=(columna or "").upper(),
+        servicio=resultado_tarifa.get("servicio") or "",
+        precio=str(resultado_tarifa.get("precio") or ""),
+    )
     session.agregar_turno(sid, pregunta, respuesta_tarifa)
     return {
         "response": respuesta_tarifa,
@@ -1039,6 +1184,46 @@ def reindexar() -> bool:
         )
         chunks += sec_chunks; ids += sec_ids; metadatas += sec_meta
 
+    # 3.5 JSONs de datos complementarios administrables desde data/
+    # Se indexan dinámicamente para incluir nuevos JSON sin tocar código.
+    skip_json_files = {
+        os.path.basename(SECCIONES_FILE or ""),
+        os.path.basename(SUCURSALES_FILE or ""),
+        os.path.basename(HISTORIA_FILE or ""),
+        "pdfs_contenido.json",
+        "skills.json",
+    }
+    managed_items = capabilities.listar_data_jsons()
+    for item in managed_items:
+        try:
+            filename = item.get("nombre_archivo")
+            json_path = item.get("ruta")
+            if not filename or not json_path:
+                continue
+            if filename in skip_json_files:
+                continue
+            if item.get("estado") != "ok":
+                continue
+            with open(json_path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            if payload in (None, "", [], {}):
+                continue
+            source_label = filename.replace(".json", "").replace("_", " ")
+            serialized = json.dumps(payload, ensure_ascii=False, indent=2)
+            jc, ji, jm = rag.documento_a_chunks(
+                serialized,
+                prefijo=f"json_{filename.replace('.json', '')}",
+                metadata_base={
+                    "source_type": "json_data",
+                    "source_name": filename,
+                    "source_label": source_label,
+                    "source_path": json_path,
+                },
+            )
+            chunks += jc; ids += ji; metadatas += jm
+        except Exception as e:
+            print(f"   Error leyendo JSON complementario '{filename}': {e}")
+
     # 4. Contenido de PDFs (si existe el JSON generado por el scraper)
     try:
         pdf_path = os.path.join(os.path.dirname(DATA_FILE), "pdfs_contenido.json")
@@ -1070,9 +1255,12 @@ def reindexar() -> bool:
         historia_path = HISTORIA_FILE
         if historia_path and not os.path.isabs(historia_path):
             historia_path = os.path.join(os.path.dirname(DATA_FILE), os.path.basename(historia_path))
+        print(f"   Buscando historia en: {historia_path}")
         if os.path.exists(historia_path):
+            print(f"   Archivo historia encontrado, cargando...")
             with open(historia_path, "r", encoding="utf-8") as f:
                 historia = json.load(f)
+            print(f"   Historia cargada: {len(historia)} entradas")
             for idx, item in enumerate(historia):
                 if not isinstance(item, dict):
                     continue
@@ -1080,6 +1268,7 @@ def reindexar() -> bool:
                 if not contenido:
                     continue
                 titulo = item.get("titulo") or f"Historia {idx + 1}"
+                print(f"   Procesando historia {idx + 1}: {titulo[:50]}...")
                 hist_chunks, hist_ids, hist_meta = rag.documento_a_chunks(
                     contenido,
                     prefijo=f"hist_{idx}",
@@ -1092,10 +1281,20 @@ def reindexar() -> bool:
                     },
                 )
                 chunks += hist_chunks; ids += hist_ids; metadatas += hist_meta
+                print(f"   → {len(hist_chunks)} chunks de historia '{titulo}'")
+        else:
+            print(f"   Archivo historia no encontrado: {historia_path}")
     except Exception as e:
         print(f"   Error leyendo historia institucional: {e}")
+        import traceback
+        traceback.print_exc()
 
-    return rag.indexar(chunks, ids, metadatas=metadatas)
+    success = rag.indexar(chunks, ids, metadatas=metadatas)
+    if success:
+        from core.cache import clear_rag_cache, clear_response_cache
+        clear_rag_cache()
+        clear_response_cache()
+    return success
 
 
 # ─────────────────────────────────────────────
@@ -1142,10 +1341,11 @@ async def welcome(lang: str = idiomas.IDIOMA_DEFAULT):
 
 @router.post("/chat")
 async def chat(request: Request):
-    sid = session.get_sid()
-
     data = await request.json()
+    sid = _resolve_sid_from_request(request, data)
+    started_at = time.perf_counter()
     pregunta = data.get("message", "").strip()
+    tarifa_mode = bool(data.get("tarifa_mode", False))
 
     if not pregunta:
         raise HTTPException(status_code=400, detail="Pregunta vacía")
@@ -1153,43 +1353,41 @@ async def chat(request: Request):
     # resolver el idioma lo antes posible para usarlo también en respuestas
     lang = idiomas.resolver_idioma(data.get("lang"), pregunta)
 
-    pendiente_tarifa = session.get_pendiente_tarifa(sid) or {}
-    level_choice = _extract_geo_level_choice(pregunta)
-    explicit_family = tarifas_skill.detect_family(pregunta)
-    only_level_choice = bool(
-        pendiente_tarifa
-        and level_choice in {"nacional", "internacional"}
-        and not pendiente_tarifa.get("family")
-    )
-    llm_hint = _llm_orquestar_tarifa(pregunta, pendiente_tarifa) if not pendiente_tarifa else None
-
-    # ── Consulta de tarifas (skill externa)
+    # ── Consulta de tarifas 100% determinista (sin LLM)
     tarifa_req = tarifas_skill.parse_tarifa_request(pregunta)
-    if llm_hint and llm_hint.get("is_info_only"):
-        tarifa_req.is_tarifa = False
-    elif llm_hint and llm_hint.get("use_tarifa_flow") and llm_hint.get("confidence", 0.0) >= 0.55:
-        tarifa_req.is_tarifa = True
-        if explicit_family and not tarifa_req.family:
-            tarifa_req.family = explicit_family
-        allow_family_hint = bool(explicit_family or pendiente_tarifa.get("family"))
-        if (
-            not only_level_choice
-            and not tarifa_req.family
-            and llm_hint.get("family")
-            and allow_family_hint
-        ):
-            tarifa_req.family = llm_hint.get("family")
-        if not only_level_choice and not tarifa_req.scope and llm_hint.get("scope"):
-            tarifa_req.scope = llm_hint.get("scope")
-        if not tarifa_req.peso and llm_hint.get("peso"):
-            tarifa_req.peso = llm_hint.get("peso")
-        if not tarifa_req.columna and llm_hint.get("columna"):
-            tarifa_req.columna = llm_hint.get("columna")
-
-    tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta, tarifa_req)
-    if tarifa_payload is not None:
-        tarifa_payload["lang"] = lang
-        return tarifa_payload
+    if TARIFF_DETERMINISTIC_ONLY:
+        pendiente_tarifa = session.get_pendiente_tarifa(sid) or {}
+        if tarifa_mode:
+            tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta, tarifa_req)
+            if tarifa_payload is not None:
+                tarifa_payload["lang"] = lang
+                return _finalizar_chat_response(
+                    sid=sid,
+                    pregunta=pregunta,
+                    payload=tarifa_payload,
+                    started_at=started_at,
+                    skip_general_log=True,
+                )
+        elif pendiente_tarifa:
+            try:
+                session.append_tarifa_flow_turn(
+                    sid,
+                    user_text=pregunta,
+                    assistant_text="Flujo de tarifas cerrado por cambio a conversación general.",
+                    stage="cancelled",
+                )
+                _persistir_flujo_tarifa(sid, status="cancelled")
+            except Exception as e:
+                print(f"   Error cerrando flujo tarifa al salir de modo: {e}")
+            session.clear_pendiente_tarifa(sid)
+            session.clear_tarifa_flow(sid)
+        elif tarifa_req.is_tarifa:
+            payload = {
+                "response": "Para cotizar sin ambigüedad, activa el modo Tarifas con el botón 'Tarifas'.",
+                "lang": lang,
+                "tarifa": {"ok": False, "requires_mode": True, "pending": False},
+            }
+            return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload=payload, started_at=started_at)
 
     # traducción automática: el frontend envía un mensaje como
     # "Traduce EXACTAMENTE este texto al <idioma>...". No queremos aplicar
@@ -1202,7 +1400,12 @@ async def chat(request: Request):
                 {"role": "user", "content": pregunta}
             ])
             respuesta = ollama.limpiar_respuesta(respuesta)
-            return {"response": respuesta, "lang": lang}
+            return _finalizar_chat_response(
+                sid=sid,
+                pregunta=pregunta,
+                payload={"response": respuesta, "lang": lang},
+                started_at=started_at,
+            )
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Error traduciéndose: {e}")
 
@@ -1230,20 +1433,23 @@ async def chat(request: Request):
 
         try:
             respuesta = ollama.limpiar_respuesta(ollama.llamar_ollama(mensajes))
-            respuesta_limpia = (respuesta or "").strip()
-            if not respuesta_limpia:
-                respuesta = respuesta_chat_vacio(lang, pregunta)
+            respuesta = _postprocess_llm_response(respuesta, respuesta_chat_vacio(lang, pregunta))
         except Exception:
             raise HTTPException(status_code=500, detail="Error razonando con la IA sobre el contexto local.")
 
-        # conservar saltos de línea para que el frontend pueda mostrar la
-        # respuesta completa con mejor legibilidad.
-        respuesta = (respuesta or "").strip()
         if CHAT_RESPONSE_MAX_CHARS > 0 and len(respuesta) > CHAT_RESPONSE_MAX_CHARS:
-            respuesta = respuesta[:CHAT_RESPONSE_MAX_CHARS].rsplit(" ", 1)[0].strip() + "..."
+            safe = respuesta[:CHAT_RESPONSE_MAX_CHARS]
+            cut = max(safe.rfind("."), safe.rfind("!"), safe.rfind("?"))
+            if cut > 30:
+                respuesta = safe[: cut + 1].strip()
+            else:
+                respuesta = safe.rsplit(" ", 1)[0].strip() + "..."
 
         session.agregar_turno(sid, pregunta, respuesta)
-        return {
+        return _finalizar_chat_response(
+            sid=sid,
+            pregunta=pregunta,
+            payload={
             "response": respuesta,
             "lang": lang,
             "general_only": True,
@@ -1254,13 +1460,15 @@ async def chat(request: Request):
             },
             "sources": local_result.get("sources", []),
             "primary_source_type": local_result.get("primary_source_type"),
-        }
+            },
+            started_at=started_at,
+        )
 
     # si el usuario responde con un pedido corto, reorganizamos la pregunta para
     # no perder el tema anterior. La función `es_pedido_corto` revisa comandos
     # como "dame" o mensajes muy breves.
     if intents.es_pedido_corto(pregunta):
-        hist = session.get_historial(session.get_sid())
+        hist = session.get_historial(sid)
         # buscar el último mensaje del propio usuario en el historial
         last_user = None
         for entry in reversed(hist):
@@ -1281,33 +1489,51 @@ async def chat(request: Request):
         resultado = capabilities.execute_special_query(consulta_especial, estado)
         respuesta = resultado["response"]
         session.agregar_turno(sid, pregunta, respuesta)
-        return (
-            {
+        return _finalizar_chat_response(
+            sid=sid,
+            pregunta=pregunta,
+            payload={
                 "response": respuesta,
                 "lang": lang,
                 "capabilities": estado,
                 "tool_result": resultado,
-            }
+            },
+            started_at=started_at,
         )
 
     # ── 1. Saludo → sin Ollama
     if intents.es_saludo(pregunta):
-        return {"response": t["saludo"], "lang": lang}
+        return _finalizar_chat_response(
+            sid=sid,
+            pregunta=pregunta,
+            payload={"response": t["saludo"], "lang": lang},
+            started_at=started_at,
+        )
 
     # ── 1.5 Presentación
     if intents.es_presentacion(pregunta):
-        return {
+        return _finalizar_chat_response(
+            sid=sid,
+            pregunta=pregunta,
+            payload={
             "response": (
                 "Soy ChatbotBO, el asistente virtual de la Agencia Boliviana de "
                 "Correos. ¿En qué puedo ayudarte?"
             ),
             "lang": lang,
-        }
+            },
+            started_at=started_at,
+        )
 
     # ── 2. Despedida
     if intents.es_despedida(pregunta):
         session.limpiar_historial(sid)
-        return {"response": t["despedida"], "despedida": True, "lang": lang}
+        return _finalizar_chat_response(
+            sid=sid,
+            pregunta=pregunta,
+            payload={"response": t["despedida"], "despedida": True, "lang": lang},
+            started_at=started_at,
+        )
 
     # ── 3. ¿Solo nombre de ciudad?
     geo = intents.detectar_solo_ciudad(pregunta, SUCURSALES)
@@ -1329,11 +1555,11 @@ async def chat(request: Request):
             else:
                 mensaje = mensaje.format(ciudades=nombres)
 
-            return ({
+            return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload={
                 "response": mensaje,
                 "lang"    : lang,
                 "no_translate": True,   # no traducir esta frase cuando el usuario cambie idioma
-            })
+            }, started_at=started_at)
 
         lat      = geo.get("lat")
         lng      = geo.get("lng")
@@ -1364,12 +1590,12 @@ async def chat(request: Request):
                 "lng"      : lng,
                 "maps_url" : maps_url,
             }
-        return (resp_json)
+        return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload=resp_json, started_at=started_at)
 
     if not skill_resolution["in_scope"]:
         respuesta = capabilities.out_of_scope_response()
         session.agregar_turno(sid, pregunta, respuesta)
-        return ({
+        return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload={
             "response": respuesta,
             "lang": lang,
             "skill_resolution": {
@@ -1377,15 +1603,50 @@ async def chat(request: Request):
                 "primary_skill": None,
                 "matched_skills": [],
             },
-        })
+        }, started_at=started_at)
+
+    primary_skill = skill_resolution.get("primary_skill") or {}
+    primary_skill_id = primary_skill.get("id", "")
+
+    cached_response = cache.get_response(
+        pregunta=pregunta,
+        lang=lang,
+        skill_id=primary_skill_id,
+        model=os.environ.get("LLM_MODEL", "correos-bot"),
+        require_evidence=REQUIRE_EVIDENCE,
+    )
+    if cached_response:
+        respuesta_cache = (cached_response.get("response") or "").strip()
+        if respuesta_cache:
+            session.agregar_turno(sid, pregunta, respuesta_cache)
+            observability.log_event(
+                "cache.response_hit",
+                lang=lang,
+                primary_skill=primary_skill_id,
+            )
+            return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload={
+                "response": respuesta_cache,
+                "lang": lang,
+                "skill_resolution": {
+                    "in_scope": skill_resolution["in_scope"],
+                    "primary_skill": primary_skill_id,
+                    "matched_skills": skill_resolution.get("skill_ids", []),
+                },
+                "sources": cached_response.get("sources", []),
+                "primary_source_type": cached_response.get("primary_source_type"),
+                "cache_hit": True,
+            }, started_at=started_at)
 
     # ── 6. Consulta general → RAG + Ollama
     try:
-        rag_result = rag.buscar(
-            pregunta,
-            preferred_source_types=capabilities.preferred_sources_for_skill(
-                skill_resolution.get("primary_skill")
-            ),
+        rag_result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: rag.buscar(
+                pregunta,
+                preferred_source_types=capabilities.preferred_sources_for_skill(
+                    primary_skill
+                ),
+            )
         )
         contexto = rag_result.get("context", "")
     except Exception as e:
@@ -1396,7 +1657,7 @@ async def chat(request: Request):
     if not contexto.strip() or not valid_sources:
         respuesta = t["sin_info"]
         session.agregar_turno(sid, pregunta, respuesta)
-        return ({
+        return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload={
             "response": respuesta,
             "lang": lang,
             "skill_resolution": {
@@ -1406,10 +1667,9 @@ async def chat(request: Request):
             },
             "sources": sources,
             "primary_source_type": rag_result.get("primary_source_type"),
-        })
+        }, started_at=started_at)
 
     hora     = session.get_hora_bolivia()
-    primary_skill = skill_resolution.get("primary_skill") or {}
     sistema  = construir_prompt(
         t["instruccion"],
         contexto,
@@ -1439,8 +1699,11 @@ async def chat(request: Request):
 
     try:
         print(f" [{lang}] {pregunta[:60]}")
-        respuesta = ollama.llamar_ollama(mensajes)
+        respuesta = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: ollama.llamar_ollama(mensajes)
+        )
         respuesta = ollama.limpiar_respuesta(respuesta)
+        respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
         observability.log_event(
             "llm.response",
             lang=lang,
@@ -1468,19 +1731,43 @@ async def chat(request: Request):
         if respuesta.startswith("Eres ChatbotBO") or respuesta.strip().startswith(presentacion_corta):
             respuesta = t["sin_info"]
 
+        should_cache = (
+            bool(respuesta and respuesta != t["sin_info"])
+            and bool(valid_sources)
+            and len(respuesta) >= 40
+        )
+        if should_cache:
+            cache.set_response(
+                pregunta=pregunta,
+                lang=lang,
+                skill_id=primary_skill_id,
+                model=os.environ.get("LLM_MODEL", "correos-bot"),
+                require_evidence=REQUIRE_EVIDENCE,
+                payload={
+                    "response": respuesta,
+                    "sources": rag_result.get("sources", []),
+                    "primary_source_type": rag_result.get("primary_source_type"),
+                },
+            )
+            observability.log_event(
+                "cache.response_set",
+                lang=lang,
+                primary_skill=primary_skill_id,
+            )
+
         session.agregar_turno(sid, pregunta, respuesta)
         print(f" [{lang}] {len(respuesta)} chars")
-        return ({
+        return _finalizar_chat_response(sid=sid, pregunta=pregunta, payload={
             "response": respuesta,
             "lang": lang,
             "skill_resolution": {
                 "in_scope": skill_resolution["in_scope"],
-                "primary_skill": primary_skill.get("id"),
+                "primary_skill": primary_skill_id,
                 "matched_skills": skill_resolution.get("skill_ids", []),
             },
             "sources": rag_result.get("sources", []),
             "primary_source_type": rag_result.get("primary_source_type"),
-        })
+        }, started_at=started_at)
 
     except requests.exceptions.Timeout:
         raise HTTPException(status_code=504, detail="El modelo tardó demasiado. Intenta de nuevo.")
@@ -1516,7 +1803,7 @@ async def translate_bulk(request: Request):
     if textos_a_traducir is None:
         # No se enviaron textos explícitos: reconstruimos a partir del
         # historial de la sesión, como antes.
-        sid = session.get_sid()
+        sid = _resolve_sid_from_request(request, data)
         historial = session.get_historial(sid)
         if not historial:
             return ({"translations": [], "lang": lang})
@@ -1560,8 +1847,16 @@ async def listar_idiomas():
 
 @router.post("/reset")
 async def reset(request: Request):
-    session.limpiar_historial(session.get_sid())
-    return {"ok": True}
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    try:
+        _persistir_flujo_tarifa(sid, status="reset")
+    except Exception as e:
+        print(f"   Error guardando flujo tarifa al reset: {e}")
+    session.limpiar_historial(sid)
+    session.clear_pendiente_tarifa(sid)
+    session.clear_tarifa_flow(sid)
+    return {"ok": True, "sid": sid}
 
 
 @router.get("/status")
@@ -1609,12 +1904,137 @@ def listar_opciones_capacidades():
     return (capabilities.management_options())
 
 
+@router.get("/cache/stats")
+def cache_stats():
+    return cache.get_namespace_stats()
+
+
+@router.get("/cache/responses")
+def cache_responses(limit: int = 200, q: str = ""):
+    items = cache.list_response_cache(limit=limit, q=q)
+    return {
+        "items": items,
+        "total": len(items),
+        "available": cache.health_check(),
+    }
+
+
+@router.delete("/cache/responses/{cache_id}")
+def cache_response_delete(cache_id: str):
+    if not cache.delete_response_cache(cache_id):
+        raise HTTPException(status_code=404, detail="Cache response no encontrada")
+    return {"ok": True, "cache_id": cache_id}
+
+
+@router.post("/cache/responses/clear")
+def cache_responses_clear():
+    deleted = cache.clear_response_cache()
+    return {"ok": True, "deleted": deleted}
+
+
+@router.get("/conversations")
+def conversations_list(limit: int = 300, offset: int = 0, q: str = ""):
+    payload = conversation_logs.list_conversations(limit=limit, offset=offset, q=q)
+    payload["stats"] = conversation_logs.stats()
+    return payload
+
+
+@router.get("/conversations/tarifas")
+def conversations_tarifas_list(limit: int = 300, offset: int = 0, q: str = ""):
+    payload = conversation_logs_tarifas.list_tarifa_conversations(limit=limit, offset=offset, q=q)
+    payload["stats"] = conversation_logs_tarifas.stats()
+    return payload
+
+
+@router.delete("/conversations/tarifas/{log_id}")
+def conversations_tarifas_delete(log_id: int):
+    if not conversation_logs_tarifas.delete_tarifa_conversation(log_id):
+        raise HTTPException(status_code=404, detail="Log de tarifas no encontrado")
+    return {"ok": True, "id": log_id}
+
+
+@router.post("/conversations/tarifas/clear")
+def conversations_tarifas_clear():
+    deleted = conversation_logs_tarifas.clear_tarifa_conversations()
+    return {"ok": True, "deleted": deleted}
+
+
+@router.delete("/conversations/{log_id}")
+def conversations_delete(log_id: int):
+    if not conversation_logs.delete_conversation(log_id):
+        raise HTTPException(status_code=404, detail="Log conversacional no encontrado")
+    return {"ok": True, "id": log_id}
+
+
+@router.put("/conversations/{log_id}/rating")
+async def conversations_rate(request: Request, log_id: int):
+    data = await request.json()
+    raw_rating = (data.get("rating") if isinstance(data, dict) else None)
+    rating_map = {"like": 1, "dislike": -1, "none": 0, "": 0, None: 0}
+    if isinstance(raw_rating, str):
+        raw_rating = raw_rating.strip().lower()
+    if raw_rating not in rating_map:
+        raise HTTPException(status_code=400, detail="rating inválido (use like|dislike|none)")
+    try:
+        ok = conversation_logs.set_rating(log_id, rating_map[raw_rating])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not ok:
+        raise HTTPException(status_code=404, detail="Log conversacional no encontrado")
+    return {"ok": True, "id": log_id, "rating": rating_map[raw_rating]}
+
+
+@router.post("/conversations/clear")
+def conversations_clear():
+    deleted = conversation_logs.clear_conversations()
+    return {"ok": True, "deleted": deleted}
+
+
 @router.get("/pdfs")
 def listar_pdfs():
     return ({
         "pdfs": capabilities.listar_pdfs(),
         "resumen": capabilities.resumen_pdfs(),
     })
+
+
+@router.get("/data-jsons")
+def listar_data_jsons():
+    return ({
+        "items": capabilities.listar_data_jsons(),
+        "resumen": capabilities.resumen_data_jsons(),
+    })
+
+
+@router.get("/data-jsons/{nombre_archivo:path}")
+def obtener_data_json(nombre_archivo: str = Path(..., description="Nombre del archivo JSON de data")):
+    try:
+        return capabilities.obtener_data_json(nombre_archivo)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error leyendo JSON: {e}")
+
+
+@router.put("/data-jsons/{nombre_archivo:path}")
+async def actualizar_data_json(request: Request, nombre_archivo: str = Path(..., description="Nombre del archivo JSON de data")):
+    data = await request.json()
+    if "content" not in data:
+        raise HTTPException(status_code=400, detail="content es obligatorio")
+    try:
+        resultado = capabilities.actualizar_data_json(nombre_archivo, data.get("content"))
+        resultado["reindex_started"] = _programar_reindex_debounced("data_json_edit", mode="full")
+        return resultado
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"JSON inválido: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error actualizando JSON: {e}")
 
 
 @router.get("/scraping")
@@ -1753,7 +2173,69 @@ async def calcular_tarifa(request: Request):
         xlsx=(data.get("xlsx") or "").strip() or None,
     )
     status = 200 if resultado.get("ok") else 422
-    return (resultado), status
+    return JSONResponse(content=resultado, status_code=status)
+
+
+@router.post("/tarifa/cancel")
+async def cancelar_tarifa(request: Request):
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    try:
+        if session.tarifa_flow_active(sid):
+            session.append_tarifa_flow_turn(
+                sid,
+                user_text=(data.get("message") if isinstance(data, dict) else "") or "cancelar tarifa",
+                assistant_text="Flujo de tarifas cancelado por el usuario.",
+                stage="cancelled",
+            )
+            _persistir_flujo_tarifa(sid, status="cancelled")
+    except Exception as e:
+        print(f"   Error guardando flujo tarifa cancelado: {e}")
+    session.clear_pendiente_tarifa(sid)
+    session.clear_tarifa_flow(sid)
+    return {
+        "ok": True,
+        "sid": sid,
+        "tarifa": {"pending": False, "cancelled": True},
+    }
+
+
+@router.post("/tarifa/start")
+async def iniciar_tarifa(request: Request):
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    lang = idiomas.resolver_idioma((data or {}).get("lang"), "")
+    try:
+        _persistir_flujo_tarifa(sid, status="cancelled")
+    except Exception:
+        pass
+    session.start_tarifa_flow(sid, metadata={"mode": "deterministic_tarifa"})
+    session.set_pendiente_tarifa(
+        sid,
+        {
+            "scope": None,
+            "family": None,
+            "level": None,
+            "peso": None,
+            "columna": None,
+        },
+    )
+    missing = ["alcance"]
+    msg = "¿Será nacional o internacional?"
+    session.append_tarifa_flow_turn(
+        sid,
+        user_text="(inicio modo tarifas)",
+        assistant_text=msg,
+        stage="start",
+    )
+    return {
+        "ok": True,
+        "sid": sid,
+        "lang": lang,
+        "response": msg,
+        "quick_replies": _tarifa_quick_replies(missing),
+        "tarifa": {"ok": False, "pending": True, "start": True, "missing": missing},
+    }
 
 
 @router.post("/rag/rebuild")
@@ -1811,5 +2293,5 @@ async def api_root(request: Request):
         return await rebuild_rag()
     # si el cuerpo contiene 'message' asumimos chat
     if "message" in data:
-        return chat()
+        return await chat()
     raise HTTPException(status_code=400, detail="requisição inválida")

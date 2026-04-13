@@ -25,10 +25,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copiar proyecto
-COPY backend/app /app
-
-# Cambiar al directorio de la app
-WORKDIR /app
+COPY . /app
 
 EXPOSE 5000
 
@@ -41,6 +38,10 @@ ENV FLASK_ENV=production \
     CHUNK_SIZE=600 \
     BATCH_SIZE=500 \
     N_RESULTADOS=3 \
-    OLLAMA_TIMEOUT=600
+    OLLAMA_TIMEOUT=600 \
+    UVICORN_WORKERS=1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
+  CMD curl -f http://localhost:5000/api/status || exit 1
+
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5000 --workers ${UVICORN_WORKERS:-1}"]

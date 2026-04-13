@@ -771,6 +771,34 @@ header::after {
   pointer-events: none;
 }
 
+.btn-rate {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.64rem;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.btn-rate:hover {
+  background: #f2f5fb;
+  border-color: #c9d3ea;
+}
+
+.btn-rate.active-like {
+  background: rgba(47,143,78,.12);
+  border-color: rgba(47,143,78,.35);
+  color: #2f8f4e;
+}
+
+.btn-rate.active-dislike {
+  background: rgba(180,66,49,.10);
+  border-color: rgba(180,66,49,.30);
+  color: #b44231;
+}
+
 /* ─── Typing Indicator ─────────────────────────── */
 .typing .bub {
   display: flex;
@@ -913,6 +941,21 @@ header::after {
 .f-hint  { font-size: 0.56rem; color: var(--ink4); letter-spacing: 0.03em; }
 .f-brand { font-size: 0.56rem; color: var(--ink4); letter-spacing: 0.04em; }
 .f-brand b { color: var(--y700); font-weight: 700; }
+.tarifa-toggle {
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--b900);
+  border-radius: 9px;
+  padding: 5px 10px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tarifa-toggle.active {
+  background: #fff2ef;
+  border-color: rgba(180,66,49,.35);
+  color: #b44231;
+}
 
 /* ─── Confirm Bar ──────────────────────────────── */
 #confirm-bar {
