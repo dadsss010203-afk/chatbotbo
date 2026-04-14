@@ -1,0 +1,102 @@
+[
+  {
+    "id": "rastreo_envios",
+    "nombre": "Rastreo de envíos",
+    "descripcion": "Atiende consultas sobre seguimiento, estado y trazabilidad de envíos postales.",
+    "modo": "rag+llm",
+    "categoria": "atencion",
+    "prioridad": 5,
+    "trigger": "rastreo, seguimiento, track, tracking, guia, codigo de envio, estado de envio, paquete",
+    "activa": true
+  },
+  {
+    "id": "servicios_correos",
+    "nombre": "Servicios de Correos de Bolivia",
+    "descripcion": "Explica servicios, características, coberturas, modalidades y condiciones operativas de AGBC.",
+    "modo": "rag+llm",
+    "categoria": "atencion",
+    "prioridad": 5,
+    "trigger": "servicio, servicios, ems, certificado, ordinario, express mail service, giros, encomienda, paqueteria",
+    "activa": true
+  },
+  {
+    "id": "guia_envio_correcto",
+    "nombre": "Cómo enviar correctamente",
+    "descripcion": "Guía paso a paso para preparar, embalar, rotular y enviar documentos o paquetes correctamente.",
+    "modo": "rag+llm",
+    "categoria": "atencion",
+    "prioridad": 5,
+    "trigger": "como enviar, paso a paso, guia de envio, embalaje, rotulado, destinatario, remitente",
+    "activa": true
+  },
+  {
+    "id": "reclamos_quejas",
+    "nombre": "Reclamos y quejas",
+    "descripcion": "Orienta sobre reclamos, quejas, demoras, pérdidas, incidencias y canales de atención.",
+    "modo": "rag+llm",
+    "categoria": "atencion",
+    "prioridad": 5,
+    "trigger": "reclamo, reclamos, queja, quejas, denuncia, demora, perdido, extraviado, no llego",
+    "activa": true
+  },
+  {
+    "id": "alertas_seguridad",
+    "nombre": "Evita estafas y alertas de seguridad",
+    "descripcion": "Ayuda a identificar fraudes, enlaces sospechosos y prácticas seguras relacionadas con servicios postales.",
+    "modo": "rag+llm",
+    "categoria": "analitica",
+    "prioridad": 5,
+    "trigger": "estafa, fraude, phishing, alerta, seguridad, mensaje falso, enlace sospechoso, scam",
+    "activa": true
+  },
+  {
+    "id": "filatelia_boliviana",
+    "nombre": "Filatelia boliviana",
+    "descripcion": "Informa sobre sellos de colección, productos filatélicos y contenido histórico relacionado.",
+    "modo": "rag+llm",
+    "categoria": "documental",
+    "prioridad": 4,
+    "trigger": "filatelia, sello, sellos, coleccion, estampilla, estampillas",
+    "activa": true
+  },
+  {
+    "id": "oficinas_contacto",
+    "nombre": "Oficinas, sucursales y contacto",
+    "descripcion": "Resuelve ubicación, horarios, contacto y datos de oficinas o sucursales de Correos de Bolivia.",
+    "modo": "rag+llm",
+    "categoria": "atencion",
+    "prioridad": 5,
+    "trigger": "oficina, oficinas, sucursal, sucursales, contacto, telefono, direccion, horario",
+    "activa": true
+  },
+  {
+    "id": "historia_correos_bolivia",
+    "nombre": "Historia de Correos Bolivia",
+    "descripcion": "Responde sobre historia institucional, evolución y antecedentes de Correos de Bolivia.",
+    "modo": "rag+llm",
+    "categoria": "documental",
+    "prioridad": 3,
+    "trigger": "historia, historia institucional, origen, evolucion, antecedentes, correos bolivia",
+    "activa": true
+  },
+  {
+    "id": "multilenguaje",
+    "nombre": "Traducción conversacional",
+    "descripcion": "Mantiene la conversación en varios idiomas y traduce respuestas visibles del bot.",
+    "modo": "translation",
+    "categoria": "idioma",
+    "prioridad": 4,
+    "trigger": "traducir, idioma, language, traduccion, translation",
+    "activa": true
+  },
+  {
+    "id": "estado_plataforma",
+    "nombre": "Estado del sistema",
+    "descripcion": "Resume el estado operativo del bot, el modelo, el RAG y los recursos cargados.",
+    "modo": "internal",
+    "categoria": "operacion",
+    "prioridad": 3,
+    "trigger": "skills, capacidades, estado del bot, estado del sistema",
+    "activa": true
+  }
+]

@@ -29,7 +29,7 @@ IDIOMAS = {
     "es": {
         "nombre"       : "Español",
         "bienvenida"   : (
-            "¡Hola! Bienvenido al asistente oficial de la Agencia Boliviana de Correos (AGBC). "
+            "¡Hola! Bienvenido al asistente oficial de Correos de Bolivia "
             "Puedo ayudarte con envíos, sucursales, ubicaciones y más. ¿En qué puedo ayudarte hoy?"
         ),
         "saludo"       : (
@@ -48,7 +48,7 @@ IDIOMAS = {
     "en": {
         "nombre"       : "English",
         "bienvenida"   : (
-            "Hello! Welcome to the official assistant of the Bolivian Postal Agency (AGBC). "
+            "Hello! Welcome to the official assistant of the Bolivian Postal. "
             "I can help you with shipments, branches, locations and more. How can I help you today?"
         ),
         "saludo"       : "Hello! I am the Correos Bolivia assistant. How can I help you?",

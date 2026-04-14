@@ -1307,6 +1307,10 @@ def inicializar():
     print(f"\n🤖 Iniciando {NOMBRE}...")
 
     SUCURSALES = location.cargar_sucursales(SUCURSALES_FILE)
+    print(f"  📍 Sucursales cargadas: {len(SUCURSALES)}")
+    if not SUCURSALES:
+        print(f"  ⚠️  ADVERTENCIA: No se encontraron sucursales en {SUCURSALES_FILE}")
+        print(f"     Ejecuta el scraper: python scraper/runner.py")
 
     if _modo_general_only():
         print("  Modo general activo → sin embeddings, sin ChromaDB y sin RAG al arranque")
@@ -1483,10 +1487,12 @@ async def chat(request: Request):
     t    = idiomas.IDIOMAS[lang]
     skill_resolution = capabilities.resolve_skills_for_query(pregunta)
 
+    print(f"[CHAT] Procesando pregunta: {pregunta[:50]}")
     consulta_especial = capabilities.detectar_consulta_especial(pregunta)
+    print(f"[CHAT] Consulta especial detectada: {consulta_especial}")
     if consulta_especial is not None:
         estado = _estado_capacidades()
-        resultado = capabilities.execute_special_query(consulta_especial, estado)
+        resultado = capabilities.execute_special_query(consulta_especial, estado, pregunta)
         respuesta = resultado["response"]
         session.agregar_turno(sid, pregunta, respuesta)
         return _finalizar_chat_response(
@@ -1835,7 +1841,58 @@ async def translate_bulk(request: Request):
 
 @router.get("/sucursales")
 async def listar_sucursales():
-    return {"sucursales": [location.sucursal_a_dict(s) for s in SUCURSALES]}
+    if not SUCURSALES:
+        return {
+            "sucursales": [],
+            "error": "No hay sucursales cargadas",
+            "ayuda": "Ejecuta el scraper: python scraper/runner.py o usa POST /api/sucursales/recargar"
+        }
+    return {
+        "sucursales": [location.sucursal_a_dict(s) for s in SUCURSALES],
+        "total": len(SUCURSALES)
+    }
+
+
+@router.post("/sucursales/recargar")
+async def recargar_sucursales():
+    global SUCURSALES
+    import os
+    
+    # Verificar si el archivo existe
+    if not os.path.exists(SUCURSALES_FILE):
+        # Intentar rutas alternativas
+        alternativas = [
+            os.path.join("data", "sucursales_contacto.json"),
+            os.path.join(os.path.dirname(__file__), "..", "..", "data", "sucursales_contacto.json"),
+            os.path.abspath(os.path.join("data", "sucursales_contacto.json")),
+        ]
+        ruta_encontrada = None
+        for alt in alternativas:
+            if os.path.exists(alt):
+                ruta_encontrada = alt
+                break
+        
+        if not ruta_encontrada:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": f"Archivo no encontrado: {SUCURSALES_FILE}",
+                    "rutas_buscadas": [SUCURSALES_FILE] + alternativas,
+                    "sugerencia": "Ejecuta el scraper primero: python scraper/runner.py"
+                }
+            )
+        ruta_usar = ruta_encontrada
+    else:
+        ruta_usar = SUCURSALES_FILE
+    
+    SUCURSALES = location.cargar_sucursales(ruta_usar)
+    
+    return {
+        "success": True,
+        "sucursales_cargadas": len(SUCURSALES),
+        "ruta_usada": ruta_usar,
+        "sucursales": [location.sucursal_a_dict(s) for s in SUCURSALES[:5]]  # Primeras 5 como muestra
+    }
 
 
 @router.get("/idiomas")

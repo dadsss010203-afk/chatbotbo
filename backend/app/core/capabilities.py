@@ -881,10 +881,55 @@ def get_runtime_capabilities(
     }
 
 
+def detectar_codigo_seguimiento(pregunta: str) -> str | None:
+    """Detecta códigos de seguimiento bolivianos (terminan en BO) o internacionales."""
+    import re
+    
+    texto = (pregunta or "").strip().upper()
+    if not texto:
+        return None
+    
+    # Patrones comunes de códigos de seguimiento (de más específico a más general)
+    patrones = [
+        # Formato boliviano específico: cualquier combinación que termine en BO
+        r'[A-Z]\d+[A-Z]?\d*BO',               # Ej: C0007A02018BO, R123456789BO
+        # Formato internacional XX123456789XX
+        r'[A-Z]{2}\d{9}[A-Z]{2}',              # Ej: ES123456789CN
+        # Solo números (12-14 dígitos)
+        r'\d{12,14}',                          # Ej: 123456789012
+        # Letra + números (8-13 dígitos)
+        r'[A-Z]\d{8,13}',                      # Ej: C123456789
+    ]
+    
+    for patron in patrones:
+        match = re.search(patron, texto)
+        if match:
+            codigo = match.group(0)
+            print(f"[TRACKING] Código detectado: {codigo}")
+            return codigo
+    
+    print(f"[TRACKING] No se detectó código en: {texto[:50]}")
+    return None
+
+
+# Test al importar
+if __name__ == "__main__":
+    # Probar con el código del usuario
+    test_codigo = "C0007A02018BO"
+    resultado = detectar_codigo_seguimiento(test_codigo)
+    print(f"Test '{test_codigo}': {resultado}")
+
+
 def detectar_consulta_especial(pregunta: str) -> str | None:
     texto = (pregunta or "").strip().lower()
     if not texto:
         return None
+
+    # Detectar código de seguimiento primero
+    codigo = detectar_codigo_seguimiento(pregunta)
+    if codigo:
+        print(f"[CONSULTA_ESPECIAL] Detectado tracking con código: {codigo}")
+        return "tracking"
 
     if any(token in texto for token in ("skill", "skills", "habilidad", "habilidades")):
         return "skills"
@@ -1268,7 +1313,7 @@ def actualizar_texto_pdf(nombre_archivo: str, texto_extraido: str | None) -> dic
     return {"ok": True, "pdf": registro}
 
 
-def execute_special_query(tipo: str, runtime_capabilities: dict) -> dict:
+def execute_special_query(tipo: str, runtime_capabilities: dict, pregunta: str = "") -> dict:
     if tipo == "skills":
         return {
             "kind": "skills",
@@ -1293,6 +1338,14 @@ def execute_special_query(tipo: str, runtime_capabilities: dict) -> dict:
     if tipo == "branches_summary":
         result = _branches_summary(runtime_capabilities)
         return {"kind": "branches", "payload": result, "response": result["text"]}
+    if tipo == "tracking":
+        codigo = detectar_codigo_seguimiento(pregunta)
+        url_tracking = f"https://trackingbo.correos.gob.bo:8100/search?tracking={codigo}"
+        return {
+            "kind": "tracking",
+            "payload": {"codigo": codigo, "url": url_tracking},
+            "response": f"Detecté el código de seguimiento: **{codigo}**\n\nPuedes consultar el estado de tu envío en:\n🔗 {url_tracking}\n\nSi prefieres, puedo ayudarte a interpretar la información una vez que accedas al enlace.",
+        }
     raise ValueError(f"Consulta especial no soportada: {tipo}")
 
 

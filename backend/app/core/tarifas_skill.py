@@ -994,6 +994,40 @@ def _cache_set(scope: str, peso: str, columna: str, xlsx: str | None, data: dict
     _CACHE[(scope, peso, columna, xlsx or "")] = (time.time(), data)
 
 
+def _parse_keyvalue_output(raw: str, exit_code: int) -> dict:
+    """Parsea salida en formato clave=valor del runtime Python y convierte a dict."""
+    text = (raw or "").strip()
+    if not text:
+        return {"ok": False, "error": "La skill de tarifas no devolvió salida", "exit_code": exit_code}
+
+    # Verificar errores conocidos
+    low = _normalize_text(text)
+    if "peso fuera de rango" in low or "precio vacio" in low:
+        return {"ok": False, "error": "Peso fuera de rango para este tarifario", "error_code": "out_of_range", "raw": text}
+
+    # Parsear formato clave=valor
+    result = {"ok": True}
+    for line in text.splitlines():
+        if "=" in line:
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+            if key == "rango_min_g":
+                result.setdefault("rango", {})["min_g"] = value
+            elif key == "rango_max_g":
+                result.setdefault("rango", {})["max_g"] = value
+            elif key == "precio":
+                try:
+                    result["precio"] = int(float(value))
+                except:
+                    result["precio"] = value
+            else:
+                result[key] = value
+    if "precio" not in result:
+        return {"ok": False, "error": "No se pudo extraer precio de la salida", "raw": text}
+    return result
+
+
 def _parse_wrapper_output(raw: str, exit_code: int) -> dict:
     text = (raw or "").strip()
     if not text:
@@ -1055,7 +1089,16 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
     if cached is not None:
         return {**cached, "cached": True}
 
-    cmd = ["bash", wrapper, "--peso", peso, "--columna", columna]
+    # En Windows, ejecutar el runtime Python directamente (los wrappers .sh no funcionan)
+    is_windows = os.name == 'nt'
+    if is_windows:  # Windows
+        # Convertir ruta del wrapper a ruta del runtime
+        # skillX/tools/calcular_hojaX_json.sh -> skillX/runtime/calcular_hojaX_runtime.py
+        runtime_path = wrapper.replace("\\tools\\", "\\runtime\\").replace("/tools/", "/runtime/")
+        runtime_path = runtime_path.replace("_json.sh", "_runtime.py")
+        cmd = ["python", runtime_path, "--peso", peso, "--columna", columna, "--json"]
+    else:
+        cmd = ["bash", wrapper, "--peso", peso, "--columna", columna]
     if xlsx:
         cmd.extend(["--xlsx", xlsx])
 
@@ -1078,7 +1121,12 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
             last = {"ok": False, "error": f"Error ejecutando skill de tarifas: {exc}"}
             continue
 
-        parsed = _parse_wrapper_output(proc.stdout or proc.stderr or "", proc.returncode)
+        output = proc.stdout or proc.stderr or ""
+        # En Windows: convertir formato clave=valor a JSON
+        if is_windows and output:
+            parsed = _parse_keyvalue_output(output, proc.returncode)
+        else:
+            parsed = _parse_wrapper_output(output, proc.returncode)
         if parsed.get("ok"):
             parsed["scope"] = scope
             parsed["skill_id"] = cfg["skill_id"]

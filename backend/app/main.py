@@ -83,7 +83,10 @@ async def widget_html():
 
 @app.get("/favicon.ico")
 async def favicon():
-    return FileResponse(os.path.join(FRONTEND_DIR, "favicon.ico"), media_type="image/x-icon")
+    favicon_path = os.path.join(FRONTEND_DIR, "favicon.ico")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path, media_type="image/x-icon")
+    raise HTTPException(status_code=404, detail="Favicon not found")
 
 
 # ─────────────────────────────────────────────
