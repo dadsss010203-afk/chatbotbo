@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "Analista Hoja 11"
+  description: "Analiza y valida Hoja 11 con salida estructurada y calculo puntual trazable."
+  default_prompt: "Usa esta skill para revisar, limpiar, validar y resumir la Hoja 11. Para calculos puntuales usa el wrapper bash backend/app/skills/skill11/tools/calcular_hoja11_json.sh y devuelve el resultado con trazabilidad."

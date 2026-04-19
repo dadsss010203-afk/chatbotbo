@@ -1,0 +1,2840 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Capacidades | ChatbotBO</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <style>
+    :root{
+      --gold-900:#7a4f00;--gold-700:#c8860e;--gold-500:#f5a623;--gold-200:#ffe49a;
+      --navy-900:#0b1f4e;--navy-700:#163a80;--navy-500:#2255b8;
+      --cream:#f8fafc;--paper:#eef2f7;--white:#ffffff;--border:#d7dce8;
+      --ink:#1a0e00;--ink-soft:rgba(26,14,0,.66);--ink-faint:rgba(26,14,0,.45);
+      --ok:#2f8f4e;--danger:#b44231;--warn:#a06600;
+      --shadow:0 18px 48px rgba(11,31,78,.12);
+      --shadow-soft:0 8px 26px rgba(122,79,0,.10);
+      --radius-xl:26px;--radius-lg:18px;--radius-md:14px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family:'DM Sans',sans-serif;
+      color:var(--ink);
+      background:linear-gradient(180deg,#f7f8fb 0%,#eef2f7 100%);
+    }
+    .shell{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+    .sidebar{
+      position:sticky;top:0;height:100vh;width:280px;flex-shrink:0;
+      background:#0b1f4e;
+      color:#fff;border-right:1px solid rgba(255,255,255,.08);
+      display:flex;flex-direction:column;overflow:hidden
+    }
+    .sidebar-scroll{flex:1;overflow-y:auto;padding:20px 16px 10px;min-height:0}
+    .sidebar-scroll::-webkit-scrollbar{width:6px}
+    .sidebar-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:3px}
+    .sidebar-footer{padding:0 16px 20px;flex-shrink:0;background:#0b1f4e}
+    .brand{padding:8px 10px 14px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:14px;flex-shrink:0}
+    .brand h1{margin:0;font-family:'Playfair Display',serif;font-size:1.5rem;letter-spacing:.02em}
+    .brand p{margin:6px 0 0;color:rgba(255,255,255,.72);font-size:.85rem;line-height:1.5}
+    .menu{display:grid;gap:8px;flex:1;min-height:0}
+    .menu-btn{
+      border:none;border-radius:14px;padding:10px 12px;text-align:left;cursor:pointer;
+      background:rgba(255,255,255,.08);color:#fff;font:inherit;font-weight:700;font-size:.9rem;
+      transition:all .2s ease;text-decoration:none;display:block;line-height:1.3
+    }
+    .menu-btn small{display:block;margin-top:2px;color:rgba(255,255,255,.6);font-weight:500;font-size:.75rem;line-height:1.2}
+    .menu-btn.active,.menu-btn:hover{background:rgba(255,255,255,.18);color:#0b1f4e;transform:none}
+    .menu-btn.active small,.menu-btn:hover small{color:rgba(11,31,78,.75)}
+    .side-actions{display:grid;gap:10px;padding-top:16px;border-top:1px solid rgba(255,255,255,.12)}
+    .side-link{
+      display:flex;align-items:center;justify-content:center;text-decoration:none;
+      border-radius:14px;padding:11px 14px;font-weight:700;background:#1a3a6e;color:#fff;border:1px solid rgba(255,255,255,.15)
+    }
+    .side-link:hover{background:#234780}
+    .side-runtime{
+      margin-top:14px;padding:14px;border-radius:16px;
+      background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);flex-shrink:0
+    }
+    .side-runtime h3{margin:0 0 8px;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+    .side-runtime strong{display:block;font-size:1.3rem}
+    .side-runtime p{margin:6px 0 0;color:rgba(255,255,255,.72);font-size:.8rem;line-height:1.4}
+    .content{padding:28px 28px 40px;display:grid;gap:22px}
+    .top-strip{
+      display:grid;grid-template-columns:1.1fr .9fr .9fr .9fr;gap:14px
+    }
+    .top-card{
+      background:#ffffff;
+      border:1px solid rgba(16,35,67,.08);
+      border-radius:20px;
+      padding:18px 20px;
+      box-shadow:0 12px 32px rgba(16,35,67,.06);
+    }
+    .top-card span{display:block;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+    .top-card strong{display:block;font-size:1.35rem;color:var(--navy-900)}
+    .top-card p{margin:8px 0 0;color:var(--ink-soft);font-size:.9rem;line-height:1.6}
+    .hero{
+      background:#ffffff;border:1px solid rgba(16,35,67,.08);box-shadow:0 18px 45px rgba(16,35,67,.08);
+      border-radius:26px;padding:26px;display:grid;grid-template-columns:1.25fr .75fr;gap:24px
+    }
+    .hero h2{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:clamp(1.9rem,4vw,2.9rem)}
+    .hero p{margin:12px 0 0;color:var(--ink-soft);line-height:1.8;max-width:780px}
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+    .btn{
+      border:none;border-radius:14px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer;
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;transition:all .15s ease
+    }
+    .btn-primary{background:#0b1f4e;color:#fff}
+    .btn-secondary{background:#f5f7fb;border:1px solid rgba(16,35,67,.12);color:var(--navy-900)}
+    .btn-danger{background:#fff2ef;border:1px solid rgba(180,66,49,.18);color:var(--danger)}
+    .btn:hover{transform:none;filter:brightness(0.95)}
+    .hero-panel{background:#f7f9fc;border:1px solid rgba(16,35,67,.08);border-radius:22px;padding:20px}
+    .hero-panel h3{margin:0 0 10px;font-family:'Playfair Display',serif;color:var(--navy-900)}
+    .hero-panel .runtime-line{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px dashed rgba(16,35,67,.08)}
+    .hero-panel .runtime-line span:first-child{color:var(--ink-faint)}
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+    .stat{background:#ffffff;border:1px solid rgba(16,35,67,.08);border-radius:18px;padding:18px;box-shadow:0 12px 32px rgba(16,35,67,.04)}
+    .stat strong{display:block;font-size:1.5rem;color:var(--navy-900);margin-bottom:6px}
+    .stat span{color:var(--ink-faint);font-size:.86rem}
+    .stat small{display:block;margin-top:10px;color:var(--ink-soft);line-height:1.5}
+    .section{background:#ffffff;border:1px solid rgba(16,35,67,.08);border-radius:24px;box-shadow:0 16px 40px rgba(16,35,67,.05);padding:24px}
+    .section-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px}
+    .section-head h3{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:1.5rem}
+    .section-head p{margin:8px 0 0;color:var(--ink-soft);line-height:1.75;max-width:720px}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .section-summary{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px
+    }
+    .summary-card{
+      background:#fafbfd;
+      border:1px solid rgba(16,35,67,.08);
+      border-radius:18px;
+      padding:18px;
+    }
+    .summary-card span{display:block;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px}
+    .summary-card strong{display:block;color:var(--navy-900);font-size:1.25rem}
+    .summary-card small{display:block;margin-top:8px;color:var(--ink-soft);line-height:1.55}
+    .search{
+      min-width:250px;background:#fff;border:1px solid var(--border);border-radius:14px;padding:12px 14px;
+      font:inherit;color:var(--ink)
+    }
+    .table-wrap{
+      border:1px solid rgba(16,35,67,.08);border-radius:20px;overflow:hidden;background:#fff
+    }
+    table{width:100%;border-collapse:collapse}
+    thead{background:#f7f9fc}
+    th,td{padding:14px 15px;text-align:left;border-bottom:1px solid rgba(16,35,67,.08);vertical-align:top}
+    th{font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--navy-900)}
+    td{font-size:.92rem;color:var(--ink-soft)}
+    tbody tr:hover{background:#f2f5fb}
+    tbody tr:nth-child(even){background:#fafbfd}
+    .cell-strong{font-weight:700;color:var(--ink)}
+    .table-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .mini-btn{
+      border:none;border-radius:11px;padding:8px 12px;font:inherit;font-size:.82rem;font-weight:700;cursor:pointer
+    }
+    .mini-run{background:var(--navy-700);color:#fff}
+    .mini-soft{background:#fff;border:1px solid var(--border);color:var(--navy-900)}
+    .mini-danger{background:#fff1ee;color:var(--danger);border:1px solid rgba(180,66,49,.18)}
+    .mini-run:disabled{opacity:.45;cursor:not-allowed}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;
+      font-size:.75rem;font-weight:700;white-space:nowrap
+    }
+    .pill.ok{background:rgba(47,143,78,.12);color:var(--ok)}
+    .pill.warn{background:rgba(180,66,49,.1);color:var(--danger)}
+    .pill.info{background:rgba(34,85,184,.10);color:var(--navy-700)}
+    .resource-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+    .resource-card{background:#ffffff;border:1px solid rgba(16,35,67,.08);border-radius:18px;padding:16px;display:flex;flex-direction:column;min-width:0}
+    .resource-card h4{margin:0 0 10px;color:var(--navy-900);font-size:1.05rem}
+    .scraping-card .card-content{flex:1;min-height:0}
+    .scraping-card .resource-line{flex-wrap:wrap;gap:4px}
+    .scraping-card .resource-line span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .scraping-card .resource-line strong{flex-shrink:0}
+    .resource-line{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px dashed rgba(16,35,67,.12);font-size:.9rem}
+    .resource-line span:first-child{color:var(--ink-faint)}
+    .resource-note{margin-top:12px;color:var(--ink-soft);font-size:.86rem;line-height:1.6;word-break:break-word}
+    .table-footer{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:14px 16px;background:#f7f9fc}
+    .table-footer span{color:var(--ink-faint);font-size:.86rem}
+    .dataTables_wrapper{padding:10px 12px 14px}
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter{margin-bottom:10px}
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select{
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:8px 10px;
+      background:#f7f9fc;
+      color:var(--ink);
+    }
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate{margin-top:12px}
+    .dataTables_wrapper .dataTables_paginate .paginate_button{
+      border-radius:10px!important;
+      border:1px solid transparent!important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current,
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current:hover{
+      background:rgba(16,35,67,.12)!important;
+      color:var(--navy-900)!important;
+      border-color:rgba(16,35,67,.15)!important;
+    }
+    .modal{
+      position:fixed;inset:0;background:rgba(11,31,78,.56);backdrop-filter:blur(8px);
+      display:none;align-items:center;justify-content:center;padding:20px;z-index:3000
+    }
+    .modal.open{display:flex}
+    .modal-card{
+      width:min(760px,96vw);max-height:90vh;overflow:auto;background:#fff;border-radius:28px;
+      border:1px solid rgba(16,35,67,.08);box-shadow:0 34px 90px rgba(11,31,78,.16);padding:22px
+    }
+    .modal-card.detail-wide{width:min(980px,96vw)}
+    .modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+    .modal-head h4{margin:0;font-family:'Playfair Display',serif;color:var(--navy-900);font-size:1.45rem}
+    .modal-head p{margin:6px 0 0;color:var(--ink-soft);line-height:1.7}
+    .close-btn{border:none;background:#f7f9fc;border-radius:12px;padding:10px 12px;cursor:pointer;font-weight:700;color:var(--navy-900)}
+    form{display:grid;gap:12px}
+    .field{display:grid;gap:7px}
+    .field label{font-size:.82rem;font-weight:700;color:var(--navy-900)}
+    .field input,.field select,.field textarea{
+      width:100%;border-radius:14px;border:1px solid var(--border);background:#fff;padding:12px 13px;font:inherit
+    }
+    .field textarea{min-height:110px;resize:vertical}
+    .msg{display:none;margin-top:10px;padding:12px 14px;border-radius:14px;font-size:.9rem;white-space:pre-wrap}
+    .msg.show{display:block}
+    .msg.ok{background:rgba(47,143,78,.10);color:var(--ok);border:1px solid rgba(47,143,78,.22)}
+    .msg.err{background:rgba(180,66,49,.09);color:var(--danger);border:1px solid rgba(180,66,49,.18)}
+    .detail-layout{display:grid;gap:16px}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .detail-card{background:#ffffff;border:1px solid rgba(16,35,67,.08);border-radius:18px;padding:16px}
+    .detail-card h5{margin:0 0 10px;color:var(--navy-900);font-size:1rem}
+    .detail-line{display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px dashed rgba(122,79,0,.12);font-size:.9rem}
+    .detail-line span:first-child{color:var(--ink-faint)}
+    .detail-line strong{color:var(--ink);text-align:right;word-break:break-word}
+    .detail-text-wrap{background:#f7f9fc;border:1px solid rgba(16,35,67,.08);border-radius:18px;padding:0;overflow:hidden}
+    .detail-text-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;background:#eef2f7;border-bottom:1px solid rgba(16,35,67,.08)}
+    .detail-text-head h5{margin:0;color:var(--navy-900);font-size:1rem}
+    .detail-text-meta{font-size:.82rem;color:var(--ink-faint)}
+    .detail-text{
+      margin:0;
+      padding:18px;
+      max-height:48vh;
+      overflow:auto;
+      background:#f7f9fc;
+      color:var(--ink);
+      font: 0.92rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space:pre-wrap;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+    }
+    .detail-textarea{
+      width:100%;
+      min-height:260px;
+      border:none;
+      outline:none;
+      padding:18px;
+      background:#f7f9fc;
+      color:var(--ink);
+      font: 0.92rem/1.75 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      resize:vertical;
+    }
+    .detail-text-actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      padding:12px 14px;
+      border-top:1px solid rgba(16,35,67,.08);
+      background:#f7f9fc;
+    }
+    .detail-text-msg{
+      font-size:.82rem;
+      color:var(--ink-faint);
+      margin-right:auto;
+      align-self:center;
+    }
+    .detail-empty{padding:20px;color:var(--ink-soft);line-height:1.7}
+    .hidden{display:none!important}
+    .view-section{display:none}
+    .view-section.active{display:block}
+    .empty-state{
+      padding:28px 18px;text-align:center;color:var(--ink-soft)
+    }
+    .empty-state strong{display:block;color:var(--navy-900);font-size:1.08rem;margin-bottom:8px}
+    @media (max-width: 1120px){
+      .shell{grid-template-columns:240px 1fr}
+      .sidebar{width:240px}
+      .sidebar-scroll{padding:16px 12px}
+      .brand h1{font-size:1.35rem}
+      .brand p{font-size:.8rem}
+      .menu{gap:6px}
+      .menu-btn{padding:9px 10px;font-size:.85rem}
+      .menu-btn small{font-size:.7rem}
+      .side-runtime{padding:12px}
+      .side-runtime strong{font-size:1.2rem}
+      .top-strip{grid-template-columns:repeat(2,1fr)}
+      .hero{grid-template-columns:1fr}
+      .section-summary,
+      .resource-grid{grid-template-columns:repeat(2,1fr)}
+      .stats{grid-template-columns:repeat(2,1fr)}
+    }
+    @media (max-width: 720px){
+      .shell{grid-template-columns:1fr}
+      .content{padding:14px}
+      .sidebar{position:relative;height:auto;width:100%;max-height:none}
+      .sidebar-scroll{max-height:45vh;padding:12px 10px}
+      .brand{padding:6px 8px 10px}
+      .brand h1{font-size:1.15rem}
+      .brand p{font-size:.75rem;display:none}
+      .menu{grid-template-columns:repeat(2,1fr);gap:6px}
+      .menu-btn{padding:8px 10px;font-size:.8rem;border-radius:12px}
+      .menu-btn small{display:none}
+      .side-actions{margin-top:12px;gap:8px}
+      .side-link{padding:9px 12px;font-size:.85rem}
+      .side-runtime{margin-top:12px;padding:12px}
+      .side-runtime h3{font-size:.75rem}
+      .side-runtime strong{font-size:1.1rem}
+      .side-runtime p{display:none}
+      .top-strip,
+      .section-summary,
+      .stats,.resource-grid{grid-template-columns:1fr}
+      .detail-grid{grid-template-columns:1fr}
+      .search{min-width:100%;width:100%}
+      .hero{padding:18px}
+      .hero h2{font-size:1.5rem}
+      .hero-actions{flex-direction:column}
+      .hero-actions .btn{width:100%}
+      .section{padding:16px}
+      .section-head{flex-direction:column;align-items:flex-start}
+      .toolbar{width:100%}
+      .toolbar .search{min-width:100%}
+      th:nth-child(3),td:nth-child(3),th:nth-child(4),td:nth-child(4){display:none}
+      .modal-card{padding:16px;border-radius:20px}
+      .modal-card.detail-wide{width:min(980px,96vw)}
+      .resource-card h4{font-size:.95rem}
+      .table-actions{flex-direction:column;gap:6px}
+      .mini-btn{width:100%}
+    }
+    @media (max-width: 480px){
+      .menu-btn{padding:10px 11px;font-size:.85rem}
+      .top-card{padding:14px 16px}
+      .stat{padding:14px}
+      .stat strong{font-size:1.2rem}
+      th,td{padding:10px 11px;font-size:.85rem}
+      .pill{font-size:.7rem;padding:4px 8px}
+      .resource-card{padding:12px;border-radius:14px}
+      .resource-card h4{font-size:.95rem;margin-bottom:8px}
+      .resource-line{padding:6px 0;font-size:.85rem}
+      .resource-note{font-size:.8rem;margin-top:8px}
+    }
+    @media (max-width: 360px){
+      .resource-grid{grid-template-columns:1fr}
+      .resource-card h4{font-size:.9rem}
+      .sidebar-scroll{padding:10px 8px}
+      .menu{gap:5px}
+      .menu-btn{padding:8px 9px;font-size:.75rem}
+    }
+  </style>
+</head>
+<body>
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#FFFCF0;display:flex;align-items:center;justify-content:center;z-index:9999;overflow:hidden;font-family:'DM Sans',sans-serif">
+    <!-- Fondo sutil -->
+    <div style="position:fixed;inset:0;background:radial-gradient(ellipse 75% 55% at 12% 8%,rgba(245,166,35,0.10) 0%,transparent 58%),radial-gradient(ellipse 55% 70% at 90% 90%,rgba(22,58,128,0.07) 0%,transparent 55%),repeating-linear-gradient(-50deg,transparent 0,transparent 36px,rgba(245,166,35,0.04) 36px,rgba(245,166,35,0.04) 37px);pointer-events:none;z-index:-1"></div>
+    
+    <!-- Barra Wiphala -->
+    <div style="position:fixed;top:0;left:0;right:0;height:5px;z-index:200;display:flex">
+      <div style="flex:1;background:#D44A2E"></div><div style="flex:1;background:#F5A623"></div><div style="flex:1;background:#E8DC40"></div><div style="flex:1;background:#4BB840"></div><div style="flex:1;background:#163A80"></div><div style="flex:1;background:#7040C8"></div><div style="flex:1;background:#B03070"></div>
+      <div style="flex:1;background:#D44A2E"></div><div style="flex:1;background:#F5A623"></div><div style="flex:1;background:#E8DC40"></div><div style="flex:1;background:#4BB840"></div><div style="flex:1;background:#163A80"></div><div style="flex:1;background:#7040C8"></div><div style="flex:1;background:#B03070"></div>
+      <div style="flex:1;background:#D44A2E"></div><div style="flex:1;background:#F5A623"></div><div style="flex:1;background:#E8DC40"></div><div style="flex:1;background:#4BB840"></div><div style="flex:1;background:#163A80"></div><div style="flex:1;background:#7040C8"></div><div style="flex:1;background:#B03070"></div>
+      <div style="flex:1;background:#D44A2E"></div><div style="flex:1;background:#F5A623"></div><div style="flex:1;background:#E8DC40"></div><div style="flex:1;background:#4BB840"></div><div style="flex:1;background:#163A80"></div><div style="flex:1;background:#7040C8"></div><div style="flex:1;background:#B03070"></div>
+      <div style="flex:1;background:#D44A2E"></div><div style="flex:1;background:#F5A623"></div><div style="flex:1;background:#E8DC40"></div><div style="flex:1;background:#4BB840"></div><div style="flex:1;background:#163A80"></div><div style="flex:1;background:#7040C8"></div><div style="flex:1;background:#B03070"></div>
+      <div style="flex:1;background:#D44A2E"></div><div style="flex:1;background:#F5A623"></div><div style="flex:1;background:#E8DC40"></div><div style="flex:1;background:#4BB840"></div><div style="flex:1;background:#163A80"></div><div style="flex:1;background:#7040C8"></div><div style="flex:1;background:#B03070"></div>
+    </div>
+
+    <!-- Login Container -->
+    <div style="width:100%;max-width:440px;background:#FFFFFF;border-radius:20px;padding:48px 40px 40px;box-shadow:0 20px 70px rgba(122,79,0,0.18),0 4px 16px rgba(122,79,0,0.11),0 0 0 1px rgba(200,134,14,0.25);position:relative;z-index:1;margin:20px">
+      <!-- Header -->
+      <div style="text-align:center;margin-bottom:32px">
+        <!-- Badge -->
+        <div style="display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid #EDD88A;border-radius:20px;padding:5px 14px;font-size:0.68rem;font-weight:600;color:#163A80;letter-spacing:0.09em;text-transform:uppercase;margin-bottom:24px;box-shadow:0 4px 20px rgba(122,79,0,0.13)">
+          <div style="width:6px;height:6px;border-radius:50%;background:#F5A623;animation:liveDot 2s ease-in-out infinite"></div>
+          PANEL ADMINISTRATIVO · AGBC
+        </div>
+        
+        <!-- Hero Seal -->
+        <div style="width:92px;height:92px;border-radius:24px;background:linear-gradient(145deg,#F5A623,#C8860E);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 14px 42px rgba(122,79,0,0.40),0 4px 12px rgba(122,79,0,0.22),inset 0 1px 0 rgba(255,255,255,0.30);position:relative;overflow:hidden">
+          <span style="font-family:'Playfair Display',serif;font-size:2.4rem;font-weight:700;color:#0B1F4E;letter-spacing:0.04em;position:relative;z-index:1">CB</span>
+        </div>
+        
+        <h1 style="font-family:'Playfair Display',serif;font-size:1.85rem;font-weight:700;color:#1A0E00;margin-bottom:4px;line-height:1.1">ChatbotBO Admin</h1>
+        <div style="font-size:0.82rem;color:#163A80;letter-spacing:0.12em;text-transform:uppercase;font-weight:600"> Correos de Bolivia</div>
+        <p style="margin-top:8px;font-size:0.88rem;color:rgba(26,14,0,0.46);line-height:1.5">Gestión del asistente virtual oficial</p>
+      </div>
+
+      <!-- Error Message -->
+      <div id="login-error" style="display:none;padding:14px 18px;background:#FFF0E6;border:1px solid #C8860E;border-radius:12px;color:#7A4F00;font-size:0.82rem;margin-bottom:20px;box-shadow:0 4px 20px rgba(122,79,0,0.13);animation:msgIn 0.3s ease"></div>
+
+      <!-- Form -->
+      <form id="login-form" onsubmit="event.preventDefault();doLogin();">
+        <div style="margin-bottom:22px">
+          <label style="display:block;margin-bottom:8px;font-weight:600;color:rgba(26,14,0,0.72);font-size:0.78rem;letter-spacing:0.05em">Usuario</label>
+          <input type="text" id="login-user" placeholder="admin" required style="width:100%;padding:14px 18px;background:#FFFCF0;border:1.5px solid #EDD88A;border-radius:12px;font-size:0.96rem;font-family:'DM Sans',sans-serif;transition:all 0.22s ease;color:#1A0E00;outline:none" onfocus="this.style.borderColor='#F5A623';this.style.boxShadow='0 0 0 3px rgba(245,166,35,0.18)';this.style.background='#fff'" onblur="this.style.borderColor='#EDD88A';this.style.boxShadow='none';this.style.background='#FFFCF0'">
+        </div>
+
+        <div style="margin-bottom:22px">
+          <label style="display:block;margin-bottom:8px;font-weight:600;color:rgba(26,14,0,0.72);font-size:0.78rem;letter-spacing:0.05em">Contraseña</label>
+          <input type="password" id="login-pass" placeholder="••••••••" required style="width:100%;padding:14px 18px;background:#FFFCF0;border:1.5px solid #EDD88A;border-radius:12px;font-size:0.96rem;font-family:'DM Sans',sans-serif;transition:all 0.22s ease;color:#1A0E00;outline:none" onfocus="this.style.borderColor='#F5A623';this.style.boxShadow='0 0 0 3px rgba(245,166,35,0.18)';this.style.background='#fff'" onblur="this.style.borderColor='#EDD88A';this.style.boxShadow='none';this.style.background='#FFFCF0'">
+        </div>
+
+        <button type="submit" id="btn-login" style="width:100%;padding:16px;background:linear-gradient(135deg,#FFC145,#C8860E);color:#0B1F4E;border:none;border-radius:14px;font-size:0.92rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:all 0.28s cubic-bezier(.34,1.56,.64,1);box-shadow:0 8px 28px rgba(122,79,0,0.38);display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.background='linear-gradient(135deg,#FFE49A,#F5A623)';this.style.transform='translateY(-3px) scale(1.02)';this.style.boxShadow='0 18px 50px rgba(122,79,0,0.45)'" onmouseout="this.style.background='linear-gradient(135deg,#FFC145,#C8860E)';this.style.transform='none';this.style.boxShadow='0 8px 28px rgba(122,79,0,0.38)'" onmousedown="this.style.transform='scale(0.96)'" onmouseup="this.style.transform='translateY(-3px) scale(1.02)'">
+          Iniciar sesión
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </form>
+
+      <!-- Footer -->
+      <div style="margin-top:28px;text-align:center;font-size:0.76rem;color:rgba(26,14,0,0.46)">
+        <a href="/" style="color:#163A80;text-decoration:none;font-weight:600;transition:all 0.2s" onmouseover="this.style.color='#C8860E';this.style.textDecoration='underline'" onmouseout="this.style.color='#163A80';this.style.textDecoration='none'">← Volver al Asistente Virtual</a>
+      </div>
+      
+      <!-- Demo accounts hint -->
+      <div style="margin-top:20px;padding-top:18px;border-top:1px solid rgba(200,134,14,0.25);text-align:center">
+        <p style="margin:0 0 8px;color:rgba(26,14,0,0.46);font-size:.75rem">Usuarios de prueba:</p>
+        <p style="margin:0;color:rgba(26,14,0,0.72);font-size:.7rem"><strong>admin</strong> / admin123 (control total) &nbsp;|&nbsp; <strong>editor</strong> / editor123 (editar datos)</p>
+      </div>
+    </div>
+    
+    <style>
+      @keyframes liveDot{0%,100%{opacity:1}50%{opacity:0.3}}
+      @keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    </style>
+  </div>
+
+  <div class="shell" id="main-panel" style="display:none">
+    <aside class="sidebar">
+      <div class="sidebar-scroll">
+        <div class="brand">
+          <h1>Capacidades</h1>
+          <p>Centro de administración de skills, PDFs y recursos de IA del chatbot.</p>
+        </div>
+        <nav class="menu">
+          <a class="menu-btn" data-view="overview" href="/gestion/capacidades">Resumen<small>Estado general del sistema</small></a>
+          <a class="menu-btn" data-view="skills" href="/gestion/capacidades/skills">Skills<small>Capacidades funcionales</small></a>
+          <a class="menu-btn" data-view="pdfs" href="/gestion/capacidades/pdfs">PDFs<small>Extracción y limpieza</small></a>
+          <a class="menu-btn" data-view="data" href="/gestion/capacidades/data">Datos JSON<small>Archivos operativos en data/</small></a>
+          <a class="menu-btn" data-view="scraping" href="/gestion/capacidades/scraping">Web Scraping<small>Contenido recolectado del sitio</small></a>
+          <a class="menu-btn" data-view="resources" href="/gestion/capacidades/recursos">Recursos IA<small>Modelos, rutas y configuración</small></a>
+          <a class="menu-btn" data-view="cache" href="/gestion/capacidades/cache">Cache Redis<small>Memoria, claves y namespaces</small></a>
+          <a class="menu-btn" data-view="tariffs" href="/gestion/capacidades/tarifas">Tarifas SQLite<small>Catálogo y cálculo por scope</small></a>
+          <a class="menu-btn" data-view="conversations" href="/gestion/capacidades/conversaciones">Conversaciones<small>Log persistente en base de datos</small></a>
+          <a class="menu-btn" data-view="tariff-conversations" href="/gestion/capacidades/conversaciones-tarifas">Conversaciones Tarifas<small>Flujos determinísticos separados</small></a>
+          <a class="menu-btn admin-only" data-view="users" href="/gestion/capacidades/usuarios" style="display:none">Usuarios<small>Gestionar accesos y roles</small></a>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        <div style="padding:12px 14px;margin-bottom:12px;background:rgba(255,255,255,.1);border-radius:12px;border:1px solid rgba(255,255,255,.15)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span id="user-name" style="font-weight:700;font-size:.9rem">Usuario</span>
+            <span id="user-role-badge" style="background:#10b981;color:#fff;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;text-transform:uppercase">Admin</span>
+          </div>
+          <button onclick="doLogout()" style="width:100%;padding:8px;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:10px;font:inherit;font-size:.8rem;cursor:pointer;transition:background .2s" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">Cerrar sesión</button>
+        </div>
+        <div class="side-actions">
+          <a class="side-link" href="/">Volver al chat</a>
+          <a class="side-link" href="/widget.html">Abrir widget</a>
+        </div>
+        <div class="side-runtime" id="side-runtime">
+          <h3>Estado del Bot</h3>
+          <strong>Sin datos</strong>
+          <p>Cargando runtime del sistema...</p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <section class="top-strip">
+        <article class="top-card" id="top-card-health"></article>
+        <article class="top-card" id="top-card-rag"></article>
+        <article class="top-card" id="top-card-content"></article>
+        <article class="top-card" id="top-card-update"></article>
+      </section>
+
+      <section class="hero">
+        <div>
+          <h2 id="page-title">Panel de Capacidades</h2>
+          <p id="page-description">Desde esta ruta administras todo lo relacionado con capacidades del bot: skills, PDFs del scraping y recursos de IA. El panel quedó centrado en tablas operativas y acciones por modal para mantener el flujo limpio y más profesional.</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" type="button" onclick="loadAll()">Actualizar panel</button>
+            <button class="btn btn-primary" type="button" onclick="triggerUpdate()">Actualizar datos IA</button>
+            <button class="btn btn-secondary" type="button" onclick="rebuildRag()">Rebuild limpio RAG</button>
+            <button class="btn btn-secondary" type="button" id="hero-create-skill" onclick="openModal('skill')">Nueva Skill</button>
+          </div>
+        </div>
+        <div class="hero-panel" id="hero-runtime"></div>
+      </section>
+
+      <section class="stats view-section" id="view-overview-stats"></section>
+
+      <section class="section view-section" id="view-skills">
+        <div class="section-head">
+          <div>
+            <h3>Skills</h3>
+            <p>Catálogo funcional del bot con categoría, prioridad, disparadores y activación real desde modales.</p>
+          </div>
+          <div class="toolbar">
+            <input class="search" id="search-skills" placeholder="Buscar skills..." oninput="renderSkills()">
+            <button class="btn btn-secondary" type="button" onclick="openModal('skill')">Crear Skill</button>
+          </div>
+        </div>
+        <div class="section-summary" id="skills-summary"></div>
+        <div class="table-wrap">
+          <table id="skills-table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>ID</th>
+                <th>Categoría</th>
+                <th>Modo</th>
+                <th>Estado</th>
+                <th>Prioridad</th>
+                <th>Trigger</th>
+                <th>Descripción</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="skills-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="skills-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-pdfs">
+        <div class="section-head">
+          <div>
+            <h3>PDFs</h3>
+            <p>Control de PDFs descargados por el scraper, con estado de extracción, texto disponible y acciones de revisión o eliminación.</p>
+          </div>
+          <div class="toolbar">
+            <span class="pill info">Tabla avanzada con filtros, orden y paginación</span>
+            <button class="btn btn-secondary" type="button" onclick="openModal('pdf-upload')">Subir PDF</button>
+          </div>
+        </div>
+        <div class="section-summary" id="pdfs-summary"></div>
+        <div class="table-wrap">
+          <table id="pdfs-table">
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>Estado</th>
+                <th>Método</th>
+                <th>Texto</th>
+                <th>Fuente</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="pdfs-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="pdfs-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-data">
+        <div class="section-head">
+          <div>
+            <h3>Datos JSON</h3>
+            <p>Administra los JSON del directorio data (enlaces, aplicativos, noticias, estadísticas y otros). Puedes revisar y editar su contenido con reindexado automático.</p>
+          </div>
+        </div>
+        <div class="section-summary" id="data-summary"></div>
+        <div class="table-wrap">
+          <table id="data-table">
+            <thead>
+              <tr>
+                <th>Archivo</th>
+                <th>Estado</th>
+                <th>Tipo</th>
+                <th>Entradas</th>
+                <th>Tamaño</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="data-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="data-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-scraping">
+        <div class="section-head">
+          <div>
+            <h3>Web Scraping</h3>
+            <p>Resumen del contenido recolectado desde la web de Correos de Bolivia: páginas, noticias, aplicativos, servicios, secciones y archivos generados.</p>
+          </div>
+        </div>
+        <div class="section-summary" id="scraping-summary"></div>
+        <div class="resource-grid" id="scraping-grid"></div>
+      </section>
+
+      <section class="section view-section" id="view-resources">
+        <div class="section-head">
+          <div>
+            <h3>Recursos de IA</h3>
+            <p>Estado ampliado de modelos, almacenamiento, parámetros del RAG y archivos críticos del sistema.</p>
+          </div>
+        </div>
+        <div class="resource-grid" id="resources-grid"></div>
+      </section>
+
+      <section class="section view-section" id="view-cache">
+        <div class="section-head">
+          <div>
+            <h3>Cache Redis</h3>
+            <p>Vista operativa de memoria y distribución de claves para RAG, embeddings y tarifas.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-danger" type="button" onclick="clearResponseCache()">Limpiar cache respuestas</button>
+          </div>
+        </div>
+        <div class="section-summary" id="cache-summary"></div>
+        <div class="resource-grid" id="cache-grid"></div>
+        <div class="table-wrap" style="margin-top:14px;">
+          <table id="cache-responses-table">
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>Respuesta</th>
+                <th>Lang</th>
+                <th>Skill</th>
+                <th>Fuente</th>
+                <th>Creado</th>
+                <th>TTL</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="cache-responses-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="cache-responses-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-tariffs">
+        <div class="section-head">
+          <div>
+            <h3>Tarifas SQLite</h3>
+            <p>Gestiona el catálogo tarifario unificado (skills 1-16), recarga desde Excel y prueba cálculo por scope/columna/peso.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="reloadTariffCatalog()">Recargar desde XLSX</button>
+            <button class="btn btn-secondary" type="button" onclick="createTariffRate()">Nueva tarifa</button>
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+          </div>
+        </div>
+        <div class="section-summary" id="tariffs-summary"></div>
+        <div class="resource-grid" id="tariffs-engine" style="margin-bottom:14px"></div>
+        <div class="detail-card" style="margin-bottom:14px">
+          <h5 style="margin-bottom:10px">Probar cálculo</h5>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px">
+            <select id="tariffs-scope-filter"></select>
+            <input id="tariffs-column-filter" placeholder="Columna (ej: C)">
+            <input id="tariffs-weight-input" placeholder="Peso (ej: 800g o 1.2kg)">
+            <button class="btn btn-primary" type="button" onclick="calculateTariffFromPanel()">Calcular</button>
+          </div>
+          <p id="tariffs-calc-result" style="margin-top:10px;color:#0b1f4e;font-weight:600"></p>
+        </div>
+        <div class="detail-card" style="margin-bottom:14px">
+          <h5 style="margin-bottom:10px">Ver tabla por tarifa</h5>
+          <div id="tariffs-scope-buttons" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        </div>
+        <div class="table-wrap">
+          <table id="tariffs-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Columna</th>
+                <th>Servicio</th>
+                <th>Min (g)</th>
+                <th>Max (g)</th>
+                <th>Precio (Bs)</th>
+                <th>Origen</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="tariffs-body"></tbody>
+          </table>
+        </div>
+        <div class="table-footer"><span id="tariffs-count">0 registros</span></div>
+      </section>
+
+      <section class="section view-section" id="view-conversations">
+        <div class="section-head">
+          <div>
+            <h3>Conversaciones</h3>
+            <p>Log persistente en SQLite. Es independiente del RAG y no se usa como contexto para el LLM.</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-danger" type="button" onclick="clearConversations()">Limpiar log</button>
+          </div>
+        </div>
+        <div class="section-summary" id="conversations-summary"></div>
+        <div class="table-wrap">
+          <table id="conversations-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Pregunta</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="conversations-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="conversations-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-tariff-conversations">
+        <div class="section-head">
+          <div>
+            <h3>Conversaciones Tarifas</h3>
+            <p>Log separado para el flujo determinístico de tarifas. Cada fila guarda una consulta completa (inicio a cierre).</p>
+          </div>
+          <div class="toolbar">
+            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-danger" type="button" onclick="clearTariffConversations()">Limpiar log tarifas</button>
+          </div>
+        </div>
+        <div class="section-summary" id="tariff-conversations-summary"></div>
+        <div class="table-wrap">
+          <table id="tariff-conversations-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Opciones</th>
+              </tr>
+            </thead>
+            <tbody id="tariff-conversations-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="tariff-conversations-count">0 registros</span></div>
+        </div>
+      </section>
+
+      <section class="section view-section" id="view-users">
+        <div class="section-head">
+          <div>
+            <h3>Gestión de Usuarios</h3>
+            <p>Administra los accesos al panel de capacidades. Solo usuarios con rol Admin pueden ver esta sección.</p>
+          </div>
+          <div class="actions-bar" style="margin-bottom:20px;display:flex;gap:10px">
+            <button class="btn btn-primary" id="btn-new-user" onclick="showUserForm()">+ Nuevo Usuario</button>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 12px;background:#f1f5f9;border-radius:6px;font-size:.85rem">
+              <input type="checkbox" id="show-inactive-users" onchange="toggleInactiveUsers()"> Mostrar inactivos
+            </label>
+          </div>
+        </div>
+
+        <!-- Formulario para agregar/editar usuario -->
+        <div id="user-form-container" style="display:none;background:#f8fafc;padding:25px;border-radius:16px;border:1px solid #e2e8f0;margin-bottom:25px">
+          <h4 id="user-form-title" style="margin:0 0 20px;color:#0b1f4e">Nuevo Usuario</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:15px">
+            <div class="field">
+              <label>Usuario (login)</label>
+              <input type="text" id="new-user-username" placeholder="ej: maria_garcia" style="width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:10px">
+            </div>
+            <div class="field">
+              <label>Nombre completo</label>
+              <input type="text" id="new-user-name" placeholder="ej: María García" style="width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:10px">
+            </div>
+            <div class="field">
+              <label>Contraseña</label>
+              <input type="password" id="new-user-password" placeholder="Mínimo 6 caracteres" style="width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:10px">
+            </div>
+            <div class="field">
+              <label>Rol</label>
+              <select id="new-user-role" style="width:100%;padding:12px;border:2px solid #e2e8f0;border-radius:10px">
+                <option value="editor">Editor - Editar datos</option>
+                <option value="admin">Admin - Control total</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:20px;display:flex;gap:10px">
+            <button class="btn btn-primary" onclick="saveUser()">Guardar Usuario</button>
+            <button class="btn btn-secondary" onclick="cancelUserForm()">Cancelar</button>
+            <button class="btn btn-danger" id="btn-delete-user" onclick="deleteCurrentUser()" style="display:none;margin-left:auto">Desactivar</button>
+            <button class="btn btn-success" id="btn-reactivate-user" onclick="reactivateCurrentUser()" style="display:none;margin-left:auto">Reactivar</button>
+          </div>
+          <p id="user-form-msg" style="margin-top:15px;padding:12px;border-radius:8px;display:none"></p>
+        </div>
+
+        <!-- Tabla de usuarios -->
+        <div class="section-summary" id="users-summary"></div>
+        <div class="table-wrap">
+          <table id="users-table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Nombre</th>
+                <th>Rol</th>
+                <th>Permisos</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="users-body"></tbody>
+          </table>
+          <div class="table-footer"><span id="users-count">0 usuarios</span></div>
+        </div>
+
+        <!-- Leyenda de roles -->
+        <div style="margin-top:25px;padding:20px;background:#f1f5f9;border-radius:12px">
+          <h4 style="margin:0 0 15px;color:#0b1f4e;font-size:1rem">Descripción de Roles</h4>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:15px">
+            <div style="padding:15px;background:#fff;border-radius:10px;border-left:4px solid #10b981">
+              <strong style="color:#10b981">Admin</strong>
+              <p style="margin:8px 0 0;font-size:.85rem;color:#64748b">Control total: gestionar usuarios, reindexar RAG, borrar datos, editar todo.</p>
+            </div>
+            <div style="padding:15px;background:#fff;border-radius:10px;border-left:4px solid #f59e0b">
+              <strong style="color:#f59e0b">Editor</strong>
+              <p style="margin:8px 0 0;font-size:.85rem;color:#64748b">Editar datos JSON y PDFs, ver estadísticas. No puede reindexar ni borrar.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="modal-shell" onclick="closeModal(event)">
+    <div class="modal-card" id="modal-card">
+      <div class="modal-head">
+        <div>
+          <h4 id="modal-title">Modal</h4>
+          <p id="modal-subtitle">Gestiona el elemento seleccionado.</p>
+        </div>
+        <button class="close-btn" type="button" onclick="closeModal()">Cerrar</button>
+      </div>
+
+      <form id="skill-form" class="hidden">
+        <div class="field">
+          <label for="skill-id">ID</label>
+          <input id="skill-id" name="id" placeholder="ej: soporte_operativo" required>
+        </div>
+        <div class="field">
+          <label for="skill-name">Nombre</label>
+          <input id="skill-name" name="nombre" placeholder="Nombre visible de la skill" required>
+        </div>
+        <div class="field">
+          <label for="skill-description">Descripción</label>
+          <textarea id="skill-description" name="descripcion" placeholder="Qué resuelve esta skill" required></textarea>
+        </div>
+        <div class="field">
+          <label for="skill-category">Categoría</label>
+          <select id="skill-category" name="categoria" required></select>
+        </div>
+        <div class="field">
+          <label for="skill-mode">Modo</label>
+          <select id="skill-mode" name="modo" required></select>
+        </div>
+        <div class="field">
+          <label for="skill-priority">Prioridad</label>
+          <input id="skill-priority" name="prioridad" type="number" min="1" max="5" step="1" value="3" required>
+        </div>
+        <div class="field">
+          <label for="skill-trigger">Trigger</label>
+          <input id="skill-trigger" name="trigger" placeholder="Palabras o intención que activan la skill" required>
+        </div>
+        <div class="field">
+          <label for="skill-active">Estado</label>
+          <select id="skill-active" name="activa" required>
+            <option value="true">Activa</option>
+            <option value="false">Inactiva</option>
+          </select>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-primary" type="submit">Guardar Skill</button>
+          <button class="btn btn-secondary" type="button" onclick="resetSkillForm()">Limpiar</button>
+        </div>
+        <div id="skill-msg" class="msg"></div>
+      </form>
+
+      <form id="pdf-form" class="hidden" enctype="multipart/form-data">
+        <div class="field">
+          <label for="pdf-file">Archivo PDF</label>
+          <input id="pdf-file" name="file" type="file" accept="application/pdf" required>
+        </div>
+        <div class="field">
+          <label for="pdf-fuente-url">URL de origen</label>
+          <input id="pdf-fuente-url" name="fuente_url" placeholder="https://...">
+        </div>
+        <div class="field">
+          <label for="pdf-pagina-fuente">Página fuente</label>
+          <input id="pdf-pagina-fuente" name="pagina_fuente" placeholder="Página o módulo relacionado">
+        </div>
+        <div class="field">
+          <label for="pdf-clean-mode">Limpieza de texto PDF</label>
+          <select id="pdf-clean-mode" name="clean_mode">
+            <option value="aggressive">Aggressive (recomendado)</option>
+            <option value="balanced">Balanced</option>
+            <option value="off">Off (sin limpieza extra)</option>
+          </select>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-primary" type="submit">Procesar PDF</button>
+          <button class="btn btn-secondary" type="button" onclick="resetPdfForm()">Limpiar</button>
+        </div>
+        <div id="pdf-msg" class="msg"></div>
+      </form>
+
+      <div id="detail-panel" class="hidden">
+        <div id="detail-output" class="detail-layout">
+          <div class="detail-empty">Sin detalle cargado.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script>
+    // ========== SISTEMA DE AUTENTICACIÓN Y ROLES ==========
+    const USERS_DB = {
+      'admin': { password: 'admin123', role: 'admin', name: 'Administrador', activo: true },
+      'editor': { password: 'editor123', role: 'editor', name: 'Editor', activo: true }
+    };
+
+    const ROLES_PERMS = {
+      admin: { canEditSkills: true, canEditData: true, canDelete: true, canReindex: true, canViewLogs: true, canManageUsers: true },
+      editor: { canEditSkills: false, canEditData: true, canDelete: false, canReindex: false, canViewLogs: true, canManageUsers: false }
+    };
+
+    let currentUser = null;
+
+    // Función helper para obtener usuarios (definida antes de usar)
+    function getUsersFromStorage() {
+      return JSON.parse(localStorage.getItem('chatbotbo_users_db')) || { ...USERS_DB };
+    }
+
+    function doLogin() {
+      const user = document.getElementById('login-user').value.trim().toLowerCase();
+      const pass = document.getElementById('login-pass').value;
+      const errorEl = document.getElementById('login-error');
+
+      // Buscar en localStorage primero, luego en usuarios por defecto
+      const storedUsers = getUsersFromStorage();
+      const userData = storedUsers[user] || USERS_DB[user];
+
+      if (userData && userData.password === pass) {
+        // Verificar si usuario está activo
+        if (userData.activo === false) {
+          errorEl.textContent = 'Usuario desactivado. Contacte al administrador.';
+          errorEl.style.display = 'block';
+          document.getElementById('login-pass').value = '';
+          return;
+        }
+        
+        currentUser = { username: user, ...userData };
+        sessionStorage.setItem('chatbotbo_auth', JSON.stringify(currentUser));
+        showMainPanel();
+      } else {
+        errorEl.textContent = 'Usuario o contraseña incorrectos';
+        errorEl.style.display = 'block';
+        document.getElementById('login-pass').value = '';
+      }
+    }
+
+    function doLogout() {
+      currentUser = null;
+      sessionStorage.removeItem('chatbotbo_auth');
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('main-panel').style.display = 'none';
+      document.getElementById('login-user').value = '';
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-error').style.display = 'none';
+    }
+
+    function showMainPanel() {
+      if (!currentUser) return;
+      
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('main-panel').style.display = 'grid';
+      
+      // Mostrar info de usuario
+      document.getElementById('user-name').textContent = currentUser.name;
+      const badge = document.getElementById('user-role-badge');
+      badge.textContent = currentUser.role;
+      badge.style.background = currentUser.role === 'admin' ? '#10b981' : currentUser.role === 'editor' ? '#f59e0b' : '#64748b';
+      
+      // Aplicar permisos
+      applyPermissions();
+      
+      // Cargar datos
+      loadAll();
+    }
+
+    function applyPermissions() {
+      if (!currentUser) return;
+      const perms = ROLES_PERMS[currentUser.role];
+      
+      // Ocultar/mostrar botones según permisos
+      const deleteButtons = document.querySelectorAll('.btn-danger, .mini-danger');
+      deleteButtons.forEach(btn => btn.style.display = perms.canDelete ? '' : 'none');
+      
+      // Deshabilitar edición de skills para no-admins
+      if (!perms.canEditSkills) {
+        document.querySelectorAll('.hero-actions button:not(.btn-secondary)').forEach(btn => {
+          if (btn.textContent.includes('Rebuild') || btn.textContent.includes('Actualizar datos')) {
+            btn.style.display = 'none';
+          }
+        });
+      }
+      
+      // Mostrar mensaje de rol
+      console.log(`👤 Usuario: ${currentUser.name} | Rol: ${currentUser.role}`);
+      console.log(`🔑 Permisos:`, perms);
+    }
+
+    function checkAuth() {
+      const saved = sessionStorage.getItem('chatbotbo_auth');
+      if (saved) {
+        try {
+          currentUser = JSON.parse(saved);
+          if (USERS_DB[currentUser.username]) {
+            showMainPanel();
+            return true;
+          }
+        } catch (e) {}
+      }
+      return false;
+    }
+
+    // Verificar sesión al cargar
+    document.addEventListener('DOMContentLoaded', checkAuth);
+
+    const state = {
+      capabilities: null,
+      pdfsPayload: null,
+      dataJsonPayload: null,
+      dataJsonDetailCache: {},
+      scrapingPayload: null,
+      cachePayload: null,
+      responseCachePayload: null,
+      conversationsPayload: null,
+      tariffConversationsPayload: null,
+      tariffsStatsPayload: null,
+      tariffsRatesPayload: null,
+      selectedTariffScope: '',
+      options: null,
+      currentModal: null,
+      pdfsDataTable: null,
+      tariffsDataTable: null,
+    };
+
+    const els = {
+      menuBtns: Array.from(document.querySelectorAll('.menu-btn')),
+      modal: document.getElementById('modal-shell'),
+      skillForm: document.getElementById('skill-form'),
+      pdfForm: document.getElementById('pdf-form'),
+      detailPanel: document.getElementById('detail-panel'),
+      detailOutput: document.getElementById('detail-output'),
+      modalTitle: document.getElementById('modal-title'),
+      modalSubtitle: document.getElementById('modal-subtitle'),
+      pageTitle: document.getElementById('page-title'),
+      pageDescription: document.getElementById('page-description'),
+      sideRuntime: document.getElementById('side-runtime'),
+      topCardHealth: document.getElementById('top-card-health'),
+      topCardRag: document.getElementById('top-card-rag'),
+      topCardContent: document.getElementById('top-card-content'),
+      topCardUpdate: document.getElementById('top-card-update'),
+      skillsSummary: document.getElementById('skills-summary'),
+      pdfsSummary: document.getElementById('pdfs-summary'),
+      dataSummary: document.getElementById('data-summary'),
+      scrapingSummary: document.getElementById('scraping-summary'),
+      cacheSummary: document.getElementById('cache-summary'),
+      tariffsSummary: document.getElementById('tariffs-summary'),
+      conversationsSummary: document.getElementById('conversations-summary'),
+      tariffConversationsSummary: document.getElementById('tariff-conversations-summary'),
+      skillMsg: document.getElementById('skill-msg'),
+      pdfMsg: document.getElementById('pdf-msg'),
+      heroRuntime: document.getElementById('hero-runtime'),
+      statsGrid: document.getElementById('view-overview-stats'),
+      skillsBody: document.getElementById('skills-body'),
+      pdfsBody: document.getElementById('pdfs-body'),
+      dataBody: document.getElementById('data-body'),
+      skillsCount: document.getElementById('skills-count'),
+      pdfsCount: document.getElementById('pdfs-count'),
+      dataCount: document.getElementById('data-count'),
+      resourcesGrid: document.getElementById('resources-grid'),
+      scrapingGrid: document.getElementById('scraping-grid'),
+      cacheGrid: document.getElementById('cache-grid'),
+      cacheResponsesBody: document.getElementById('cache-responses-body'),
+      cacheResponsesCount: document.getElementById('cache-responses-count'),
+      tariffsEngine: document.getElementById('tariffs-engine'),
+      tariffsScopeButtons: document.getElementById('tariffs-scope-buttons'),
+      tariffsBody: document.getElementById('tariffs-body'),
+      tariffsCount: document.getElementById('tariffs-count'),
+      tariffsScopeFilter: document.getElementById('tariffs-scope-filter'),
+      tariffsColumnFilter: document.getElementById('tariffs-column-filter'),
+      tariffsWeightInput: document.getElementById('tariffs-weight-input'),
+      tariffsCalcResult: document.getElementById('tariffs-calc-result'),
+      conversationsBody: document.getElementById('conversations-body'),
+      conversationsCount: document.getElementById('conversations-count'),
+      tariffConversationsBody: document.getElementById('tariff-conversations-body'),
+      tariffConversationsCount: document.getElementById('tariff-conversations-count'),
+      skillMode: document.getElementById('skill-mode'),
+      skillCategory: document.getElementById('skill-category'),
+      heroCreateSkill: document.getElementById('hero-create-skill'),
+      viewSections: {
+        overview: document.getElementById('view-overview-stats'),
+        skills: document.getElementById('view-skills'),
+        pdfs: document.getElementById('view-pdfs'),
+        data: document.getElementById('view-data'),
+        scraping: document.getElementById('view-scraping'),
+        resources: document.getElementById('view-resources'),
+        cache: document.getElementById('view-cache'),
+        tariffs: document.getElementById('view-tariffs'),
+        conversations: document.getElementById('view-conversations'),
+        'tariff-conversations': document.getElementById('view-tariff-conversations'),
+        users: document.getElementById('view-users'),
+      }
+    };
+
+    const viewConfig = {
+      overview: {
+        title: 'Resumen General',
+        description: 'Vista ejecutiva del estado del sistema, el runtime del bot, el RAG y el volumen documental disponible.',
+        showSkillButton: true,
+      },
+      skills: {
+        title: 'Gestión de Skills',
+        description: 'Mantén el catálogo funcional del bot con categoría, prioridad, activación, disparadores y edición centralizada.',
+        showSkillButton: true,
+      },
+      pdfs: {
+        title: 'Gestión de PDFs',
+        description: 'Supervisa los PDFs descargados por el scraping, el estado de extracción y la limpieza documental del RAG.',
+        showSkillButton: false,
+      },
+      data: {
+        title: 'Gestión de Datos JSON',
+        description: 'Administra los archivos JSON del directorio data, revisa su estructura y actualiza contenido con reindexado automático.',
+        showSkillButton: false,
+      },
+      scraping: {
+        title: 'Información de Web Scraping',
+        description: 'Consulta el estado del scraping, el volumen recolectado y muestras del contenido obtenido desde la web institucional.',
+        showSkillButton: false,
+      },
+      resources: {
+        title: 'Recursos de IA',
+        description: 'Consulta modelos, rutas, configuración del RAG y archivos críticos usados por el sistema.',
+        showSkillButton: false,
+      },
+      cache: {
+        title: 'Cache Redis',
+        description: 'Consulta en tiempo real memoria y claves de caché para RAG, embeddings y cálculo de tarifas.',
+        showSkillButton: false,
+      },
+      tariffs: {
+        title: 'Gestión Tarifaria SQLite',
+        description: 'Administra el catálogo tarifario consolidado, recalcula precios y edita filas por scope/columna.',
+        showSkillButton: false,
+      },
+      conversations: {
+        title: 'Log de Conversaciones',
+        description: 'Historial persistente en base de datos, gestionable desde panel y aislado del contexto usado por el modelo.',
+        showSkillButton: false,
+      },
+      'tariff-conversations': {
+        title: 'Log de Tarifas Determinísticas',
+        description: 'Flujos completos de tarifas en una tabla independiente, separados del log conversacional general.',
+        showSkillButton: false,
+      },
+      users: {
+        title: 'Gestión de Usuarios',
+        description: 'Administra los accesos al panel de capacidades. Solo usuarios con rol Admin pueden ver esta sección.',
+        showSkillButton: false,
+      }
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[m]);
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, {
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+        ...options
+      });
+      const raw = await response.text();
+      let data = {};
+      if (raw) {
+        try {
+          data = JSON.parse(raw);
+        } catch (_) {
+          data = { raw };
+        }
+      }
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || data.raw || `HTTP ${response.status}`);
+      }
+      return data;
+    }
+
+    function formatBytes(bytes) {
+      const value = Number(bytes || 0);
+      if (value <= 0) return '0 B';
+      if (value < 1024) return `${value} B`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+      return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+    }
+
+    function renderSummaryCards(target, items) {
+      target.innerHTML = items.map(item => `
+        <div class="summary-card">
+          <span>${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.value)}</strong>
+          <small>${escapeHtml(item.note || '')}</small>
+        </div>
+      `).join('');
+    }
+
+    function getCurrentView() {
+      const parts = window.location.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+      const last = parts[parts.length - 1];
+      if (!last || last === 'capacidades') return 'overview';
+      if (last === 'recursos') return 'resources';
+      if (last === 'tarifas') return 'tariffs';
+      if (last === 'conversaciones') return 'conversations';
+      if (last === 'conversaciones-tarifas') return 'tariff-conversations';
+      if (last === 'usuarios') return 'users';
+      return viewConfig[last] ? last : 'overview';
+    }
+
+    function applyView() {
+      const currentView = getCurrentView();
+      const config = viewConfig[currentView] || viewConfig.overview;
+
+      els.menuBtns.forEach(item => {
+        item.classList.toggle('active', item.dataset.view === currentView);
+      });
+
+      Object.entries(els.viewSections).forEach(([view, element]) => {
+        element.classList.toggle('active', view === currentView);
+      });
+
+      els.pageTitle.textContent = config.title;
+      els.pageDescription.textContent = config.description;
+      els.heroCreateSkill.classList.toggle('hidden', !config.showSkillButton);
+      
+      // Cargar datos específicos de la vista
+      if (currentView === 'users' && currentUser?.role === 'admin') {
+        loadUsers();
+      }
+    }
+
+    function updateHero(cap) {
+      const runtime = cap.runtime || {};
+      const act = runtime.actualizacion || {};
+      els.heroRuntime.innerHTML = `
+        <h3>Runtime actual</h3>
+        <div class="runtime-line"><span>Modelo</span><strong>${escapeHtml(runtime.modelo || '—')}</strong></div>
+        <div class="runtime-line"><span>Ollama</span><strong>${runtime.ollama ? 'Disponible' : 'No disponible'}</strong></div>
+        <div class="runtime-line"><span>Sesiones activas</span><strong>${runtime.sesiones_activas ?? 0}</strong></div>
+        <div class="runtime-line"><span>Próxima actualización</span><strong>${escapeHtml(act.proxima_vez || '—')}</strong></div>
+        <div class="runtime-line"><span>Último resultado</span><strong>${escapeHtml(act.ultimo_resultado || '—')}</strong></div>
+      `;
+
+      els.sideRuntime.innerHTML = `
+        <h3>Estado del Bot</h3>
+        <strong>${runtime.ollama ? 'Operativo' : 'Revisar'}</strong>
+        <p>Modelo ${escapeHtml(runtime.modelo || '—')} con ${cap.rag?.chunks ?? 0} chunks indexados y ${runtime.sesiones_activas ?? 0} sesiones activas.</p>
+      `;
+    }
+
+    function updateTopStrip(cap, pdfPayload) {
+      const runtime = cap.runtime || {};
+      const rag = cap.rag || {};
+      const pdfs = pdfPayload?.resumen || {};
+      const act = runtime.actualizacion || {};
+
+      els.topCardHealth.innerHTML = `
+        <span>Salud General</span>
+        <strong>${runtime.ollama ? 'Sistema estable' : 'Atención requerida'}</strong>
+        <p>${runtime.ollama ? 'Ollama responde y el backend tiene capacidad operativa.' : 'El modelo o el backend necesitan revisión.'}</p>
+      `;
+      els.topCardRag.innerHTML = `
+        <span>RAG</span>
+        <strong>${rag.chunks ?? 0} chunks</strong>
+        <p>Modelo de embeddings ${escapeHtml(rag.embedding_model || '—')} con base en ${escapeHtml(rag.chroma_path || '—')}.</p>
+      `;
+      els.topCardContent.innerHTML = `
+        <span>Contenido</span>
+        <strong>${pdfs.total ?? 0} PDFs y ${runtime.sucursales ?? 0} sucursales</strong>
+        <p>${pdfs.con_texto ?? 0} PDFs ya aportan texto utilizable al sistema documental.</p>
+      `;
+      els.topCardUpdate.innerHTML = `
+        <span>Actualización</span>
+        <strong>${escapeHtml(act.proxima_vez || 'Sin agenda')}</strong>
+        <p>Último estado reportado: ${escapeHtml(act.ultimo_resultado || 'Pendiente')}.</p>
+      `;
+    }
+
+    function renderStats(cap, pdfPayload) {
+      const runtime = cap.runtime || {};
+      const pdfs = pdfPayload?.resumen || {};
+      els.statsGrid.innerHTML = `
+        <div class="stat"><strong>${cap.rag?.chunks ?? 0}</strong><span>Chunks RAG</span><small>Volumen actual de conocimiento utilizable por el chatbot.</small></div>
+        <div class="stat"><strong>${cap.skills?.length ?? 0}</strong><span>Skills activas</span><small>Capacidades funcionales declaradas para el comportamiento del bot.</small></div>
+        <div class="stat"><strong>${runtime.sucursales ?? 0}</strong><span>Sucursales cargadas</span><small>Datos operativos listos para consultas de ubicación y atención.</small></div>
+        <div class="stat"><strong>${pdfs.total ?? 0}</strong><span>PDFs registrados</span><small>Documentos disponibles para extracción, revisión y soporte del RAG.</small></div>
+        <div class="stat"><strong>${pdfs.con_texto ?? 0}</strong><span>PDFs con texto</span><small>Documentos ya convertidos en contenido potencialmente indexable.</small></div>
+        <div class="stat"><strong>${pdfs.sin_texto ?? 0}</strong><span>PDFs sin texto</span><small>Fuentes candidatas a OCR, limpieza o reprocesamiento.</small></div>
+        <div class="stat"><strong>${pdfs.tamano_directorio_kb ?? 0} KB</strong><span>Tamaño carpeta PDF</span><small>Peso estimado del almacenamiento documental actual.</small></div>
+        <div class="stat"><strong>${cap.ai_resources?.capabilities?.skills_registradas ?? 0}</strong><span>Skills registradas</span><small>Catálogo total de capacidades funcionales mantenidas desde el panel.</small></div>
+      `;
+    }
+
+    function matchesSearch(value, term) {
+      return value.toLowerCase().includes(term.toLowerCase());
+    }
+
+    function renderSkills() {
+      const skills = state.capabilities?.skills || [];
+      const term = document.getElementById('search-skills').value.trim();
+      const rows = skills.filter(item => {
+        const blob = [item.nombre, item.id, item.modo, item.categoria, item.descripcion, item.estado, item.trigger].join(' ');
+        return !term || matchesSearch(blob, term);
+      });
+      els.skillsBody.innerHTML = rows.map(item => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(item.nombre)}</span></td>
+          <td>${escapeHtml(item.id)}</td>
+          <td>${escapeHtml(item.categoria || '—')}</td>
+          <td>${escapeHtml(item.modo || '—')}</td>
+          <td><span class="pill ${item.activa ? 'ok' : 'warn'}">${item.activa ? 'Activa' : 'Inactiva'}</span></td>
+          <td>${escapeHtml(item.prioridad || '—')}</td>
+          <td>${escapeHtml(item.trigger || '—')}</td>
+          <td>${escapeHtml(item.descripcion || '')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="editSkill('${escapeHtml(item.id)}')">Editar</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deleteSkill('${escapeHtml(item.id)}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.skillsCount.textContent = `${rows.length} registros`;
+      renderSummaryCards(els.skillsSummary, [
+        { label: 'Total Skills', value: skills.length, note: 'Capacidades declaradas en el catálogo del bot.' },
+        { label: 'Activas', value: skills.filter(item => item.activa).length, note: 'Disponibles para el comportamiento actual del bot.' },
+        { label: 'Automatizables', value: skills.filter(item => item.automatizable).length, note: 'Quedan alineadas con modos operables por el sistema.' },
+        { label: 'Alta prioridad', value: skills.filter(item => Number(item.prioridad) >= 4).length, note: 'Entradas que merecen mayor peso operativo o de diseño.' },
+      ]);
+      setupGenericDataTable('#skills-table', 'skills', 8);
+    }
+
+    function renderPdfs() {
+      const pdfs = state.pdfsPayload?.pdfs || [];
+      els.pdfsBody.innerHTML = pdfs.map(item => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(item.nombre_archivo)}</span></td>
+          <td><span class="pill ${item.texto_disponible ? 'ok' : 'warn'}">${escapeHtml(item.estado_extraccion)}</span></td>
+          <td>${escapeHtml(item.metodo_extraccion || 'sin método')}</td>
+          <td>${item.longitud_texto || 0} chars</td>
+          <td>${escapeHtml(item.pagina_fuente || '—')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showPdfDetail('${escapeHtml(item.nombre_archivo)}')">Detalle</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deletePdf('${escapeHtml(item.registro_id || item.nombre_archivo)}','${escapeHtml(item.nombre_archivo)}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.pdfsCount.textContent = `${pdfs.length} registros`;
+      renderSummaryCards(els.pdfsSummary, [
+        { label: 'Total PDFs', value: pdfs.length, note: 'Documentos detectados y almacenados por el scraping.' },
+        { label: 'Con texto', value: pdfs.filter(item => item.texto_disponible).length, note: 'Aptos para revisión documental y soporte RAG.' },
+        { label: 'Sin texto', value: pdfs.filter(item => !item.texto_disponible).length, note: 'Candidatos a reprocesamiento u OCR.' },
+      ]);
+      setupPdfsDataTable();
+    }
+
+    function renderDataJsons() {
+      const payload = state.dataJsonPayload || {};
+      const items = payload.items || [];
+      const resumen = payload.resumen || {};
+
+      els.dataBody.innerHTML = items.map(item => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(item.nombre_archivo)}</span></td>
+          <td><span class="pill ${item.estado === 'ok' ? 'ok' : 'warn'}">${escapeHtml(item.estado || '—')}</span></td>
+          <td>${escapeHtml(item.tipo || '—')}</td>
+          <td>${escapeHtml(String(item.entradas ?? 0))}</td>
+          <td>${escapeHtml(formatBytes(item.tamano_bytes || 0))}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showDataJsonDetail('${escapeHtml(item.nombre_archivo)}')">Detalle</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      els.dataCount.textContent = `${items.length} registros`;
+      renderSummaryCards(els.dataSummary, [
+        { label: 'Total JSON', value: resumen.total ?? items.length, note: 'Archivos JSON gestionables desde data/.' },
+        { label: 'Válidos', value: resumen.validos ?? 0, note: 'JSON parseables y listos para indexación.' },
+        { label: 'Inválidos', value: resumen.invalidos ?? 0, note: 'Archivos con estructura JSON rota o inválida.' },
+        { label: 'Entradas', value: resumen.total_entradas ?? 0, note: 'Suma de elementos detectados en arrays/objetos.' },
+        { label: 'Peso total', value: `${resumen.tamano_total_kb ?? 0} KB`, note: 'Tamaño combinado de los JSON gestionables.' },
+      ]);
+      setupGenericDataTable('#data-table', 'archivos JSON', 5);
+    }
+
+    function renderScraping() {
+      const payload = state.scrapingPayload || {};
+      const counts = payload.counts || {};
+      const stats = payload.stats || {};
+      const samples = payload.samples || {};
+      const files = payload.files || {};
+
+      renderSummaryCards(els.scrapingSummary, [
+        { label: 'Páginas OK', value: counts.paginas_exitosas ?? 0, note: 'Páginas procesadas correctamente durante el scraping.' },
+        { label: 'Páginas fallidas', value: counts.paginas_fallidas ?? 0, note: 'URLs que fallaron o no pudieron procesarse.' },
+        { label: 'Servicios', value: counts.servicios ?? 0, note: 'Servicios detectados desde páginas y módulos.' },
+        { label: 'Noticias', value: counts.noticias ?? 0, note: 'Noticias y eventos identificados en el sitio.' },
+        { label: 'Aplicativos', value: counts.aplicativos ?? 0, note: 'Aplicativos específicos procesados por el scraper.' },
+        { label: 'Caracteres extraídos', value: counts.caracteres_extraidos ?? 0, note: 'Volumen bruto de texto incorporado desde la web.' },
+      ]);
+
+      const cards = [
+        {
+          title: 'Ejecución',
+          lines: [
+            ['Inicio', stats.inicio || '—'],
+            ['Fin', stats.fin || '—'],
+            ['Duración', `${Math.round(Number(stats.duracion_segundos || 0))} s`],
+            ['Historia', stats.historia_encontrada ? 'Sí' : 'No'],
+          ],
+        },
+        {
+          title: 'Cobertura',
+          lines: [
+            ['Sucursales', counts.sucursales ?? 0],
+            ['Secciones', counts.secciones ?? 0],
+            ['Aplicaciones', counts.aplicaciones ?? 0],
+            ['Herramientas', counts.herramientas ?? 0],
+          ],
+        },
+        {
+          title: 'Muestras',
+          lines: [
+            ['Secciones', (samples.secciones || []).slice(0, 3).join(' | ') || '—'],
+            ['Aplicativos', (samples.aplicativos || []).slice(0, 3).join(' | ') || '—'],
+            ['Servicios', (samples.servicios || []).slice(0, 3).join(' | ') || '—'],
+            ['Noticias', (samples.noticias || []).slice(0, 2).join(' | ') || '—'],
+          ],
+        },
+        {
+          title: 'Archivos',
+          lines: [
+            ['Estadísticas', files.estadisticas?.exists ? 'Sí' : 'No'],
+            ['Aplicativos', files.aplicativos?.exists ? 'Sí' : 'No'],
+            ['Servicios', files.servicios?.exists ? 'Sí' : 'No'],
+            ['Noticias', files.noticias?.exists ? 'Sí' : 'No'],
+          ],
+          note: files.estadisticas?.path || '—',
+        },
+      ];
+
+      els.scrapingGrid.innerHTML = cards.map(card => `
+        <div class="resource-card scraping-card">
+          <h4>${escapeHtml(card.title)}</h4>
+          <div class="card-content">
+            ${card.lines.map(line => `
+              <div class="resource-line">
+                <span>${escapeHtml(line[0])}</span>
+                <strong>${escapeHtml(line[1])}</strong>
+              </div>
+            `).join('')}
+          </div>
+          ${card.note ? `<div class="resource-note">${escapeHtml(card.note)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function setupGenericDataTable(selector, label, lastColumnIndex) {
+      if (!window.jQuery || !window.jQuery.fn?.DataTable) return;
+      const table = window.jQuery(selector);
+      if (!table.length) return;
+
+      if (window.jQuery.fn.DataTable.isDataTable(selector)) {
+        table.DataTable().destroy();
+      }
+
+      table.DataTable({
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[0, 'asc']],
+        language: {
+          search: 'Buscar:',
+          lengthMenu: `Mostrar _MENU_ ${label}`,
+          info: `Mostrando _START_ a _END_ de _TOTAL_ ${label}`,
+          infoEmpty: `Sin ${label} disponibles`,
+          zeroRecords: `No se encontraron ${label}`,
+          paginate: {
+            first: 'Primero',
+            last: 'Último',
+            next: 'Siguiente',
+            previous: 'Anterior'
+          }
+        },
+        columnDefs: [
+          { orderable: false, targets: lastColumnIndex }
+        ]
+      });
+    }
+
+    function setupPdfsDataTable() {
+      if (!window.jQuery || !window.jQuery.fn?.DataTable) return;
+
+      if (state.pdfsDataTable) {
+        state.pdfsDataTable.destroy();
+        state.pdfsDataTable = null;
+      }
+
+      state.pdfsDataTable = window.jQuery('#pdfs-table').DataTable({
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        order: [[0, 'asc']],
+        language: {
+          search: 'Buscar:',
+          lengthMenu: 'Mostrar _MENU_ PDFs',
+          info: 'Mostrando _START_ a _END_ de _TOTAL_ PDFs',
+          infoEmpty: 'Sin PDFs disponibles',
+          zeroRecords: 'No se encontraron PDFs',
+          paginate: {
+            first: 'Primero',
+            last: 'Último',
+            next: 'Siguiente',
+            previous: 'Anterior'
+          }
+        },
+        columnDefs: [
+          { orderable: false, targets: 5 }
+        ]
+      });
+    }
+
+    function renderResources(cap, pdfPayload) {
+      const ai = cap.ai_resources || {};
+      const llm = ai.llm || {};
+      const emb = ai.embeddings || {};
+      const session = ai.session || {};
+      const storage = ai.storage || {};
+      const pdfs = pdfPayload?.resumen || ai.pdfs || {};
+      const cards = [
+        {
+          title: 'Modelo Generativo',
+          lines: [
+            ['Modelo', llm.modelo || '—'],
+            ['Ollama', llm.ollama_disponible ? 'Disponible' : 'No disponible'],
+            ['Timeout', `${llm.timeout_segundos ?? 0} s`],
+          ],
+          note: llm.ollama_url || '—',
+        },
+        {
+          title: 'Embeddings y RAG',
+          lines: [
+            ['Embeddings', emb.modelo || '—'],
+            ['Chunk size', emb.chunk_size ?? 0],
+            ['Batch size', emb.batch_size ?? 0],
+            ['N resultados', emb.n_resultados ?? 0],
+          ],
+        },
+        {
+          title: 'Sesiones',
+          lines: [
+            ['Historial máximo', session.max_historial ?? 0],
+            ['Sesiones activas', session.sesiones_activas ?? 0],
+          ],
+        },
+        {
+          title: 'PDFs',
+          lines: [
+            ['Registrados', pdfs.total ?? 0],
+            ['Con texto', pdfs.con_texto ?? 0],
+            ['Sin texto', pdfs.sin_texto ?? 0],
+            ['Carpeta PDF', `${pdfs.tamano_directorio_kb ?? 0} KB`],
+          ],
+        },
+        {
+          title: 'Storage',
+          lines: [
+            ['Chroma', storage.chroma_path?.exists ? 'Sí' : 'No'],
+            ['Skills', storage.skills_file?.exists ? 'Sí' : 'No'],
+            ['PDFs JSON', storage.pdfs_file?.exists ? 'Sí' : 'No'],
+          ],
+          note: storage.chroma_path?.path || '—',
+        },
+        {
+          title: 'Fuentes Base',
+          lines: [
+            ['Texto base', storage.data_file?.exists ? 'Sí' : 'No'],
+            ['Sucursales', storage.sucursales_file?.exists ? 'Sí' : 'No'],
+            ['Secciones', storage.secciones_file?.exists ? 'Sí' : 'No'],
+          ],
+          note: storage.data_file?.path || '—',
+        },
+      ];
+
+      els.resourcesGrid.innerHTML = cards.map(card => `
+        <div class="resource-card">
+          <h4>${escapeHtml(card.title)}</h4>
+          ${card.lines.map(line => `
+            <div class="resource-line">
+              <span>${escapeHtml(line[0])}</span>
+              <strong>${escapeHtml(line[1])}</strong>
+            </div>
+          `).join('')}
+          ${card.note ? `<div class="resource-note">${escapeHtml(card.note)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    function renderCache() {
+      const payload = state.cachePayload || {};
+      const responseItems = state.responseCachePayload?.items || [];
+      const available = !!payload.available;
+      const namespaces = payload.namespaces || {};
+      const features = payload.features || {};
+      const usedMemory = Number(payload.used_memory_mb || 0);
+      const totalKeys = Number(payload.keys || 0);
+
+      renderSummaryCards(els.cacheSummary, [
+        { label: 'Redis', value: available ? 'Disponible' : 'No disponible', note: available ? 'Conectado y operativo para caché distribuida.' : (payload.error || 'No se pudo consultar Redis.') },
+        { label: 'Memoria usada', value: `${usedMemory.toFixed(2)} MB`, note: 'Memoria total consumida en la base de Redis usada por el proyecto.' },
+        { label: 'Claves totales', value: totalKeys, note: 'Cantidad de claves presentes en la DB actual de Redis.' },
+        { label: 'TTL respuestas', value: `${Number(features.response_cache_ttl_seconds || 0)} s`, note: 'Tiempo de vida de respuestas completas para preguntas repetidas.' },
+        { label: 'Respuestas cacheadas', value: responseItems.length, note: 'Registros auditables y eliminables desde esta tabla.' },
+      ]);
+
+      const cards = [
+        {
+          title: 'Namespaces',
+          lines: [
+            ['RAG', namespaces.rag ?? 0],
+            ['Embeddings', namespaces.embeddings ?? 0],
+            ['Tarifas', namespaces.tarifas ?? 0],
+            ['Respuestas', namespaces.respuestas ?? 0],
+            ['Otros', namespaces.otros ?? 0],
+          ],
+        },
+        {
+          title: 'Evicción y expiración',
+          lines: [
+            ['Expired keys', payload.expired_keys ?? 0],
+            ['Evicted keys', payload.evicted_keys ?? 0],
+          ],
+        },
+        {
+          title: 'Flags de caché',
+          lines: [
+            ['Embeddings', features.embedding_cache_enabled ? 'Activado' : 'Desactivado'],
+            ['Tarifas', features.tariff_cache_enabled ? 'Activado' : 'Desactivado'],
+            ['Respuestas', features.response_cache_enabled ? 'Activado' : 'Desactivado'],
+          ],
+        },
+      ];
+
+      els.cacheGrid.innerHTML = cards.map(card => `
+        <div class="resource-card">
+          <h4>${escapeHtml(card.title)}</h4>
+          ${card.lines.map(line => `
+            <div class="resource-line">
+              <span>${escapeHtml(line[0])}</span>
+              <strong>${escapeHtml(line[1])}</strong>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+
+      renderResponseCacheTable(responseItems);
+    }
+
+    function renderTariffs() {
+      if (state.tariffsDataTable) {
+        try {
+          state.tariffsDataTable.destroy();
+        } catch (_) {}
+        state.tariffsDataTable = null;
+      } else if (window.jQuery && window.jQuery.fn?.DataTable && window.jQuery.fn.DataTable.isDataTable('#tariffs-table')) {
+        try {
+          window.jQuery('#tariffs-table').DataTable().destroy();
+        } catch (_) {}
+      }
+
+      const statsPayload = state.tariffsStatsPayload || {};
+      const ratesPayload = state.tariffsRatesPayload || {};
+      const allItems = ratesPayload.items || [];
+      const supported = statsPayload.supported_scopes || [];
+      const scopeOptions = supported.map(item => item.scope);
+
+      if (els.tariffsScopeFilter) {
+        const current = els.tariffsScopeFilter.value || '';
+        els.tariffsScopeFilter.innerHTML = [
+          '<option value="">Scope (todos)</option>',
+          ...supported.map(item => `<option value="${escapeHtml(item.scope)}">${escapeHtml(item.scope)} · ${escapeHtml(item.label || '')}</option>`)
+        ].join('');
+        els.tariffsScopeFilter.value = scopeOptions.includes(current) ? current : '';
+      }
+
+      const selectedCol = (els.tariffsColumnFilter?.value || '').trim().toUpperCase();
+      const items = allItems.filter(item => {
+        const colOk = !selectedCol || String(item.column_code || '').toUpperCase() === selectedCol;
+        return colOk;
+      });
+
+      renderSummaryCards(els.tariffsSummary, [
+        { label: 'Engine', value: statsPayload.engine || 'sqlite', note: 'Motor activo para cálculo tarifario en backend.' },
+        { label: 'Tarifas activas', value: statsPayload.total_rates ?? allItems.length, note: 'Filas disponibles para cálculo en SQLite.' },
+        { label: 'Scopes soportados', value: (statsPayload.supported_scopes || []).length, note: 'Catálogo de hojas/servicios disponibles.' },
+        { label: 'Última actualización', value: statsPayload.last_updated || '—', note: 'Fecha de modificación más reciente del catálogo.' },
+      ]);
+
+      els.tariffsEngine.innerHTML = `
+        <div class="resource-card">
+          <h4>Base Tarifaria</h4>
+          <div class="resource-line"><span>DB</span><strong>${escapeHtml(statsPayload.db_path || '—')}</strong></div>
+          <div class="resource-line"><span>Total filas</span><strong>${escapeHtml(String(statsPayload.total_rates ?? 0))}</strong></div>
+          <div class="resource-line"><span>Engine</span><strong>${escapeHtml(statsPayload.engine || 'sqlite')}</strong></div>
+        </div>
+        <div class="resource-card">
+          <h4>Distribución por Scope</h4>
+          ${(statsPayload.scopes || []).slice(0, 8).map(item => `
+            <div class="resource-line"><span>${escapeHtml(item.scope)}</span><strong>${escapeHtml(String(item.total || 0))}</strong></div>
+          `).join('') || '<div class="resource-line"><span>Sin datos</span><strong>0</strong></div>'}
+        </div>
+      `;
+      const grouped = {};
+      for (const item of items) {
+        const scope = String(item.scope || '').trim().toLowerCase() || 'sin_scope';
+        if (!grouped[scope]) grouped[scope] = [];
+        grouped[scope].push(item);
+      }
+
+      const orderedScopes = supported
+        .map(s => String(s.scope || '').trim().toLowerCase())
+        .filter(s => grouped[s]);
+      for (const scope of Object.keys(grouped).sort()) {
+        if (!orderedScopes.includes(scope)) orderedScopes.push(scope);
+      }
+
+      if (!state.selectedTariffScope || !orderedScopes.includes(state.selectedTariffScope)) {
+        state.selectedTariffScope = orderedScopes[0] || '';
+      }
+
+      els.tariffsScopeButtons.innerHTML = orderedScopes.map(scope => {
+        const scopeInfo = supported.find(s => String(s.scope || '').trim().toLowerCase() === scope) || {};
+        const active = scope === state.selectedTariffScope;
+        const total = (grouped[scope] || []).length;
+        const cls = active ? 'btn btn-primary' : 'btn btn-secondary';
+        return `<button class="${cls}" type="button" onclick="selectTariffScope('${escapeHtml(scope)}')">${escapeHtml(scopeInfo.label || scope)} (${total})</button>`;
+      }).join('');
+
+      const scopeItems = grouped[state.selectedTariffScope] || [];
+      els.tariffsBody.innerHTML = scopeItems.map(item => `
+        <tr>
+          <td>${escapeHtml(String(item.id || ''))}</td>
+          <td>${escapeHtml(item.column_code || '—')}</td>
+          <td>${escapeHtml(item.service_label || '—')}</td>
+          <td>${escapeHtml(String(item.min_g ?? '—'))}</td>
+          <td>${escapeHtml(String(item.max_g ?? '—'))}</td>
+          <td>${escapeHtml(String(item.price_bs ?? '—'))}</td>
+          <td>${escapeHtml(item.source_sheet || 'manual')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showTariffRateDetail(${Number(item.id || 0)})">Detalle</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deleteTariffRate(${Number(item.id || 0)})">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+      els.tariffsCount.textContent = `${scopeItems.length} registros en ${state.selectedTariffScope || 'sin scope'} (de ${items.length} filtrados)`;
+
+      if (window.jQuery && window.jQuery.fn?.DataTable) {
+        state.tariffsDataTable = window.jQuery('#tariffs-table').DataTable({
+          pageLength: 10,
+          lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+          order: [[0, 'asc']],
+          language: {
+            search: 'Buscar:',
+            lengthMenu: 'Mostrar _MENU_ tarifas',
+            info: 'Mostrando _START_ a _END_ de _TOTAL_ tarifas',
+            infoEmpty: 'Sin tarifas disponibles',
+            zeroRecords: 'No se encontraron tarifas',
+            paginate: {
+              first: 'Primero',
+              last: 'Último',
+              next: 'Siguiente',
+              previous: 'Anterior'
+            }
+          },
+          columnDefs: [{ orderable: false, targets: 7 }]
+        });
+      }
+    }
+
+    function truncateText(value, max = 120) {
+      const text = String(value || '');
+      if (text.length <= max) return text;
+      return `${text.slice(0, max).trim()}...`;
+    }
+
+    function ratingLabel(value) {
+      return value === 1 ? 'Like' : (value === -1 ? 'Dislike' : 'Sin calificar');
+    }
+
+    function conversationStatusClass(status) {
+      const normalized = String(status || '').toLowerCase();
+      if (normalized === 'completed') return 'ok';
+      if (normalized === 'cancelled') return 'warn';
+      if (normalized === 'reset') return 'info';
+      return 'info';
+    }
+
+    function showConversationDetail(id) {
+      const item = (state.conversationsPayload?.items || []).find(entry => Number(entry.id || 0) === Number(id));
+      if (!item) {
+        els.detailOutput.innerHTML = `<div class="detail-empty">Conversación no encontrada.</div>`;
+        openModal('detail');
+        return;
+      }
+      els.detailOutput.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h5>Identificación</h5>
+            <div class="detail-line"><span>ID</span><strong>${escapeHtml(String(item.id || '—'))}</strong></div>
+            <div class="detail-line"><span>Fecha</span><strong>${escapeHtml(item.created_at || '—')}</strong></div>
+            <div class="detail-line"><span>Sesión</span><strong>${escapeHtml(item.session_id || '—')}</strong></div>
+            <div class="detail-line"><span>Request ID</span><strong>${escapeHtml(item.request_id || '—')}</strong></div>
+          </div>
+          <div class="detail-card">
+            <h5>Resolución</h5>
+            <div class="detail-line"><span>Idioma</span><strong>${escapeHtml(item.lang || '—')}</strong></div>
+            <div class="detail-line"><span>Skill</span><strong>${escapeHtml(item.skill_id || '—')}</strong></div>
+            <div class="detail-line"><span>Fuente principal</span><strong>${escapeHtml(item.primary_source_type || '—')}</strong></div>
+            <div class="detail-line"><span>Cache hit</span><strong>${item.cache_hit ? 'Sí' : 'No'}</strong></div>
+            <div class="detail-line"><span>Rating</span><strong>${escapeHtml(ratingLabel(item.rating))}</strong></div>
+            <div class="detail-line"><span>Latencia</span><strong>${escapeHtml(String(item.latency_ms ?? 0))} ms</strong></div>
+          </div>
+        </div>
+        <div class="detail-text-wrap">
+          <div class="detail-text-head">
+            <h5>Pregunta</h5>
+            <span class="detail-text-meta">Texto completo enviado por el usuario</span>
+          </div>
+          <pre class="detail-text">${escapeHtml(item.question || '—')}</pre>
+        </div>
+        <div class="detail-text-wrap">
+          <div class="detail-text-head">
+            <h5>Respuesta</h5>
+            <span class="detail-text-meta">Salida completa registrada en el log</span>
+          </div>
+          <pre class="detail-text">${escapeHtml(item.response || '—')}</pre>
+        </div>
+      `;
+      openModal('detail');
+    }
+
+    function showTariffConversationDetail(id) {
+      const item = (state.tariffConversationsPayload?.items || []).find(entry => Number(entry.id || 0) === Number(id));
+      if (!item) {
+        els.detailOutput.innerHTML = `<div class="detail-empty">Flujo tarifario no encontrado.</div>`;
+        openModal('detail');
+        return;
+      }
+      els.detailOutput.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h5>Identificación</h5>
+            <div class="detail-line"><span>ID</span><strong>${escapeHtml(String(item.id || '—'))}</strong></div>
+            <div class="detail-line"><span>Fecha</span><strong>${escapeHtml(item.created_at || '—')}</strong></div>
+            <div class="detail-line"><span>Sesión</span><strong>${escapeHtml(item.session_id || '—')}</strong></div>
+            <div class="detail-line"><span>Estado</span><strong>${escapeHtml(item.status || '—')}</strong></div>
+            <div class="detail-line"><span>Turnos</span><strong>${escapeHtml(String(item.turns ?? 0))}</strong></div>
+            <div class="detail-line"><span>Latencia</span><strong>${escapeHtml(String(item.latency_ms ?? 0))} ms</strong></div>
+          </div>
+          <div class="detail-card">
+            <h5>Resultado</h5>
+            <div class="detail-line"><span>Scope</span><strong>${escapeHtml(item.scope || '—')}</strong></div>
+            <div class="detail-line"><span>Peso</span><strong>${escapeHtml(item.peso || '—')}</strong></div>
+            <div class="detail-line"><span>Columna</span><strong>${escapeHtml(item.columna || '—')}</strong></div>
+            <div class="detail-line"><span>Servicio</span><strong>${escapeHtml(item.servicio || '—')}</strong></div>
+            <div class="detail-line"><span>Precio</span><strong>${escapeHtml(item.precio ? `${item.precio} ${item.moneda || 'Bs'}` : '—')}</strong></div>
+          </div>
+        </div>
+        <div class="detail-text-wrap">
+          <div class="detail-text-head">
+            <h5>Flujo completo</h5>
+            <span class="detail-text-meta">Historial íntegro del flujo determinístico de tarifas</span>
+          </div>
+          <pre class="detail-text">${escapeHtml(item.flow_text || '—')}</pre>
+        </div>
+      `;
+      openModal('detail');
+    }
+
+    function renderResponseCacheTable(items) {
+      els.cacheResponsesBody.innerHTML = items.map(item => `
+        <tr>
+          <td title="${escapeHtml(item.question || '')}">${escapeHtml(truncateText(item.question, 140))}</td>
+          <td title="${escapeHtml(item.response || '')}">${escapeHtml(truncateText(item.response, 180))}</td>
+          <td>${escapeHtml(item.lang || '—')}</td>
+          <td>${escapeHtml(item.skill_id || '—')}</td>
+          <td>${escapeHtml(item.primary_source_type || '—')}</td>
+          <td>${escapeHtml(item.created_at || '—')}</td>
+          <td>${escapeHtml(String(item.ttl_seconds ?? -1))} s</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-danger" type="button" onclick="deleteResponseCache('${escapeHtml(item.cache_id || '')}')">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.cacheResponsesCount.textContent = `${items.length} registros`;
+      setupGenericDataTable('#cache-responses-table', 'respuestas cacheadas', 7);
+    }
+
+    function renderConversations() {
+      const payload = state.conversationsPayload || {};
+      const items = payload.items || [];
+      const stats = payload.stats || {};
+
+      renderSummaryCards(els.conversationsSummary, [
+        { label: 'Total logs', value: stats.total ?? items.length, note: 'Registros guardados en la base de datos local.' },
+        { label: 'Cache hits', value: stats.cache_hits ?? 0, note: 'Conversaciones servidas desde caché de respuesta.' },
+        { label: 'Likes', value: stats.likes ?? 0, note: 'Respuestas marcadas como útiles por usuarios.' },
+        { label: 'Dislikes', value: stats.dislikes ?? 0, note: 'Respuestas marcadas como no útiles por usuarios.' },
+        { label: 'Latencia promedio', value: `${Number(stats.avg_latency_ms || 0).toFixed(1)} ms`, note: 'Tiempo medio desde llegada de pregunta hasta respuesta.' },
+      ]);
+
+      els.conversationsBody.innerHTML = items.map(item => `
+        <tr>
+          <td>${escapeHtml(String(item.id || ''))}</td>
+          <td>${escapeHtml(item.created_at || '—')}</td>
+          <td title="${escapeHtml(item.question || '')}">${escapeHtml(truncateText(item.question, 120))}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showConversationDetail(${Number(item.id || 0)})">Detalle</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deleteConversation(${Number(item.id || 0)})">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.conversationsCount.textContent = `${items.length} registros`;
+      setupGenericDataTable('#conversations-table', 'conversaciones', 3);
+    }
+
+    function renderTariffConversations() {
+      const payload = state.tariffConversationsPayload || {};
+      const items = payload.items || [];
+      const stats = payload.stats || {};
+
+      renderSummaryCards(els.tariffConversationsSummary, [
+        { label: 'Total flujos', value: stats.total ?? items.length, note: 'Consultas determinísticas de tarifas guardadas como flujo completo.' },
+        { label: 'Completados', value: stats.completed ?? 0, note: 'Flujos que llegaron a precio final.' },
+        { label: 'Cancelados', value: stats.cancelled ?? 0, note: 'Flujos detenidos por el usuario.' },
+        { label: 'Reseteados', value: stats.reset ?? 0, note: 'Flujos reiniciados durante la interacción.' },
+        { label: 'Latencia promedio', value: `${Number(stats.avg_latency_ms || 0).toFixed(1)} ms`, note: 'Tiempo medio de todo el flujo, no solo de un turno.' },
+      ]);
+
+      els.tariffConversationsBody.innerHTML = items.map(item => `
+        <tr>
+          <td>${escapeHtml(String(item.id || ''))}</td>
+          <td>${escapeHtml(item.created_at || '—')}</td>
+          <td>
+            <div class="table-actions">
+              <button class="mini-btn mini-soft" type="button" onclick="showTariffConversationDetail(${Number(item.id || 0)})">Detalle</button>
+              <button class="mini-btn mini-danger" type="button" onclick="deleteTariffConversation(${Number(item.id || 0)})">Eliminar</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+      els.tariffConversationsCount.textContent = `${items.length} registros`;
+      setupGenericDataTable('#tariff-conversations-table', 'flujos de tarifas', 2);
+    }
+
+    function showMsg(target, text, type = 'ok') {
+      target.textContent = text;
+      target.className = `msg show ${type}`;
+    }
+
+    function resetSkillForm() {
+      els.skillForm.reset();
+      document.getElementById('skill-category').value = 'atencion';
+      document.getElementById('skill-mode').value = 'rag+llm';
+      document.getElementById('skill-priority').value = 3;
+      document.getElementById('skill-active').value = 'true';
+      els.skillMsg.className = 'msg';
+    }
+
+    function resetPdfForm() {
+      els.pdfForm.reset();
+      const cleanDefault = state.options?.pdf_cleaning?.default_mode || 'aggressive';
+      const cleanModeEl = document.getElementById('pdf-clean-mode');
+      if (cleanModeEl) cleanModeEl.value = cleanDefault;
+      els.pdfMsg.className = 'msg';
+    }
+
+    function openModal(type) {
+      state.currentModal = type;
+      els.modal.querySelector('#modal-card').classList.toggle('detail-wide', type === 'detail');
+      els.skillForm.classList.add('hidden');
+      els.pdfForm.classList.add('hidden');
+      els.detailPanel.classList.add('hidden');
+      if (type === 'skill') {
+        els.modalTitle.textContent = 'Skill';
+        els.modalSubtitle.textContent = 'Crea o edita una skill funcional para el bot.';
+        els.skillForm.classList.remove('hidden');
+      } else if (type === 'pdf-upload') {
+        els.modalTitle.textContent = 'Subir PDF';
+        els.modalSubtitle.textContent = 'El PDF se procesa de forma temporal, se conserva solo la información extraída y el archivo real se elimina.';
+        els.pdfForm.classList.remove('hidden');
+      } else {
+        els.modalTitle.textContent = 'Detalle';
+        els.modalSubtitle.textContent = 'Vista detallada del elemento seleccionado.';
+        els.detailPanel.classList.remove('hidden');
+      }
+      els.modal.classList.add('open');
+    }
+
+    function closeModal(event) {
+      if (event && event.target !== els.modal) return;
+      els.modal.classList.remove('open');
+    }
+
+    function editSkill(id) {
+      const item = (state.capabilities?.skills || []).find(entry => entry.id === id);
+      if (!item) return;
+      resetSkillForm();
+      document.getElementById('skill-id').value = item.id || '';
+      document.getElementById('skill-name').value = item.nombre || '';
+      document.getElementById('skill-description').value = item.descripcion || '';
+      document.getElementById('skill-category').value = item.categoria || 'custom';
+      document.getElementById('skill-mode').value = item.modo || '';
+      document.getElementById('skill-priority').value = item.prioridad || 3;
+      document.getElementById('skill-trigger').value = item.trigger || '';
+      document.getElementById('skill-active').value = item.activa ? 'true' : 'false';
+      openModal('skill');
+    }
+
+    function showPdfDetail(nombreArchivo) {
+      const item = (state.pdfsPayload?.pdfs || []).find(entry => entry.nombre_archivo === nombreArchivo);
+      if (!item) {
+        els.detailOutput.innerHTML = `<div class="detail-empty">PDF no encontrado.</div>`;
+        openModal('detail');
+        return;
+      }
+      const texto = item.texto_extraido || '';
+      const registroId = item.registro_id || item.nombre_archivo;
+      els.detailOutput.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h5>Documento</h5>
+            <div class="detail-line"><span>Archivo</span><strong>${escapeHtml(item.nombre_archivo || '—')}</strong></div>
+            <div class="detail-line"><span>Estado</span><strong>${escapeHtml(item.estado_extraccion || '—')}</strong></div>
+            <div class="detail-line"><span>Método</span><strong>${escapeHtml(item.metodo_extraccion || 'sin método')}</strong></div>
+            <div class="detail-line"><span>Limpieza</span><strong>${escapeHtml(item.clean_mode || 'aggressive')}</strong></div>
+            <div class="detail-line"><span>Texto extraído</span><strong>${escapeHtml(String(item.longitud_texto || 0))} chars</strong></div>
+            <div class="detail-line"><span>Tamaño</span><strong>${escapeHtml(String(item.tamano_bytes || 0))} bytes</strong></div>
+          </div>
+          <div class="detail-card">
+            <h5>Origen</h5>
+            <div class="detail-line"><span>Página fuente</span><strong>${escapeHtml(item.pagina_fuente || '—')}</strong></div>
+            <div class="detail-line"><span>URL</span><strong>${escapeHtml(item.url || '—')}</strong></div>
+            <div class="detail-line"><span>Guardado físico</span><strong>${item.archivo_guardado === false ? 'No' : 'Sí'}</strong></div>
+            <div class="detail-line"><span>Registro</span><strong>${escapeHtml(item.registro_id || '—')}</strong></div>
+          </div>
+        </div>
+        <div class="detail-text-wrap">
+          <div class="detail-text-head">
+            <h5>Texto extraído</h5>
+            <span class="detail-text-meta">${escapeHtml(item.texto_disponible ? 'Contenido disponible para revisión' : 'Sin contenido utilizable')}</span>
+          </div>
+          <textarea id="pdf-text-editor" class="detail-textarea" placeholder="Escribe o corrige aquí el texto extraído del PDF...">${escapeHtml(texto)}</textarea>
+          <div class="detail-text-actions">
+            <span id="pdf-text-msg" class="detail-text-msg"></span>
+            <button class="btn btn-secondary" type="button" onclick="resetPdfTextEditor('${escapeHtml(registroId)}')">Revertir</button>
+            <button class="btn btn-primary" type="button" onclick="savePdfText('${escapeHtml(registroId)}')">Guardar texto</button>
+          </div>
+        </div>
+      `;
+      openModal('detail');
+    }
+
+    async function showDataJsonDetail(nombreArchivo) {
+      try {
+        els.detailOutput.innerHTML = `<div class="detail-empty">Cargando detalle de ${escapeHtml(nombreArchivo)}...</div>`;
+        openModal('detail');
+        const item = await fetchJson(`/api/data-jsons/${encodeURIComponent(nombreArchivo)}`);
+        state.dataJsonDetailCache[nombreArchivo] = item;
+        els.detailOutput.innerHTML = `
+          <div class="detail-grid">
+            <div class="detail-card">
+              <h5>Archivo JSON</h5>
+              <div class="detail-line"><span>Nombre</span><strong>${escapeHtml(item.nombre_archivo || nombreArchivo)}</strong></div>
+              <div class="detail-line"><span>Tamaño</span><strong>${escapeHtml(formatBytes(item.tamano_bytes || 0))}</strong></div>
+              <div class="detail-line"><span>Modificado</span><strong>${escapeHtml(item.modificado_en || '—')}</strong></div>
+            </div>
+            <div class="detail-card">
+              <h5>Ruta</h5>
+              <div class="detail-line"><span>Ubicación</span><strong>${escapeHtml(item.ruta || '—')}</strong></div>
+            </div>
+          </div>
+          <div class="detail-text-wrap">
+            <div class="detail-text-head">
+              <h5>Contenido JSON</h5>
+              <span class="detail-text-meta">Editar y guardar reindexará el RAG en modo completo</span>
+            </div>
+            <textarea id="data-json-editor" class="detail-textarea" placeholder="Contenido JSON...">${escapeHtml(item.content_pretty || '')}</textarea>
+            <div class="detail-text-actions">
+              <span id="data-json-msg" class="detail-text-msg"></span>
+              <button class="btn btn-secondary" type="button" onclick="resetDataJsonEditor('${escapeHtml(nombreArchivo)}')">Revertir</button>
+              <button class="btn btn-primary" type="button" onclick="saveDataJson('${escapeHtml(nombreArchivo)}')">Guardar JSON</button>
+            </div>
+          </div>
+        `;
+      } catch (err) {
+        els.detailOutput.innerHTML = `<div class="detail-empty">Error cargando JSON: ${escapeHtml(err.message)}</div>`;
+        openModal('detail');
+      }
+    }
+
+    function resetPdfTextEditor(registroId) {
+      const item = (state.pdfsPayload?.pdfs || []).find(entry => (entry.registro_id || entry.nombre_archivo) === registroId);
+      const editor = document.getElementById('pdf-text-editor');
+      const msg = document.getElementById('pdf-text-msg');
+      if (!editor || !item) return;
+      editor.value = item.texto_extraido || '';
+      if (msg) msg.textContent = '';
+    }
+
+    async function savePdfText(registroId) {
+      const editor = document.getElementById('pdf-text-editor');
+      const msg = document.getElementById('pdf-text-msg');
+      if (!editor) return;
+      const texto = editor.value || '';
+      try {
+        if (msg) msg.textContent = 'Guardando...';
+        const result = await fetchJson(`/api/pdfs/${encodeURIComponent(registroId)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ texto_extraido: texto }),
+        });
+        if (msg) {
+          msg.textContent = result.reindex_started
+            ? 'Texto guardado. Reindex incremental en curso.'
+            : 'Texto guardado.';
+        }
+        await loadAll();
+      } catch (err) {
+        if (msg) msg.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    function resetDataJsonEditor(nombreArchivo) {
+      const item = state.dataJsonDetailCache[nombreArchivo];
+      const editor = document.getElementById('data-json-editor');
+      const msg = document.getElementById('data-json-msg');
+      if (!editor || !item) return;
+      editor.value = item.content_pretty || '';
+      if (msg) msg.textContent = '';
+    }
+
+    async function saveDataJson(nombreArchivo) {
+      const editor = document.getElementById('data-json-editor');
+      const msg = document.getElementById('data-json-msg');
+      if (!editor) return;
+      const content = editor.value || '';
+      try {
+        if (msg) msg.textContent = 'Guardando...';
+        const result = await fetchJson(`/api/data-jsons/${encodeURIComponent(nombreArchivo)}`, {
+          method: 'PUT',
+          body: JSON.stringify({ content }),
+        });
+        state.dataJsonDetailCache[nombreArchivo] = result;
+        if (msg) {
+          msg.textContent = result.reindex_started
+            ? 'JSON guardado. Reindex completo en curso.'
+            : 'JSON guardado.';
+        }
+        editor.value = result.content_pretty || content;
+        await loadAll();
+      } catch (err) {
+        if (msg) msg.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function deleteSkill(id) {
+      if (!confirm(`Eliminar skill ${id}?`)) return;
+      try {
+        await fetchJson(`/api/skills/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deletePdf(registroId, nombreArchivo) {
+      if (!confirm(`Eliminar registro PDF ${nombreArchivo || registroId}?`)) return;
+      try {
+        await fetchJson(`/api/pdfs/${encodeURIComponent(registroId)}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function triggerUpdate() {
+      try {
+        await fetchJson('/api/actualizar', { method: 'POST' });
+        els.detailOutput.textContent = 'Actualización lanzada correctamente. Refresca el panel en unos segundos.';
+        openModal('detail');
+        await loadAll();
+      } catch (err) {
+        els.detailOutput.textContent = err.message;
+        openModal('detail');
+      }
+    }
+
+    async function rebuildRag() {
+      if (!confirm('Esto borrará la colección vectorial actual y la reconstruirá desde cero. ¿Continuar?')) return;
+      try {
+        const result = await fetchJson('/api/rag/rebuild', { method: 'POST' });
+        els.detailOutput.textContent = JSON.stringify(result, null, 2);
+        openModal('detail');
+        await loadAll();
+      } catch (err) {
+        els.detailOutput.textContent = err.message;
+        openModal('detail');
+      }
+    }
+
+    async function deleteResponseCache(cacheId) {
+      if (!cacheId) return;
+      if (!confirm(`Eliminar respuesta cacheada ${cacheId}?`)) return;
+      try {
+        await fetchJson(`/api/cache/responses/${encodeURIComponent(cacheId)}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearResponseCache() {
+      if (!confirm('Esto eliminará toda la caché de respuestas generadas. ¿Continuar?')) return;
+      try {
+        await fetchJson('/api/cache/responses/clear', { method: 'POST' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteConversation(id) {
+      if (!id) return;
+      if (!confirm(`Eliminar conversación #${id}?`)) return;
+      try {
+        await fetchJson(`/api/conversations/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearConversations() {
+      if (!confirm('Esto eliminará todo el log conversacional persistente. ¿Continuar?')) return;
+      try {
+        await fetchJson('/api/conversations/clear', { method: 'POST' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function deleteTariffConversation(id) {
+      if (!id) return;
+      if (!confirm(`Eliminar flujo tarifario #${id}?`)) return;
+      try {
+        await fetchJson(`/api/conversations/tarifas/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function clearTariffConversations() {
+      if (!confirm('Esto eliminará todo el log de flujos tarifarios. ¿Continuar?')) return;
+      try {
+        await fetchJson('/api/conversations/tarifas/clear', { method: 'POST' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function reloadTariffCatalog() {
+      if (!confirm('Se reconstruirá el catálogo de tarifas desde los Excel de skills 1-16. ¿Continuar?')) return;
+      try {
+        const result = await fetchJson('/api/tarifas/reload', { method: 'POST' });
+        const inserted = result?.reload?.inserted ?? 0;
+        alert(`Recarga completada. Filas insertadas: ${inserted}`);
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    function selectTariffScope(scope) {
+      state.selectedTariffScope = (scope || '').trim().toLowerCase();
+      if (els.tariffsScopeFilter) {
+        els.tariffsScopeFilter.value = state.selectedTariffScope;
+      }
+      renderTariffs();
+    }
+
+    async function createTariffRateForScope(scopePref = '') {
+      const scope = scopePref || prompt('Scope (ej: nacional, internacional, eca_nacional, etc):');
+      if (!scope) return;
+      const columnCode = prompt('Columna (ej: C):');
+      if (!columnCode) return;
+      const minG = prompt('Peso mínimo en gramos (ej: 500):');
+      if (!minG) return;
+      const maxG = prompt('Peso máximo en gramos (ej: 1000):');
+      if (!maxG) return;
+      const priceBs = prompt('Precio en Bs (ej: 12.5):');
+      if (!priceBs) return;
+      const serviceLabel = prompt('Etiqueta de servicio (opcional):') || '';
+
+      try {
+        await fetchJson('/api/tarifas/rates', {
+          method: 'POST',
+          body: JSON.stringify({
+            scope: scope.trim(),
+            column_code: columnCode.trim().toUpperCase(),
+            min_g: Number(minG),
+            max_g: Number(maxG),
+            price_bs: Number(priceBs),
+            service_label: serviceLabel.trim(),
+            source_sheet: 'manual',
+          }),
+        });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function createTariffRate() {
+      await createTariffRateForScope(state.selectedTariffScope || '');
+    }
+
+    function showTariffRateDetail(id) {
+      const item = (state.tariffsRatesPayload?.items || []).find(entry => Number(entry.id || 0) === Number(id));
+      if (!item) return;
+      els.detailOutput.innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h5>Identificación</h5>
+            <div class="detail-line"><span>ID</span><strong>${escapeHtml(String(item.id || '—'))}</strong></div>
+            <div class="detail-line"><span>Scope</span><strong>${escapeHtml(item.scope || '—')}</strong></div>
+            <div class="detail-line"><span>Columna</span><strong>${escapeHtml(item.column_code || '—')}</strong></div>
+            <div class="detail-line"><span>Origen</span><strong>${escapeHtml(item.source_sheet || 'manual')}</strong></div>
+          </div>
+          <div class="detail-card">
+            <h5>Editar tarifa</h5>
+            <div class="field">
+              <label for="tariff-detail-service">Servicio</label>
+              <input id="tariff-detail-service" value="${escapeHtml(item.service_label || '')}" />
+            </div>
+            <div class="field">
+              <label for="tariff-detail-min">Min (g)</label>
+              <input id="tariff-detail-min" value="${escapeHtml(String(item.min_g ?? ''))}" />
+            </div>
+            <div class="field">
+              <label for="tariff-detail-max">Max (g)</label>
+              <input id="tariff-detail-max" value="${escapeHtml(String(item.max_g ?? ''))}" />
+            </div>
+            <div class="field">
+              <label for="tariff-detail-price">Precio (Bs)</label>
+              <input id="tariff-detail-price" value="${escapeHtml(String(item.price_bs ?? ''))}" />
+            </div>
+            <div class="hero-actions" style="margin-top:10px">
+              <button class="btn btn-primary" type="button" onclick="saveTariffRateDetail(${Number(item.id || 0)})">Guardar cambios</button>
+            </div>
+            <div id="tariff-detail-msg" class="msg" style="margin-top:10px"></div>
+          </div>
+        </div>
+      `;
+      openModal('detail');
+    }
+
+    async function saveTariffRateDetail(id) {
+      const minG = document.getElementById('tariff-detail-min')?.value ?? '';
+      const maxG = document.getElementById('tariff-detail-max')?.value ?? '';
+      const priceBs = document.getElementById('tariff-detail-price')?.value ?? '';
+      const serviceLabel = document.getElementById('tariff-detail-service')?.value ?? '';
+      const msgEl = document.getElementById('tariff-detail-msg');
+
+      const toNum = (value) => {
+        const text = String(value ?? '').trim().replace(',', '.');
+        if (!text) return NaN;
+        return Number(text);
+      };
+      const minNum = toNum(minG);
+      const maxNum = toNum(maxG);
+      const priceNum = toNum(priceBs);
+      if (!Number.isFinite(minNum) || !Number.isFinite(maxNum) || !Number.isFinite(priceNum)) {
+        if (msgEl) {
+          msgEl.className = 'msg show err';
+          msgEl.textContent = 'Min, Max y Precio deben ser números válidos.';
+        }
+        return;
+      }
+      if (minNum > maxNum) {
+        if (msgEl) {
+          msgEl.className = 'msg show err';
+          msgEl.textContent = 'El mínimo no puede ser mayor que el máximo.';
+        }
+        return;
+      }
+
+      if (msgEl) {
+        msgEl.className = 'msg show';
+        msgEl.textContent = 'Guardando...';
+      }
+
+      try {
+        await fetchJson(`/api/tarifas/rates/${encodeURIComponent(String(id))}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            min_g: minNum,
+            max_g: maxNum,
+            price_bs: priceNum,
+            service_label: serviceLabel.trim(),
+          }),
+        });
+        await loadAll();
+        if (msgEl) {
+          msgEl.className = 'msg show ok';
+          msgEl.textContent = 'Tarifa actualizada correctamente.';
+        }
+        showTariffRateDetail(id);
+      } catch (err) {
+        if (msgEl) {
+          msgEl.className = 'msg show err';
+          msgEl.textContent = err.message;
+        }
+      }
+    }
+
+    async function deleteTariffRate(id) {
+      if (!id) return;
+      if (!confirm(`Eliminar tarifa #${id}?`)) return;
+      try {
+        await fetchJson(`/api/tarifas/rates/${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+        await loadAll();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function calculateTariffFromPanel() {
+      const scope = (els.tariffsScopeFilter?.value || '').trim();
+      const columnCode = (els.tariffsColumnFilter?.value || '').trim().toUpperCase();
+      const peso = (els.tariffsWeightInput?.value || '').trim();
+
+      if (!scope || !columnCode || !peso) {
+        els.tariffsCalcResult.textContent = 'Completa scope, columna y peso para calcular.';
+        return;
+      }
+
+      try {
+        const result = await fetchJson('/api/tarifas/calculate', {
+          method: 'POST',
+          body: JSON.stringify({
+            scope,
+            column_code: columnCode,
+            peso,
+          }),
+        });
+        els.tariffsCalcResult.textContent = `Precio: ${result.precio} Bs | Servicio: ${result.servicio || '—'} | Rango: ${result?.rango?.min_g}-${result?.rango?.max_g} g`;
+      } catch (err) {
+        els.tariffsCalcResult.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function loadOptions() {
+      state.options = await fetchJson('/api/capabilities/options');
+      document.getElementById('skill-mode').innerHTML = (state.options.modos_skill || []).map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.nombre)}</option>`).join('');
+      document.getElementById('skill-category').innerHTML = (state.options.categorias_skill || []).map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.nombre)}</option>`).join('');
+      const cleanModes = state.options.pdf_cleaning?.modes || ['aggressive', 'balanced', 'off'];
+      const cleanDefault = state.options.pdf_cleaning?.default_mode || 'aggressive';
+      const cleanModeEl = document.getElementById('pdf-clean-mode');
+      if (cleanModeEl) {
+        cleanModeEl.innerHTML = cleanModes.map((mode) => {
+          const label = mode === 'aggressive'
+            ? 'Aggressive (recomendado)'
+            : (mode === 'balanced' ? 'Balanced' : 'Off (sin limpieza extra)');
+          return `<option value="${escapeHtml(mode)}">${escapeHtml(label)}</option>`;
+        }).join('');
+        cleanModeEl.value = cleanDefault;
+      }
+    }
+
+    async function loadAll() {
+      const [capabilities, pdfs, dataJsons, scraping, cacheStats, cacheResponses, conversations, tariffConversations, tariffsStats, tariffsRates] = await Promise.all([
+        fetchJson('/api/capabilities'),
+        fetchJson('/api/pdfs'),
+        fetchJson('/api/data-jsons'),
+        fetchJson('/api/scraping'),
+        fetchJson('/api/cache/stats'),
+        fetchJson('/api/cache/responses?limit=250'),
+        fetchJson('/api/conversations?limit=500'),
+        fetchJson('/api/conversations/tarifas?limit=500'),
+        fetchJson('/api/tarifas/stats'),
+        fetchJson('/api/tarifas/rates?limit=5000'),
+      ]);
+      state.capabilities = capabilities;
+      state.pdfsPayload = pdfs;
+      state.dataJsonPayload = dataJsons;
+      state.scrapingPayload = scraping;
+      state.cachePayload = cacheStats;
+      state.responseCachePayload = cacheResponses;
+      state.conversationsPayload = conversations;
+      state.tariffConversationsPayload = tariffConversations;
+      state.tariffsStatsPayload = tariffsStats;
+      state.tariffsRatesPayload = tariffsRates;
+      updateHero(capabilities);
+      updateTopStrip(capabilities, pdfs);
+      renderStats(capabilities, pdfs);
+      renderSkills();
+      renderPdfs();
+      renderDataJsons();
+      renderScraping();
+      renderResources(capabilities, pdfs);
+      renderCache();
+      renderTariffs();
+      renderConversations();
+      renderTariffConversations();
+    }
+
+    els.skillForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = Object.fromEntries(new FormData(els.skillForm).entries());
+      try {
+        const result = await fetchJson('/api/skills', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        showMsg(els.skillMsg, result.created ? 'Skill creada correctamente.' : 'Skill actualizada correctamente.', 'ok');
+        await loadAll();
+      } catch (err) {
+        showMsg(els.skillMsg, err.message, 'err');
+      }
+    });
+
+    els.pdfForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = new FormData(els.pdfForm);
+      try {
+        const response = await fetch('/api/pdfs/upload', {
+          method: 'POST',
+          body: payload,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        showMsg(els.pdfMsg, result.created ? 'PDF procesado correctamente. Se guardó solo la información extraída.' : 'PDF actualizado correctamente. Se guardó solo la información extraída.', 'ok');
+        await loadAll();
+      } catch (err) {
+        showMsg(els.pdfMsg, err.message, 'err');
+      }
+    });
+
+    if (els.tariffsScopeFilter) {
+      els.tariffsScopeFilter.addEventListener('change', renderTariffs);
+    }
+    if (els.tariffsColumnFilter) {
+      els.tariffsColumnFilter.addEventListener('input', renderTariffs);
+    }
+
+    (async function init() {
+      applyView();
+      try {
+        await loadOptions();
+        await loadAll();
+      } catch (err) {
+        els.detailOutput.textContent = `No se pudo cargar el panel: ${err.message}`;
+        openModal('detail');
+      }
+    })();
+
+    // ========== GESTIÓN DE USUARIOS (Admin only) ==========
+    const USERS_STORAGE_KEY = 'chatbotbo_users_db';
+    let editingUser = null;
+
+    function loadUsers() {
+      if (!currentUser || currentUser.role !== 'admin') {
+        alert('Solo usuarios Admin pueden gestionar usuarios');
+        return;
+      }
+      
+      const users = getUsersFromStorage();
+      const checkbox = document.getElementById('show-inactive-users');
+      const showInactive = checkbox ? checkbox.checked : false;
+      
+      const activeUsers = Object.values(users).filter(u => u.activo !== false);
+      const inactiveUsers = Object.values(users).filter(u => u.activo === false);
+      
+      // Si showInactive es true, mostramos TODOS (activos + inactivos)
+      // Si showInactive es false, mostramos solo activos
+      renderUsersTable(users, showInactive);
+      
+      const count = showInactive ? Object.keys(users).length : activeUsers.length;
+      
+      document.getElementById('users-count').textContent = `${count} usuario${count !== 1 ? 's' : ''}${inactiveUsers.length > 0 ? ` (${inactiveUsers.length} inactivos)` : ''}`;
+      document.getElementById('users-summary').innerHTML = `
+        <div class="mini-stats">
+          <div class="mini-stat" style="border-left-color:#10b981"><h4>${activeUsers.filter(u => u.role === 'admin').length}</h4><p>Admins</p></div>
+          <div class="mini-stat" style="border-left-color:#f59e0b"><h4>${activeUsers.filter(u => u.role === 'editor').length}</h4><p>Editores</p></div>
+          ${inactiveUsers.length > 0 ? `<div class="mini-stat" style="border-left-color:#94a3b8"><h4>${inactiveUsers.length}</h4><p>Inactivos</p></div>` : ''}
+        </div>`;
+    }
+    
+    function toggleInactiveUsers() {
+      const checkbox = document.getElementById('show-inactive-users');
+      console.log('Checkbox inactivos:', checkbox.checked);
+      loadUsers();
+    }
+
+    function renderUsersTable(users, showInactive = false) {
+      const tbody = document.getElementById('users-body');
+      tbody.innerHTML = '';
+      
+      const roleColors = { admin: '#10b981', editor: '#f59e0b' };
+      const roleLabels = { admin: 'Admin', editor: 'Editor' };
+      const permTexts = {
+        admin: 'Todo: reindexar, borrar, editar, gestionar usuarios',
+        editor: 'Editar datos, ver logs. No reindexar/borrar'
+      };
+      
+      Object.entries(users).forEach(([username, user]) => {
+        const isActive = user.activo !== false;
+        if (!isActive && !showInactive) return;
+        
+        const tr = document.createElement('tr');
+        tr.style.opacity = isActive ? '1' : '0.6';
+        tr.style.background = isActive ? '' : '#f8fafc';
+        
+        tr.innerHTML = `
+          <td><strong>${username}</strong>${!isActive ? ' <span style="color:#94a3b8;font-size:.75rem">(INACTIVO)</span>' : ''}</td>
+          <td>${user.name}</td>
+          <td><span style="color:${roleColors[user.role]};font-weight:600">${roleLabels[user.role]}</span></td>
+          <td style="font-size:.85rem;color:#64748b">${permTexts[user.role]}</td>
+          <td>
+            <button class="btn btn-secondary mini" onclick="editUser('${username}')">Editar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function saveUsersToStorage(users) {
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    }
+
+    function getUsersFromStorage() {
+      const stored = localStorage.getItem(USERS_STORAGE_KEY);
+      if (!stored) {
+        // Inicializar con usuarios por defecto
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(USERS_DB));
+        console.log('Inicializando usuarios por defecto:', USERS_DB);
+        return { ...USERS_DB };
+      }
+      return JSON.parse(stored);
+    }
+
+    function showUserForm() {
+      editingUser = null;
+      document.getElementById('user-form-title').textContent = 'Nuevo Usuario';
+      document.getElementById('new-user-username').value = '';
+      document.getElementById('new-user-username').disabled = false;
+      document.getElementById('new-user-name').value = '';
+      document.getElementById('new-user-password').value = '';
+      document.getElementById('new-user-role').value = 'editor';
+      document.getElementById('btn-delete-user').style.display = 'none';
+      document.getElementById('btn-reactivate-user').style.display = 'none';
+      document.getElementById('user-form-msg').style.display = 'none';
+      document.getElementById('user-form-container').style.display = 'block';
+    }
+
+    function editUser(username) {
+      console.log('Editando usuario:', username);
+      const users = getUsersFromStorage();
+      console.log('Usuarios cargados:', Object.keys(users));
+      const user = users[username];
+      if (!user) {
+        console.error('Usuario no encontrado:', username);
+        alert('Error: Usuario no encontrado');
+        return;
+      }
+      
+      editingUser = username;
+      const isActive = user.activo !== false;
+      document.getElementById('user-form-title').textContent = `Editar: ${username} ${isActive ? '' : '(INACTIVO)'}`;
+      document.getElementById('new-user-username').value = username;
+      document.getElementById('new-user-username').disabled = true;
+      document.getElementById('new-user-name').value = user.name;
+      document.getElementById('new-user-password').value = '';
+      document.getElementById('new-user-password').placeholder = 'Dejar vacío para mantener actual';
+      document.getElementById('new-user-role').value = user.role;
+      
+      // Mostrar botón según estado
+      const canModify = username !== 'admin';
+      document.getElementById('btn-delete-user').style.display = (canModify && isActive) ? 'inline-block' : 'none';
+      document.getElementById('btn-reactivate-user').style.display = (canModify && !isActive) ? 'inline-block' : 'none';
+      
+      document.getElementById('user-form-msg').style.display = 'none';
+      document.getElementById('user-form-container').style.display = 'block';
+    }
+
+    function saveUser() {
+      const username = document.getElementById('new-user-username').value.trim().toLowerCase();
+      const name = document.getElementById('new-user-name').value.trim();
+      const password = document.getElementById('new-user-password').value;
+      const role = document.getElementById('new-user-role').value;
+      
+      const msgEl = document.getElementById('user-form-msg');
+      
+      // Validaciones
+      if (!username) { showFormMsg('El usuario es obligatorio', 'error'); return; }
+      if (!name) { showFormMsg('El nombre es obligatorio', 'error'); return; }
+      if (!editingUser && !password) { showFormMsg('La contraseña es obligatoria para nuevos usuarios', 'error'); return; }
+      if (password && password.length < 6) { showFormMsg('La contraseña debe tener al menos 6 caracteres', 'error'); return; }
+      
+      const users = getUsersFromStorage();
+      
+      // Si es nuevo, verificar que no exista
+      if (!editingUser && users[username]) {
+        showFormMsg(`El usuario "${username}" ya existe`, 'error');
+        return;
+      }
+      
+      // Guardar (mantener estado activo si existe, o crear como activo)
+      const existingUser = users[username];
+      users[username] = {
+        name: name,
+        role: role,
+        password: password || (existingUser ? existingUser.password : ''),
+        activo: existingUser ? existingUser.activo : true
+      };
+      
+      saveUsersToStorage(users);
+      showFormMsg(`Usuario "${username}" ${editingUser ? 'actualizado' : 'creado'} correctamente`, 'success');
+      
+      // Recargar tabla y cerrar formulario
+      setTimeout(() => {
+        loadUsers();
+        cancelUserForm();
+        console.log('Usuario guardado y formulario cerrado');
+      }, 800);
+    }
+
+    function deleteUser(username) {
+      if (username === 'admin') {
+        alert('No se puede desactivar el usuario admin principal');
+        return;
+      }
+      if (!confirm(`¿Desactivar al usuario "${username}"?\n\nEl usuario no podrá iniciar sesión pero sus datos se conservan.`)) return;
+      
+      const users = getUsersFromStorage();
+      if (users[username]) {
+        users[username].activo = false;
+        saveUsersToStorage(users);
+      }
+      
+      loadUsers();
+      if (editingUser === username) {
+        // Cerrar formulario si el usuario quedó inactivo (ya no se puede editar fácilmente)
+        const checkbox = document.getElementById('show-inactive-users');
+        if (!checkbox || !checkbox.checked) {
+          cancelUserForm(); // Cerrar si no estamos mostrando inactivos
+        } else {
+          editUser(username); // Recargar formulario para mostrar cambio
+        }
+      }
+    }
+
+    function deleteCurrentUser() {
+      if (editingUser) deleteUser(editingUser);
+    }
+    
+    function reactivateUser(username) {
+      if (!confirm(`¿Reactivar al usuario "${username}"?\n\nEl usuario podrá iniciar sesión nuevamente.`)) return;
+      
+      const users = getUsersFromStorage();
+      if (users[username]) {
+        users[username].activo = true;
+        saveUsersToStorage(users);
+      }
+      
+      loadUsers();
+      if (editingUser === username) editUser(username); // Recargar formulario para mostrar cambio
+    }
+    
+    function reactivateCurrentUser() {
+      if (editingUser) reactivateUser(editingUser);
+    }
+
+    function cancelUserForm() {
+      document.getElementById('user-form-container').style.display = 'none';
+      editingUser = null;
+    }
+
+    function showFormMsg(text, type) {
+      const el = document.getElementById('user-form-msg');
+      el.textContent = text;
+      el.style.display = 'block';
+      el.style.background = type === 'error' ? '#fee2e2' : '#dcfce7';
+      el.style.color = type === 'error' ? '#dc2626' : '#16a34a';
+    }
+
+    // Mostrar menú de usuarios solo para admin
+    function updateAdminMenu() {
+      if (currentUser && currentUser.role === 'admin') {
+        document.querySelectorAll('.admin-only').forEach(el => {
+          el.style.display = 'flex';
+          el.style.flexDirection = 'column';
+        });
+        // Si estamos en la vista de usuarios, cargar la lista
+        if (getCurrentView() === 'users') {
+          loadUsers();
+        }
+      }
+    }
+
+    // Modificar checkAuth para actualizar menú
+    const originalShowMainPanel = showMainPanel;
+    showMainPanel = function() {
+      originalShowMainPanel();
+      updateAdminMenu();
+      // Forzar applyView para cargar datos específicos de la vista actual
+      applyView();
+    };
+  </script>
+</body>
+</html>

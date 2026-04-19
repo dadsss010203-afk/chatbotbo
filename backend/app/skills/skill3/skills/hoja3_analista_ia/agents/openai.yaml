@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "Analista Hoja 3"
+  description: "Analiza y valida Hoja 3 con salida estructurada y calculo puntual trazable."
+  default_prompt: "Usa esta skill para revisar, limpiar, validar y resumir la Hoja 3. Para calculos puntuales usa el wrapper bash backend/app/skills/skill3/tools/calcular_hoja3_json.sh y devuelve el resultado con trazabilidad."

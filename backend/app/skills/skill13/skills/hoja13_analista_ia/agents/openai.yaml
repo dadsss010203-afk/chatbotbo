@@ -1,0 +1,5 @@
+version: 1
+interface:
+  display_name: "Analista Hoja 13"
+  description: "Analiza y valida Hoja 13 con salida estructurada y calculo puntual trazable."
+  default_prompt: "Usa esta skill para revisar, limpiar, validar y resumir la Hoja 13. Para calculos puntuales usa el wrapper bash backend/app/skills/skill13/tools/calcular_hoja13_json.sh y devuelve el resultado con trazabilidad."
