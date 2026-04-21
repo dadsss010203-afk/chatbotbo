@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{
   --y900:#7A4F00;--y700:#C8860E;--y500:#F5A623;--y400:#FFC145;--y200:#FFE49A;--y100:#FFF8E1;
@@ -150,6 +151,20 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .td:nth-child(2){background:var(--b700);animation-delay:0.18s}
 .td:nth-child(3){background:var(--y500);animation-delay:0.36s}
 @keyframes tdBounce{0%,100%{transform:translateY(0);opacity:0.4}50%{transform:translateY(-6px);opacity:1}}
+
+/* Cursor parpadeante para efecto máquina de escribir */
+.typing-cursor{
+  display:inline-block;
+  color:var(--b700);
+  font-weight:300;
+  animation:cursorBlink 0.8s ease-in-out infinite;
+  margin-left:2px;
+}
+@keyframes cursorBlink{
+  0%,100%{opacity:1}
+  50%{opacity:0}
+}
+
 .scard{background:var(--white);border:1.5px solid var(--border2);border-radius:16px;overflow:hidden;max-width:248px;box-shadow:var(--shd2)}
 .sc-head{background:linear-gradient(135deg,var(--b900),var(--b700));padding:12px 14px;display:flex;align-items:center;gap:10px;position:relative;overflow:hidden}
 .sc-head::after{content:'✦';position:absolute;right:10px;bottom:-10px;font-size:40px;color:rgba(245,166,35,0.20);line-height:1}
@@ -188,6 +203,10 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 .f-brand b{color:var(--y700);font-weight:700}
 .tarifa-toggle{border:1px solid var(--border);background:var(--white);color:var(--b900);border-radius:9px;padding:5px 10px;font-size:0.62rem;font-weight:700;cursor:pointer}
 .tarifa-toggle.active{background:#fff2ef;border-color:rgba(180,66,49,.35);color:#b44231}
+.tracking-toggle{border:1px solid var(--border);background:var(--white);color:var(--b900);border-radius:9px;padding:5px 10px;font-size:0.62rem;font-weight:700;cursor:pointer}
+.tracking-toggle.active{background:#eef7ff;border-color:rgba(37,99,235,.32);color:#1d4ed8}
+.nearby-toggle{border:1px solid var(--border);background:var(--white);color:var(--b900);border-radius:9px;padding:5px 10px;font-size:0.62rem;font-weight:700;cursor:pointer}
+.nearby-toggle:hover{background:#f0f9eb;border-color:rgba(74,124,23,.32);color:#4a7c17}
 
 #confirm-bar{display:none;background:var(--paper);border-top:1.5px solid var(--border);padding:10px 12px;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;animation:barIn 0.18s ease}
 @keyframes barIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
@@ -317,6 +336,8 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
     <div class="f-meta">
       <span class="f-hint">Enter para enviar</span>
       <button type="button" id="tarifa-toggle" class="tarifa-toggle" onclick="toggleTarifaMode()">Tarifas</button>
+      <button type="button" id="tracking-toggle" class="tracking-toggle" onclick="toggleTrackingMode()">Rastreo</button>
+      <button type="button" id="nearby-toggle" class="nearby-toggle" onclick="findNearestBranch()">  Cercana</button>
       <span class="f-brand">Powered by <b>AGBC IA</b></span>
     </div>
   </div>
@@ -347,7 +368,16 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
 let chatOpen=false, welcomeLoaded=false, busy=false, ctrl=null, lang='es';
 let translating=false; // flag para evitar traducciones simultáneas
 let tarifaMode=false;
+let trackingMode=false;
 let sid = localStorage.getItem('chat_sid') || '';
+let currentRequestId='';
+
+function newRequestId(){
+  if(window.crypto && typeof window.crypto.randomUUID==='function'){
+    return window.crypto.randomUUID();
+  }
+  return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
 
 // ─── TEXTOS POR IDIOMA ────────────────────────
 const TX={
@@ -470,7 +500,17 @@ async function translateConversation(){
 
 // ─── UI HELPERS ───────────────────────────────
 function setStop(v){document.getElementById('stop').classList.toggle('vis',v);document.getElementById('send').style.display=v?'none':'flex';}
-function stopResp(){if(ctrl){ctrl.abort();ctrl=null;}}
+function stopResp(){
+  if(!ctrl) return;
+  fetch('/api/chat/cancel',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({sid,request_id:currentRequestId}),
+  }).catch(()=>{});
+  ctrl.abort();
+  ctrl=null;
+  currentRequestId='';
+}
 function minimize(){document.getElementById('chat-window').classList.remove('open');chatOpen=false;}
 function now(){return new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});}
 function setTarifaModeUI(){
@@ -478,6 +518,13 @@ function setTarifaModeUI(){
   if(!btn) return;
   btn.classList.toggle('active', tarifaMode);
   btn.textContent = tarifaMode ? 'Cancelar tarifa' : 'Tarifas';
+}
+
+function setTrackingModeUI(){
+  const btn=document.getElementById('tracking-toggle');
+  if(!btn) return;
+  btn.classList.toggle('active', trackingMode);
+  btn.textContent = trackingMode ? 'Cancelar rastreo' : 'Rastreo';
 }
 
 async function cancelTarifaMode(notify=true){
@@ -502,10 +549,35 @@ async function cancelTarifaMode(notify=true){
   }
 }
 
+async function cancelTrackingMode(notify=true){
+  trackingMode=false;
+  setTrackingModeUI();
+  try{
+    const res = await fetch('/api/tracking/cancel',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sid}),
+    });
+    const data = await res.json();
+    if(data && data.sid){
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+  }catch(e){
+    console.warn('No se pudo cancelar flujo tracking:', e);
+  }
+  if(notify){
+    addMsg('Modo rastreo cancelado. Volviste al chat general.','b',false,null,true,null);
+  }
+}
+
 async function toggleTarifaMode(){
   if(tarifaMode){
     await cancelTarifaMode(true);
     return;
+  }
+  if(trackingMode){
+    await cancelTrackingMode(false);
   }
   tarifaMode=true;
   setTarifaModeUI();
@@ -524,6 +596,34 @@ async function toggleTarifaMode(){
     addQuickReplies(Array.isArray(data.quick_replies) ? data.quick_replies : []);
   }catch(e){
     addMsg('Modo tarifas activado. ¿Qué servicio quieres usar?','b',false,null,true,null);
+  }
+}
+
+async function toggleTrackingMode(){
+  if(trackingMode){
+    await cancelTrackingMode(true);
+    return;
+  }
+  if(tarifaMode){
+    await cancelTarifaMode(false);
+  }
+  trackingMode=true;
+  setTrackingModeUI();
+  try{
+    const res = await fetch('/api/tracking/start',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sid,lang}),
+    });
+    const data = await res.json();
+    if(data && data.sid){
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+    addMsg(data.response||'Envíame tu código de rastreo.','b',false,null,true,data.conversation_log_id||null);
+    addQuickReplies(Array.isArray(data.quick_replies) ? data.quick_replies : []);
+  }catch(e){
+    addMsg('Modo rastreo activado. Envíame tu código de rastreo.','b',false,null,true,null);
   }
 }
 
@@ -560,6 +660,30 @@ async function rateConversation(logId, rating, likeBtn, dislikeBtn){
   }catch(e){
     console.warn('No se pudo guardar rating:', e);
   }
+}
+
+function appendBotActions(body, conversationLogId){
+  if(!conversationLogId) return;
+  const acts=document.createElement('div');acts.className='msg-actions';
+
+  const likeBtn=document.createElement('button');
+  likeBtn.className='btn-rate';
+  likeBtn.type='button';
+  likeBtn.title='Me gustó esta respuesta';
+  likeBtn.textContent='👍';
+
+  const dislikeBtn=document.createElement('button');
+  dislikeBtn.className='btn-rate';
+  dislikeBtn.type='button';
+  dislikeBtn.title='No me gustó esta respuesta';
+  dislikeBtn.textContent='👎';
+
+  likeBtn.onclick=()=>rateConversation(conversationLogId,'like',likeBtn,dislikeBtn);
+  dislikeBtn.onclick=()=>rateConversation(conversationLogId,'dislike',likeBtn,dislikeBtn);
+
+  acts.appendChild(likeBtn);
+  acts.appendChild(dislikeBtn);
+  body.appendChild(acts);
 }
 
 function addMsg(text,type,bye=false,loc=null,noTranslate=false,conversationLogId=null){
@@ -599,30 +723,26 @@ function addMsg(text,type,bye=false,loc=null,noTranslate=false,conversationLogId
     body.appendChild(b);body.appendChild(tm);
     // Botón de traducción individual (solo para burbujas normales)
     if(!bye && !noTranslate){
-      const acts=document.createElement('div'); acts.className='msg-actions';
-      if(type==='b' && conversationLogId){
-        const likeBtn=document.createElement('button');
-        likeBtn.className='btn-rate';
-        likeBtn.type='button';
-        likeBtn.title='Me gustó esta respuesta';
-        likeBtn.textContent='👍';
-        likeBtn.onclick=()=>rateConversation(conversationLogId,'like',likeBtn,dislikeBtn);
-
-        const dislikeBtn=document.createElement('button');
-        dislikeBtn.className='btn-rate';
-        dislikeBtn.type='button';
-        dislikeBtn.title='No me gustó esta respuesta';
-        dislikeBtn.textContent='👎';
-        dislikeBtn.onclick=()=>rateConversation(conversationLogId,'dislike',likeBtn,dislikeBtn);
-
-        acts.appendChild(likeBtn);
-        acts.appendChild(dislikeBtn);
-      }
-      body.appendChild(acts);
+      if(type==='b') appendBotActions(body, conversationLogId);
     }
     wrap.appendChild(mkAv(type));wrap.appendChild(body);
   }
   chat.appendChild(wrap);chat.scrollTop=chat.scrollHeight;
+}
+
+function createStreamingBotMessage(){
+  document.getElementById('welcomeCard')?.remove();
+  const chat=document.getElementById('chat');
+  const wrap=document.createElement('div');wrap.className='msg b';
+  const bubble=document.createElement('div');bubble.className='bub';bubble.textContent='';
+  bubble.dataset.original='';
+  const tm=document.createElement('span');tm.className='msg-time';tm.textContent=now();
+  const body=document.createElement('div');
+  body.style.cssText='display:flex;flex-direction:column;align-items:flex-start';
+  body.appendChild(bubble);body.appendChild(tm);
+  wrap.appendChild(mkAv('b'));wrap.appendChild(body);
+  chat.appendChild(wrap);chat.scrollTop=chat.scrollHeight;
+  return {wrap,body,bubble};
 }
 
 // ─── TRADUCIR MENSAJE INDIVIDUAL ─────────────
@@ -683,6 +803,250 @@ function addQuickReplies(options){
   chat.scrollTop=chat.scrollHeight;
 }
 
+// ─── QR CODE PARA RASTREO ─────────────────────
+function addTrackingQR(trackingUrl, codigo){
+  const chat=document.getElementById('chat');
+  const wrap=document.createElement('div');
+  wrap.className='msg b qr-message';
+  
+  const body=document.createElement('div');
+  body.className='bub';
+  body.style.background='var(--white)';
+  body.style.border='1px solid var(--border)';
+  body.style.borderRadius='12px';
+  body.style.padding='12px';
+  
+  // Título
+  const title=document.createElement('div');
+  title.textContent='📱 Escanea para rastrear en tu celular';
+  title.style.fontSize='0.75rem';
+  title.style.fontWeight='600';
+  title.style.color='var(--b700)';
+  title.style.marginBottom='8px';
+  body.appendChild(title);
+  
+  // Contenedor del QR
+  const qrContainer=document.createElement('div');
+  qrContainer.id='qr-'+codigo;
+  qrContainer.style.display='flex';
+  qrContainer.style.justifyContent='center';
+  qrContainer.style.padding='8px';
+  qrContainer.style.background='white';
+  qrContainer.style.borderRadius='8px';
+  body.appendChild(qrContainer);
+  
+  // Link debajo
+  const link=document.createElement('a');
+  link.href=trackingUrl;
+  link.target='_blank';
+  link.textContent='🔗 Abrir en web de Correos';
+  link.style.display='block';
+  link.style.marginTop='8px';
+  link.style.fontSize='0.7rem';
+  link.style.color='var(--b500)';
+  link.style.textAlign='center';
+  body.appendChild(link);
+  
+  wrap.appendChild(mkAv('b'));
+  wrap.appendChild(body);
+  chat.appendChild(wrap);
+  chat.scrollTop=chat.scrollHeight;
+  
+  // Generar QR
+  try{
+    new QRCode(qrContainer,{
+      text:trackingUrl,
+      width:128,
+      height:128,
+      colorDark:'#0B1F4E',
+      colorLight:'#ffffff',
+      correctLevel:QRCode.CorrectLevel.M
+    });
+  }catch(e){
+    console.error('Error generando QR:',e);
+    qrContainer.innerHTML='<div style="padding:20px;color:#999;font-size:0.7rem">Ver en: '+trackingUrl+'</div>';
+  }
+  chat.scrollTop=chat.scrollHeight;
+}
+
+// ─── GEOLOCALIZACIÓN - SUCURSAL CERCANA ─────────
+let isLocating = false; // Flag para evitar llamadas múltiples
+
+async function findNearestBranch(){
+  console.log('[GEO] Iniciando findNearestBranch, isLocating:', isLocating);
+  if(isLocating){
+    console.log('[GEO] Ya hay una búsqueda en curso, ignorando');
+    return;
+  }
+  if(!navigator.geolocation){
+    console.log('[GEO] ERROR: Navegador no soporta geolocalización');
+    addMsg('❌ Tu navegador no soporta geolocalización.','b');
+    return;
+  }
+  isLocating = true;
+  addMsg('  Solicitando acceso a tu ubicación...','b');
+  
+  navigator.geolocation.getCurrentPosition(
+    async (position)=>{
+      const lat=position.coords.latitude;
+      const lng=position.coords.longitude;
+      console.log('[GEO] Posición obtenida:', lat, lng);
+      
+      try{
+        const res=await fetch('/api/sucursal/cercana',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({lat,lng,lang,sid})
+        });
+        const data=await res.json();
+        
+        if(data.ok && data.sucursal){
+          console.log('[GEO] Sucursal encontrada:', data.sucursal.nombre);
+          addMsg(data.response,'b');
+          // Mostrar mapa con ubicación
+          addBranchMap(data.mi_ubicacion,data.sucursal);
+          // Agregar quick replies
+          if(data.quick_replies){
+            addQuickReplies(data.quick_replies);
+          }
+        }else{
+          console.log('[GEO] No se encontró sucursal:', data);
+          addMsg('❌ No se pudo encontrar sucursal cercana. Intenta con "sucursales" para ver la lista.','b');
+        }
+      }catch(e){
+        console.log('[GEO] Error en fetch:', e);
+        addMsg('❌ Error consultando sucursal cercana.','b');
+        console.error(e);
+      } finally {
+        isLocating = false;
+        console.log('[GEO] Finalizado, isLocating reseteado');
+      }
+    },
+    (err)=>{
+      console.log('[GEO] ERROR geolocalización:', err.code, err.message);
+      isLocating = false;
+      console.log('[GEO] Error geolocalización, isLocating reseteado');
+      let msg='❌ No se pudo obtener tu ubicación.';
+      let sugerencia=' Escribe "sucursales" para ver la lista completa.';
+      if(err.code===1) msg='❌ Permiso de ubicación denegado.'+sugerencia;
+      if(err.code===2) msg='❌ Ubicación no disponible.'+sugerencia;
+      if(err.code===3) msg='❌ Tiempo de espera agotado.'+sugerencia;
+      addMsg(msg,'b');
+      console.log('[GEO] Mensaje de error mostrado, no debería ejecutarse más código');
+    },
+    {enableHighAccuracy:true,timeout:10000,maximumAge:0}
+  );
+}
+
+function addBranchesList(branches){
+  let texto = 'Nuestras oficinas:\n\n';
+  branches.forEach(s => {
+    const isCentral = s.nombre.includes('Central');
+    const nombre = s.nombre.replace('Oficina Central: ','').replace('Regional: ','');
+    if (isCentral) {
+      texto += `   ${nombre} - Central\n`;
+    } else {
+      texto += `• ${nombre}\n`;
+    }
+  });
+  texto += '\nEscribe una ciudad para ver detalles.';
+  
+  addMsg(texto, 'b');
+}
+
+function suggestBranch(nombre){
+  const inp = document.getElementById('userInput');
+  inp.value = nombre;
+  sendMsg();
+}
+
+function addBranchMap(userLoc,sucursal){
+  const chat=document.getElementById('chat');
+  const wrap=document.createElement('div');
+  wrap.className='msg b map-message';
+  
+  const body=document.createElement('div');
+  body.className='bub';
+  body.style.background='var(--white)';
+  body.style.border='1px solid var(--border)';
+  body.style.borderRadius='12px';
+  body.style.padding='8px';
+  body.style.width='100%';
+  body.style.maxWidth='320px';
+  
+  // Título
+  const title=document.createElement('div');
+  title.textContent='🗺️ Sucursal más cercana';
+  title.style.fontSize='0.75rem';
+  title.style.fontWeight='600';
+  title.style.color='var(--b700)';
+  title.style.marginBottom='8px';
+  title.style.textAlign='center';
+  body.appendChild(title);
+  
+  // Contenedor del mapa
+  const mapDiv=document.createElement('div');
+  mapDiv.id='map-'+Date.now();
+  mapDiv.style.height='200px';
+  mapDiv.style.borderRadius='8px';
+  mapDiv.style.overflow='hidden';
+  body.appendChild(mapDiv);
+  
+  // Info de la sucursal
+  const info=document.createElement('div');
+  info.style.marginTop='8px';
+  info.style.fontSize='0.7rem';
+  info.style.color='var(--ink2)';
+  info.innerHTML=`
+    <strong>${sucursal.nombre||'Sucursal'}</strong><br>
+      ${sucursal.direccion||'Dirección no disponible'}<br>
+    📏 Distancia: ${sucursal.distancia_km||'?'} km<br>
+    🕐 Horario: ${sucursal.horario||'Consultar'}
+  `;
+  body.appendChild(info);
+  
+  wrap.appendChild(mkAv('b'));
+  wrap.appendChild(body);
+  chat.appendChild(wrap);
+  chat.scrollTop=chat.scrollHeight;
+  
+  // Inicializar mapa de Leaflet
+  setTimeout(()=>{
+    try{
+      const map=L.map(mapDiv.id).setView([sucursal.lat,sucursal.lng],13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+        attribution:'© OpenStreetMap'
+      }).addTo(map);
+      
+      // Marcador de usuario (azul)
+      const userIcon=L.divIcon({
+        className:'user-marker',
+        html:'<div style="background:#2255B8;width:12px;height:12px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
+        iconSize:[16,16]
+      });
+      L.marker([userLoc.lat,userLoc.lng],{icon:userIcon}).addTo(map).bindPopup('Tú');
+      
+      // Marcador de sucursal (rojo/dorado)
+      const branchIcon=L.divIcon({
+        className:'branch-marker',
+        html:'<div style="background:#F5A623;width:16px;height:16px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
+        iconSize:[20,20]
+      });
+      L.marker([sucursal.lat,sucursal.lng],{icon:branchIcon}).addTo(map).bindPopup(sucursal.nombre||'Sucursal');
+      
+      // Ajustar vista para ver ambos marcadores
+      const bounds=L.latLngBounds([
+        [userLoc.lat,userLoc.lng],
+        [sucursal.lat,sucursal.lng]
+      ]);
+      map.fitBounds(bounds,{padding:[20,20]});
+    }catch(e){
+      console.error('Error mapa:',e);
+      mapDiv.innerHTML='<div style="padding:20px;color:#999">🗺️ Mapa no disponible</div>';
+    }
+  },100);
+}
+
 function quickRepliesFromTarifa(data){
   const missing = data && data.tarifa && Array.isArray(data.tarifa.missing) ? data.tarifa.missing : [];
   if(missing.includes('alcance')){
@@ -729,38 +1093,103 @@ async function sendMsg(msg){
   inp.disabled=true;setStop(true);
   addMsg(msg,'u');showTyping();
   ctrl=new AbortController();
+  currentRequestId=newRequestId();
   try{
-    const res=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({message:msg,lang,sid,tarifa_mode:tarifaMode}),signal:ctrl.signal});
-    const data=await res.json();
-    if(data && data.sid){
-      sid = data.sid;
-      localStorage.setItem('chat_sid', sid);
-    }
-    removeTyping();
-    const bye=data.despedida===true;
-    addMsg(
-      data.response||data.error||'Sin respuesta disponible',
-      'b',
-      bye,
-      data.ubicacion||null,
-      data.no_translate,
-      data.conversation_log_id||null
-    );
-    if(data?.tarifa?.requires_mode){
-      tarifaMode=false;
-      setTarifaModeUI();
-    }
-    addQuickReplies((Array.isArray(data.quick_replies)&&data.quick_replies.length>0)?data.quick_replies:quickRepliesFromTarifa(data));
-    if(bye){
-      inp.disabled=true;inp.placeholder=(TX[lang]||TX.es).bye;
-      setStop(false);document.getElementById('send').disabled=true;return;
+    const res=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:msg,lang,sid,request_id:currentRequestId,tarifa_mode:tarifaMode,tracking_mode:trackingMode}),signal:ctrl.signal});
+    if(!res.ok || !res.body) throw new Error('stream_failed');
+
+    const reader=res.body.getReader();
+    const decoder=new TextDecoder();
+    let buffer='';
+    let streamMsg=null;
+
+    while(true){
+      const {value,done}=await reader.read();
+      if(done) break;
+      buffer+=decoder.decode(value,{stream:true});
+      const lines=buffer.split('\n');
+      buffer=lines.pop()||'';
+
+      for(const line of lines){
+        if(!line.trim()) continue;
+        const evt=JSON.parse(line);
+
+        if(evt.type==='start'){
+          if(evt.sid){
+            sid=evt.sid;
+            localStorage.setItem('chat_sid',sid);
+          }
+          continue;
+        }
+
+        if(evt.type==='token'){
+          if(!streamMsg){
+            removeTyping();
+            streamMsg=createStreamingBotMessage();
+            streamMsg._fullText='';
+          }
+          // Acumular texto y mostrar directamente
+          streamMsg._fullText+=evt.content||'';
+          streamMsg.bubble.textContent=streamMsg._fullText;
+          streamMsg.bubble.dataset.original=streamMsg._fullText;
+          const chat=document.getElementById('chat');
+          chat.scrollTop=chat.scrollHeight;
+          continue;
+        }
+
+        if(evt.type==='end'){
+          const data=evt;
+          if(data && data.sid){
+            sid = data.sid;
+            localStorage.setItem('chat_sid', sid);
+          }
+          removeTyping();
+          const bye=data.despedida===true;
+
+          if(streamMsg){
+            const finalText=data.response||streamMsg.bubble.textContent||'Sin respuesta disponible';
+            streamMsg.bubble.textContent=finalText;
+            streamMsg.bubble.dataset.original=finalText;
+            if(!bye && !data.no_translate){
+              appendBotActions(streamMsg.body, data.conversation_log_id||null);
+            }
+          }else{
+            addMsg(
+              data.response||data.error||'Sin respuesta disponible',
+              'b',
+              bye,
+              data.ubicacion||null,
+              data.no_translate,
+              data.conversation_log_id||null
+            );
+          }
+
+          if(data?.tarifa?.requires_mode){
+            tarifaMode=false;
+            setTarifaModeUI();
+          }
+          // Si hay tracking con URL, mostrar QR
+          if(data?.tracking?.tracking_url && data?.tracking?.codigo){
+            addTrackingQR(data.tracking.tracking_url, data.tracking.codigo);
+          }
+          // Si es lista de sucursales, mostrar diseño mejorado
+          if(data?.response_type === 'branches_list' && data?.branches){
+            addBranchesList(data.branches);
+          }
+          addQuickReplies((Array.isArray(data.quick_replies)&&data.quick_replies.length>0)?data.quick_replies:quickRepliesFromTarifa(data));
+          if(bye){
+            inp.disabled=true;inp.placeholder=(TX[lang]||TX.es).bye;
+            setStop(false);document.getElementById('send').disabled=true;return;
+          }
+        }
+      }
     }
   }catch(e){
     removeTyping();
     addMsg(e.name==='AbortError'?'Consulta cancelada.':'Error de conexión. Verifique que el servidor esté activo.','b');
   }
-  ctrl=null;busy=false;setStop(false);inp.disabled=false;inp.focus();
+  ctrl=null;currentRequestId='';busy=false;setStop(false);inp.disabled=false;inp.focus();
 }
 
 function suggest(btn){sendMsg(btn.textContent);}
@@ -800,6 +1229,7 @@ async function doClear(){
   inp.disabled=false;inp.placeholder=t.ph;
   document.getElementById('send').disabled=false;
   tarifaMode=false;setTarifaModeUI();
+  trackingMode=false;setTrackingModeUI();
   busy=false;setStop(false);welcomeLoaded=true;loadWelcome();
 }
 
@@ -842,6 +1272,7 @@ function closeMap(){document.getElementById('mapa-modal').classList.remove('open
 document.getElementById('mapa-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeMap();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeMap();if(chatOpen)minimize();}});
 setTarifaModeUI();
+setTrackingModeUI();
 </script>
 </body>
 </html>

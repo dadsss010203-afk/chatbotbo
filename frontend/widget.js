@@ -103,6 +103,7 @@ function initWidget(s) {
 
   if (lang !== 'es') setLang(lang);
   setTarifaModeUI();
+  setTrackingModeUI();
 
   console.log('Chat Bubble Widget - Correos de Bolivia cargado');
 }
@@ -115,7 +116,16 @@ let translating = false;
 let ctrl        = null;
 let mapInst     = null;
 let tarifaMode  = false;
+let trackingMode = false;
 let sid         = localStorage.getItem('chat_sid') || '';
+let currentRequestId = '';
+
+function newRequestId() {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+    return window.crypto.randomUUID();
+  }
+  return `req_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
 
 // ─── TEXTOS POR IDIOMA ─────────────────────────────
 const TX = {
@@ -182,6 +192,13 @@ function setTarifaModeUI() {
   btn.textContent = tarifaMode ? 'Cancelar tarifa' : 'Tarifas';
 }
 
+function setTrackingModeUI() {
+  const btn = document.getElementById('tracking-toggle');
+  if (!btn) return;
+  btn.classList.toggle('active', trackingMode);
+  btn.textContent = trackingMode ? 'Cancelar rastreo' : 'Rastreo';
+}
+
 async function cancelTarifaMode(notify = true) {
   tarifaMode = false;
   setTarifaModeUI();
@@ -202,10 +219,33 @@ async function cancelTarifaMode(notify = true) {
   if (notify) addMsg('Modo tarifas cancelado. Volviste al chat general.', 'b', false, null);
 }
 
+async function cancelTrackingMode(notify = true) {
+  trackingMode = false;
+  setTrackingModeUI();
+  try {
+    const res = await fetch(`${API_URL}/tracking/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid }),
+    });
+    const data = await res.json();
+    if (data && data.sid) {
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+  } catch (e) {
+    console.warn('No se pudo cancelar flujo tracking:', e);
+  }
+  if (notify) addMsg('Modo rastreo cancelado. Volviste al chat general.', 'b', false, null);
+}
+
 async function toggleTarifaMode() {
   if (tarifaMode) {
     await cancelTarifaMode(true);
     return;
+  }
+  if (trackingMode) {
+    await cancelTrackingMode(false);
   }
   tarifaMode = true;
   setTarifaModeUI();
@@ -224,6 +264,34 @@ async function toggleTarifaMode() {
     addQuickReplies(Array.isArray(data.quick_replies) ? data.quick_replies : []);
   } catch (e) {
     addMsg('Modo tarifas activado. ¿Qué servicio quieres usar?', 'b', false, null);
+  }
+}
+
+async function toggleTrackingMode() {
+  if (trackingMode) {
+    await cancelTrackingMode(true);
+    return;
+  }
+  if (tarifaMode) {
+    await cancelTarifaMode(false);
+  }
+  trackingMode = true;
+  setTrackingModeUI();
+  try {
+    const res = await fetch(`${API_URL}/tracking/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid, lang }),
+    });
+    const data = await res.json();
+    if (data && data.sid) {
+      sid = data.sid;
+      localStorage.setItem('chat_sid', sid);
+    }
+    addMsg(data.response || 'Envíame tu código de rastreo.', 'b', false, data.conversation_log_id || null);
+    addQuickReplies(Array.isArray(data.quick_replies) ? data.quick_replies : []);
+  } catch (e) {
+    addMsg('Modo rastreo activado. Envíame tu código de rastreo.', 'b', false, null);
   }
 }
 
@@ -540,11 +608,12 @@ async function sendMsg(msg) {
   addMsg(msg, 'u');
   showTyping();
   ctrl = new AbortController();
+  currentRequestId = newRequestId();
   try {
     const res  = await fetch(`${API_URL}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg, lang, sid, tarifa_mode: tarifaMode }),
+      body: JSON.stringify({ message: msg, lang, sid, request_id: currentRequestId, tarifa_mode: tarifaMode, tracking_mode: trackingMode }),
       signal: ctrl.signal
     });
     const data = await res.json();
@@ -572,6 +641,7 @@ async function sendMsg(msg) {
     addMsg(e.name === 'AbortError' ? 'Consulta cancelada.' : 'Error de conexión. Verifique que el servidor esté activo.', 'b');
   }
   ctrl = null;
+  currentRequestId = '';
   busy = false;
   setStop(false);
   inp.disabled = false;
@@ -579,7 +649,17 @@ async function sendMsg(msg) {
 }
 
 function suggest(btn) { sendMsg(btn.textContent); }
-function stopResp()   { if (ctrl) { ctrl.abort(); ctrl = null; } }
+function stopResp() {
+  if (!ctrl) return;
+  fetch(`${API_URL}/chat/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sid, request_id: currentRequestId }),
+  }).catch(() => {});
+  ctrl.abort();
+  ctrl = null;
+  currentRequestId = '';
+}
 
 // ─── LIMPIAR CONVERSACIÓN ──────────────────────────
 function clearConv() { document.getElementById('confirm-bar').classList.add('open'); }
@@ -625,6 +705,8 @@ async function doClear() {
   document.getElementById('send').disabled = false;
   tarifaMode = false;
   setTarifaModeUI();
+  trackingMode = false;
+  setTrackingModeUI();
   busy = false;
   setStop(false);
 }
@@ -675,7 +757,7 @@ async function openMap() {
   branches.forEach(s => {
     if (!s.lat || !s.lng) return;
     const m = L.marker([s.lat, s.lng], { icon: ico }).addTo(mapInst)
-      .bindPopup(`<div style="font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.5;color:#1A0E00"><strong>${s.nombre}</strong><br>📍 ${s.direccion || ''}<br>🕐 ${s.horario || ''}</div>`);
+      .bindPopup(`<div style="font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.5;color:#1A0E00"><strong>${s.nombre}</strong><br>  ${s.direccion || ''}<br>🕐 ${s.horario || ''}</div>`);
     const item = document.createElement('div');
     item.className = 'suc-item';
     item.innerHTML = `<div class="suc-ico"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div><div class="suc-nfo"><h4>${s.nombre}</h4><p>${s.direccion || 'No disponible'}<br>${s.horario || 'No disponible'}</p></div>`;

@@ -956,6 +956,21 @@ header::after {
   border-color: rgba(180,66,49,.35);
   color: #b44231;
 }
+.tracking-toggle {
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--b900);
+  border-radius: 9px;
+  padding: 5px 10px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tracking-toggle.active {
+  background: #eef7ff;
+  border-color: rgba(37,99,235,.32);
+  color: #1d4ed8;
+}
 
 /* ─── Confirm Bar ──────────────────────────────── */
 #confirm-bar {
