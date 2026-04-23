@@ -7,13 +7,21 @@ Compartido por todos los chatbots.
 import os
 import re
 import time
+import json
+import threading
 import requests
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
-LLM_MODEL             = os.environ.get("LLM_MODEL",         "correos-bot")
-OLLAMA_URL            = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
+#LOCAL
+# LLM_MODEL             = os.environ.get("LLM_MODEL",         "correos-bot")
+# OLLAMA_URL            = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
+#PRUEBA CON COLAB
+LLM_MODEL      = os.environ.get("LLM_MODEL",         "llama3.2:1b")
+OLLAMA_URL     = os.environ.get("OLLAMA_URL",        "https://nondeceivable-contributable-daryl.ngrok-free.dev/api/chat")
+
+
 OLLAMA_TIMEOUT        = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
 OLLAMA_RETRIES        = int(os.environ.get("OLLAMA_RETRIES", "2"))
 OLLAMA_RETRY_BACKOFF  = float(os.environ.get("OLLAMA_RETRY_BACKOFF", "0.5"))
@@ -21,6 +29,61 @@ OLLAMA_MAX_TOKENS     = os.environ.get("OLLAMA_MAX_TOKENS")
 OLLAMA_PROMPT_MAX_TOKENS = int(os.environ.get("OLLAMA_PROMPT_MAX_TOKENS", "3600"))
 
 _SESSION = requests.Session()
+_ACTIVE_LOCK = threading.Lock()
+_ACTIVE_REQUESTS: dict[str, dict] = {}
+
+
+class OllamaCancelled(Exception):
+    """La generación fue cancelada explícitamente por el usuario."""
+
+
+def _register_active_request(request_id: str, cancel_event: threading.Event) -> None:
+    with _ACTIVE_LOCK:
+        _ACTIVE_REQUESTS[request_id] = {"cancel_event": cancel_event, "response": None, "session": None}
+
+
+def _set_active_response(request_id: str, response) -> None:
+    with _ACTIVE_LOCK:
+        if request_id in _ACTIVE_REQUESTS:
+            _ACTIVE_REQUESTS[request_id]["response"] = response
+
+
+def _set_active_session(request_id: str, session) -> None:
+    with _ACTIVE_LOCK:
+        if request_id in _ACTIVE_REQUESTS:
+            _ACTIVE_REQUESTS[request_id]["session"] = session
+
+
+def _unregister_active_request(request_id: str) -> None:
+    with _ACTIVE_LOCK:
+        _ACTIVE_REQUESTS.pop(request_id, None)
+
+
+def cancel_request(request_id: str) -> bool:
+    with _ACTIVE_LOCK:
+        state = _ACTIVE_REQUESTS.get(request_id)
+        if not state:
+            return False
+        state["cancel_event"].set()
+        response = state.get("response")
+        session = state.get("session")
+    try:
+        if response is not None:
+            try:
+                raw = getattr(response, "raw", None)
+                if raw is not None:
+                    raw.close()
+            except Exception:
+                pass
+            response.close()
+    except Exception:
+        pass
+    try:
+        if session is not None:
+            session.close()
+    except Exception:
+        pass
+    return True
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
@@ -76,6 +139,7 @@ def llamar_ollama(
     mensajes : list,
     modelo   : str  = None,
     opciones : dict = None,
+    request_id: str | None = None,
 ) -> str:
     """
     Envía mensajes a Ollama y devuelve la respuesta como string.
@@ -96,23 +160,118 @@ def llamar_ollama(
     payload = {
         "model"   : modelo or LLM_MODEL,
         "messages": mensajes,
-        "stream"  : False,
+        "stream"  : bool(request_id),
         "options" : {**_default_options(), **(opciones or {})},
     }
 
     last_exception = None
-    for attempt in range(1, OLLAMA_RETRIES + 2):
-        try:
-            resp = _SESSION.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
-            resp.raise_for_status()
-            data = resp.json()
-            return data["message"]["content"]
-        except requests.exceptions.RequestException as exc:
-            last_exception = exc
-            if attempt > OLLAMA_RETRIES:
+    cancel_event = threading.Event() if request_id else None
+    if request_id and cancel_event is not None:
+        _register_active_request(request_id, cancel_event)
+    try:
+        for attempt in range(1, OLLAMA_RETRIES + 2):
+            try:
+                if request_id:
+                    request_session = requests.Session()
+                    _set_active_session(request_id, request_session)
+                    with request_session.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT, stream=True) as resp:
+                        _set_active_response(request_id, resp)
+                        resp.raise_for_status()
+                        partes = []
+                        for raw_line in resp.iter_lines(chunk_size=1, decode_unicode=True):
+                            if cancel_event is not None and cancel_event.is_set():
+                                raise OllamaCancelled("Generación cancelada por el usuario.")
+                            if not raw_line:
+                                continue
+                            data = json.loads(raw_line)
+                            fragmento = ((data.get("message") or {}).get("content") or "")
+                            if fragmento:
+                                partes.append(fragmento)
+                            if data.get("done"):
+                                break
+                        if cancel_event is not None and cancel_event.is_set():
+                            raise OllamaCancelled("Generación cancelada por el usuario.")
+                        return "".join(partes)
+                resp = _SESSION.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["message"]["content"]
+            except OllamaCancelled:
                 raise
-            time.sleep(OLLAMA_RETRY_BACKOFF * attempt)
-    raise last_exception
+            except requests.exceptions.RequestException as exc:
+                last_exception = exc
+                if cancel_event is not None and cancel_event.is_set():
+                    raise OllamaCancelled("Generación cancelada por el usuario.") from exc
+                if attempt > OLLAMA_RETRIES:
+                    raise
+                time.sleep(OLLAMA_RETRY_BACKOFF * attempt)
+        raise last_exception
+    finally:
+        if request_id:
+            _unregister_active_request(request_id)
+
+
+def stream_ollama(
+    mensajes: list,
+    modelo: str = None,
+    opciones: dict = None,
+    request_id: str | None = None,
+):
+    """
+    Envía mensajes a Ollama y produce fragmentos de respuesta conforme llegan.
+
+    Si se pasa `request_id`, la generación puede cancelarse usando
+    `cancel_request(request_id)`.
+    """
+    payload = {
+        "model": modelo or LLM_MODEL,
+        "messages": mensajes,
+        "stream": True,
+        "options": {**_default_options(), **(opciones or {})},
+    }
+
+    last_exception = None
+    cancel_event = threading.Event() if request_id else None
+    if request_id and cancel_event is not None:
+        _register_active_request(request_id, cancel_event)
+    try:
+        for attempt in range(1, OLLAMA_RETRIES + 2):
+            try:
+                request_session = requests.Session()
+                if request_id:
+                    _set_active_session(request_id, request_session)
+                with request_session.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT, stream=True) as resp:
+                    if request_id:
+                        _set_active_response(request_id, resp)
+                    resp.raise_for_status()
+                    for raw_line in resp.iter_lines(chunk_size=1, decode_unicode=True):
+                        if cancel_event is not None and cancel_event.is_set():
+                            raise OllamaCancelled("Generación cancelada por el usuario.")
+                        if not raw_line:
+                            continue
+                        data = json.loads(raw_line)
+                        fragmento = ((data.get("message") or {}).get("content") or "")
+                        if fragmento:
+                            yield fragmento
+                        if data.get("done"):
+                            break
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise OllamaCancelled("Generación cancelada por el usuario.")
+                    return
+            except OllamaCancelled:
+                raise
+            except requests.exceptions.RequestException as exc:
+                last_exception = exc
+                if cancel_event is not None and cancel_event.is_set():
+                    raise OllamaCancelled("Generación cancelada por el usuario.") from exc
+                if attempt > OLLAMA_RETRIES:
+                    raise
+                time.sleep(OLLAMA_RETRY_BACKOFF * attempt)
+        raise last_exception
+    finally:
+        if request_id:
+            _unregister_active_request(request_id)
+    
 
 
 # ─────────────────────────────────────────────

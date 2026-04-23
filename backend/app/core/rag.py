@@ -57,7 +57,7 @@ MAX_CONTEXT_CHARS  = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
 MAX_CONTEXT_TOKENS = int(os.environ.get("MAX_CONTEXT_TOKENS", "900"))
 MIN_CHUNK_CHARS    = int(os.environ.get("MIN_CHUNK_CHARS", "40"))
 RAG_VECTOR_STORE   = os.environ.get("RAG_VECTOR_STORE", "qdrant").lower()
-QDRANT_URL         = os.environ.get("QDRANT_URL", "http://qdrant:6333")
+QDRANT_URL         = os.environ.get("QDRANT_URL", "http://localhost:6333")
 QDRANT_COLLECTION  = os.environ.get("QDRANT_COLLECTION", "correos")
 USE_TRITON         = os.environ.get("USE_TRITON", "false").lower() in ("1", "true", "yes")
 TRITON_URL         = os.environ.get("TRITON_URL", "http://triton:8000")
@@ -81,7 +81,7 @@ def _use_triton() -> bool:
 
 
 def _qdrant_client() -> QdrantClient:
-    return QdrantClient(url=QDRANT_URL, prefer_grpc=False)
+    return QdrantClient(url=QDRANT_URL, prefer_grpc=False, timeout=30)
 
 
 def _qdrant_point_id(raw_id: str) -> str:
@@ -106,7 +106,7 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
         embedding_model  : nombre del modelo sentence-transformers
         collection_name  : nombre de la colección en ChromaDB (uno por chatbot)
     """
-    global _embedder, _client, _collection, _collection_name
+    global _embedder, _client, _collection, _collection_name, _use_qdrant, _chroma_path
 
     modelo = embedding_model or EMBEDDING_MODEL
     path   = chroma_path     or CHROMA_PATH
@@ -125,23 +125,52 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
     print(" Modelo de embeddings cargado (con ignore_mismatched_sizes)")
 
     if _use_qdrant():
-        client = _qdrant_client()
-        _client = client
-        _collection_name = collection_name
-        vector_size = _embedder.encode([""], show_progress_bar=False).shape[1]
         try:
-            collections = [c.name for c in client.get_collections().collections]
-        except Exception:
-            collections = []
-        if collection_name not in collections:
-            client.create_collection(
-                collection_name=collection_name,
-                vectors_config=qmodels.VectorParams(size=vector_size, distance=qmodels.Distance.COSINE),
+            # Intentar conectar a Qdrant con timeout corto
+            import socket
+            host = QDRANT_URL.replace("http://", "").replace("https://", "").split(":")[0]
+            port = int(QDRANT_URL.replace("http://", "").replace("https://", "").split(":")[1]) if ":" in QDRANT_URL else 6333
+            
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(2)  # 2 segundos timeout
+            result = sock.connect_ex((host, port))
+            sock.close()
+            
+            if result != 0:
+                raise Exception(f"Qdrant no responde en {QDRANT_URL}")
+            
+            client = QdrantClient(url=QDRANT_URL, timeout=30)
+            collections = client.get_collections().collections
+            collection_names = [c.name for c in collections]
+            if collection_name not in collection_names:
+                client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=models.VectorParams(
+                        size=_embedder.encode([""], show_progress_bar=False).shape[1],
+                        distance=models.Distance.COSINE
+                    )
+                )
+                print(f" Qdrant collection '{collection_name}' creada con vector_size={_embedder.encode([''], show_progress_bar=False).shape[1]}")
+            _collection = collection_name
+            _collection_name = collection_name
+            _client = client
+            count = client.count(collection_name=collection_name).count
+            print(f" Qdrant listo en '{QDRANT_URL}' ({count} chunks en '{collection_name}')")
+        except Exception as e:
+            print(f" ⚠️  Qdrant no disponible ({e}), usando ChromaDB local")
+            _use_qdrant = False
+            import chromadb
+            from chromadb.config import Settings
+            client      = chromadb.PersistentClient(
+                path=path,
+                settings=Settings(anonymized_telemetry=False),
             )
-            print(f" Qdrant collection '{collection_name}' creada con vector_size={vector_size}")
-        _collection = collection_name
-        count = client.count(collection_name=collection_name).count
-        print(f" Qdrant listo en '{QDRANT_URL}' ({count} chunks en '{collection_name}')")
+            _client = client
+            _collection_name = collection_name
+            def embed_function(texts):
+                return _embedder.encode(texts, show_progress_bar=False).tolist()
+            _collection = client.get_or_create_collection(name=collection_name, embedding_function=embed_function)
+            print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
     else:
         import chromadb
         from chromadb.config import Settings

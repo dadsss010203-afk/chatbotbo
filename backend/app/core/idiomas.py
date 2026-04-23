@@ -28,9 +28,14 @@ IDIOMA_DEFAULT = "es"
 IDIOMAS = {
     "es": {
         "nombre"       : "Español",
-        "bienvenida"   : (
-            "¡Hola! Bienvenido al asistente oficial de la Agencia Boliviana de Correos (AGBC). "
-            "Puedo ayudarte con envíos, sucursales, ubicaciones y más. ¿En qué puedo ayudarte hoy?"
+        "bienvenida": (
+            "¡Hola! Bienvenido al asistente oficial de Correos de Bolivia. "
+            "Puedo ayudarte con envíos, sucursales, ubicaciones y más.\n\n"
+            "• Presiona el botón TARIFAS para activar las consultas de tarifas de envío. "
+            "Presiónalo de nuevo para desactivarlo.\n"
+            "• Presiona el botón RASTREO para rastrear un paquete. "
+            "Presiónalo de nuevo para desactivarlo.\n\n"
+            "¿En qué puedo ayudarte hoy?"
         ),
         "saludo"       : (
             "¡Hola! Soy ChatbotBO, el asistente de Correos Bolivia. "
@@ -48,7 +53,7 @@ IDIOMAS = {
     "en": {
         "nombre"       : "English",
         "bienvenida"   : (
-            "Hello! Welcome to the official assistant of the Bolivian Postal Agency (AGBC). "
+            "Hello! Welcome to the official assistant of the Bolivian Postal. "
             "I can help you with shipments, branches, locations and more. How can I help you today?"
         ),
         "saludo"       : "Hello! I am the Correos Bolivia assistant. How can I help you?",
@@ -137,7 +142,7 @@ IDIOMAS = {
 
 def detectar_idioma(texto: str) -> str:
     texto_limpio = texto.strip()
-    if len(texto_limpio) < 4:
+    if len(texto_limpio) < 2:
         return IDIOMA_DEFAULT
     try:
         codigo = detect(texto_limpio)

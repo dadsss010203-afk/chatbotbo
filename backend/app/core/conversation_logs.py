@@ -28,6 +28,7 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TEXT NOT NULL,
                 session_id TEXT NOT NULL,
+                request_id TEXT,
                 question TEXT NOT NULL,
                 response TEXT NOT NULL,
                 lang TEXT,
@@ -49,12 +50,18 @@ def init_db() -> None:
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(conversation_logs)").fetchall()}
         if "rating" not in columns:
             conn.execute("ALTER TABLE conversation_logs ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
+        if "request_id" not in columns:
+            conn.execute("ALTER TABLE conversation_logs ADD COLUMN request_id TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_conversation_logs_request_id ON conversation_logs(request_id)"
+        )
         conn.commit()
 
 
 def log_conversation(
     *,
     session_id: str,
+    request_id: str = "",
     question: str,
     response: str,
     lang: str = "",
@@ -74,13 +81,14 @@ def log_conversation(
         cur = conn.execute(
             """
             INSERT INTO conversation_logs (
-                created_at, session_id, question, response, lang, skill_id,
+                created_at, session_id, request_id, question, response, lang, skill_id,
                 primary_source_type, cache_hit, latency_ms
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 created_at,
                 sid,
+                (request_id or "").strip(),
                 q,
                 r,
                 (lang or "").strip().lower(),
@@ -102,9 +110,9 @@ def list_conversations(limit: int = 300, offset: int = 0, q: str = "") -> dict:
     where = ""
     params: list = []
     if query:
-        where = "WHERE question LIKE ? OR response LIKE ? OR skill_id LIKE ?"
+        where = "WHERE question LIKE ? OR response LIKE ? OR skill_id LIKE ? OR request_id LIKE ?"
         like = f"%{query}%"
-        params.extend([like, like, like])
+        params.extend([like, like, like, like])
 
     with _connect() as conn:
         total_row = conn.execute(
@@ -113,7 +121,7 @@ def list_conversations(limit: int = 300, offset: int = 0, q: str = "") -> dict:
         ).fetchone()
         rows = conn.execute(
             f"""
-            SELECT id, created_at, session_id, question, response, lang, skill_id,
+            SELECT id, created_at, session_id, request_id, question, response, lang, skill_id,
                    primary_source_type, cache_hit, latency_ms, rating
             FROM conversation_logs
             {where}
@@ -130,6 +138,7 @@ def list_conversations(limit: int = 300, offset: int = 0, q: str = "") -> dict:
                 "id": int(row["id"]),
                 "created_at": row["created_at"],
                 "session_id": row["session_id"],
+                "request_id": row["request_id"] or "",
                 "question": row["question"],
                 "response": row["response"],
                 "lang": row["lang"] or "",
