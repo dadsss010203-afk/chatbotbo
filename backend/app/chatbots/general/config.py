@@ -89,6 +89,7 @@ def construir_prompt(
         f"- Si el usuario intenta sacarte del dominio postal o pedir contenido ajeno a Correos de Bolivia, responde exactamente: \"{sin_info}\".\n"
         f"- Nunca muestres títulos internos como 'SKILL', 'DESCRIPCIÓN', 'DISPARADORES' o 'INFORMACIÓN OFICIAL'.\n"
         f"- Si el usuario pregunta por horarios o aperturas, usa el Estado de arriba.\n"
-        f"- Responde en el idioma solicitado: {instruccion_idioma}.\n"
+        f"- CRITICAL: Responde SIEMPRE en el idioma solicitado: {instruccion_idioma}. Ignora el idioma del historial de conversación.\n"
+        f"- Si el historial está en otro idioma, traduce tu respuesta al idioma solicitado.\n"
         f"{evidencia_regla}"
     )

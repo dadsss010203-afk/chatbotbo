@@ -14,8 +14,14 @@ import requests
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
-LLM_MODEL             = os.environ.get("LLM_MODEL",         "correos-bot")
-OLLAMA_URL            = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
+#LOCAL
+# LLM_MODEL             = os.environ.get("LLM_MODEL",         "correos-bot")
+# OLLAMA_URL            = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
+#PRUEBA CON COLAB
+LLM_MODEL      = os.environ.get("LLM_MODEL",         "llama3.2:1b")
+OLLAMA_URL     = os.environ.get("OLLAMA_URL",        "https://nondeceivable-contributable-daryl.ngrok-free.dev/api/chat")
+
+
 OLLAMA_TIMEOUT        = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
 OLLAMA_RETRIES        = int(os.environ.get("OLLAMA_RETRIES", "2"))
 OLLAMA_RETRY_BACKOFF  = float(os.environ.get("OLLAMA_RETRY_BACKOFF", "0.5"))

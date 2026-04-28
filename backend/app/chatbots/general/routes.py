@@ -13,6 +13,7 @@ POST /api/actualizar
 
 import sys
 import os
+import logging
 import threading
 import re
 import hashlib
@@ -47,6 +48,7 @@ from chatbots.general.config import (
 #  ROUTER
 # ─────────────────────────────────────────────
 router = APIRouter(prefix="/api")   # rutas en /api/*
+logger = logging.getLogger("chatbotbo.general.routes")
 
 SUCURSALES: list = []
 CHATBOT_GENERAL_ONLY = os.environ.get("CHATBOT_GENERAL_ONLY", "false").strip().lower() in ("1", "true", "yes")
@@ -54,12 +56,13 @@ REINDEX_DEBOUNCE_SECONDS = int(os.environ.get("REINDEX_DEBOUNCE_SECONDS", "30"))
 CHAT_RESPONSE_MAX_CHARS = int(os.environ.get("CHAT_RESPONSE_MAX_CHARS", "0"))
 LLM_TARIFF_ORCHESTRATOR = os.environ.get("LLM_TARIFF_ORCHESTRATOR", "true").strip().lower() in ("1", "true", "yes")
 TARIFF_DETERMINISTIC_ONLY = os.environ.get("TARIFF_DETERMINISTIC_ONLY", "true").strip().lower() in ("1", "true", "yes")
+LOCATION_USE_LLM_ONLY = True
 TRACKING_API_URL = os.environ.get(
     "TRACKING_API_URL",
     "https://trackingbo.correos.gob.bo:8100/api/public/tracking/eventos",
 )
 TRACKING_API_TIMEOUT = int(os.environ.get("TRACKING_API_TIMEOUT", "20"))
-TRACKING_API_VERIFY_SSL = os.environ.get("TRACKING_API_VERIFY_SSL", "true").strip().lower() in ("1", "true", "yes")
+TRACKING_API_VERIFY_SSL = os.environ.get("TRACKING_API_VERIFY_SSL", "false").strip().lower() in ("1", "true", "yes")
 GENERAL_SYSTEM_PROMPT = (
     "Eres un asistente conversacional general, útil, claro y profesional. "
     "No afirmes tener acceso a bases de datos, documentos, skills, RAG, PDFs, scraping o contexto institucional "
@@ -259,7 +262,9 @@ def _modo_general_only() -> bool:
     return CHATBOT_GENERAL_ONLY
 
 
-def _tracking_prompt_message() -> str:
+def _tracking_prompt_message(lang: str = "es") -> str:
+    if lang == "en":
+        return "Send me your complete tracking code, for example: C0028A03441BO"
     return "Envíame tu código de rastreo completo, por ejemplo: C0028A03441BO"
 
 
@@ -323,6 +328,9 @@ def _format_tracking_response(codigo: str, payload: dict) -> tuple[str, dict]:
     if ultimo_evento.get("ciudad_destino"):
         lineas.append(f"• Ciudad destino: {ultimo_evento['ciudad_destino']}")
 
+    # URL para rastreo web y QR
+    tracking_url = f"https://trackingbo.correos.gob.bo:8100/?codigo={codigo}"
+    
     return (
         "\n".join(lineas),
         {
@@ -332,6 +340,7 @@ def _format_tracking_response(codigo: str, payload: dict) -> tuple[str, dict]:
             "found": True,
             "total_eventos": total_eventos,
             "ultimo_evento": ultimo_evento,
+            "tracking_url": tracking_url,
             "raw": payload,
         },
     )
@@ -353,6 +362,92 @@ def _resolver_tracking_deterministico(pregunta: str) -> dict:
         "tracking": tracking_data,
         "quick_replies": [],
     }
+
+
+def _es_regional(sucursal: dict) -> bool:
+    nombre = (sucursal.get("nombre") or "").strip().lower()
+    return nombre.startswith("regional") or nombre.startswith("oficina central")
+
+
+def _filtrar_sucursales_por_scope(sucursales: list[dict], scope: str | None) -> list[dict]:
+    if scope == "regionales":
+        return [s for s in sucursales if _es_regional(s)]
+    if scope == "sucursales":
+        return [s for s in sucursales if not _es_regional(s)]
+    return list(sucursales)
+
+
+def _extraer_scope_ubicacion(texto: str) -> str | None:
+    t = (texto or "").strip().lower()
+    if not t:
+        return None
+    if t in {"__ubicacion_regionales__", "regional", "regionales"}:
+        return "regionales"
+    if t in {"__ubicacion_sucursales__", "sucursal", "sucursales"}:
+        return "sucursales"
+    if re.search(r"\b(regional|regionales|oficina central)\b", t):
+        return "regionales"
+    if re.search(r"\b(sucursal|sucursales)\b", t):
+        return "sucursales"
+    return None
+
+
+def _parece_consulta_ubicacion(texto: str, sucursales: list[dict]) -> bool:
+    return (
+        intents.detectar_solo_ciudad(texto, sucursales) is not None
+        or intents.detectar_consulta_ubicacion(texto, sucursales) is not None
+    )
+
+
+def _payload_pregunta_scope_ubicacion(lang: str, *, reask: bool = False) -> dict:
+    if lang == "en":
+        msg = (
+            "Do you mean locations of regional offices or branches?"
+            if not reask
+            else "I need that detail first: regional offices or branches?"
+        )
+        label_regionales = "Regional Offices"
+        label_sucursales = "Branches"
+    else:
+        msg = (
+            "¿Te refieres a ubicación de regionales o de sucursales?"
+            if not reask
+            else "Para ubicarte bien, primero indícame: ¿regionales o sucursales?"
+        )
+        label_regionales = "Regionales"
+        label_sucursales = "Sucursales"
+
+    return {
+        "response": msg,
+        "lang": lang,
+        "no_translate": True,
+        "quick_replies": [
+            {"label": label_regionales, "value": "__ubicacion_regionales__"},
+            {"label": label_sucursales, "value": "__ubicacion_sucursales__"},
+        ],
+        "location_disambiguation": True,
+    }
+
+
+def _resolver_scope_ubicacion_o_preguntar(sid: str, pregunta: str, lang: str) -> tuple[str | None, dict | None]:
+    scope = _extraer_scope_ubicacion(pregunta)
+    if scope:
+        session.clear_pendiente_ubicacion(sid)
+        return scope, None
+
+    pendiente = session.get_pendiente_ubicacion(sid) or {}
+    if pendiente:
+        if _parece_consulta_ubicacion(pregunta, SUCURSALES) or len((pregunta or "").strip()) <= 30:
+            session.set_pendiente_ubicacion(sid, {"awaiting_scope": True})
+            return None, _payload_pregunta_scope_ubicacion(lang, reask=True)
+        session.clear_pendiente_ubicacion(sid)
+        return None, None
+
+    if _parece_consulta_ubicacion(pregunta, SUCURSALES):
+        session.set_pendiente_ubicacion(sid, {"awaiting_scope": True})
+        return None, _payload_pregunta_scope_ubicacion(lang)
+
+    return None, None
 
 
 def _estimate_message_tokens(message: dict) -> int:
@@ -399,27 +494,39 @@ def _postprocess_llm_response(texto: str, sin_info: str) -> str:
         return sin_info
     respuesta = "\n".join(lineas).strip()
 
-    # Si parece cortada, recorta al último final de frase conocido.
-    if respuesta and respuesta[-1] not in ".!?\"”":
-        candidatos = [respuesta.rfind("."), respuesta.rfind("!"), respuesta.rfind("?")]
-        corte = max(candidatos)
-        if corte > 40:
-            respuesta = respuesta[: corte + 1].strip()
+    # No recortar al último punto: durante streaming esto provoca que la UI
+    # "retroceda" al final y se vea como texto recortado.
 
     return respuesta or sin_info
 
 
-def _single_paragraph_text(texto: str) -> str:
-    raw = (texto or "").replace("\r", "\n")
-    partes = [re.sub(r"\s+", " ", ln.strip()) for ln in raw.splitlines() if ln.strip()]
-    return " ".join(partes).strip()
+def _normalize_response_text(texto: str) -> str:
+    raw = (texto or "").replace("\r\n", "\n").replace("\r", "\n")
+    normalized_lines: list[str] = []
+    previous_blank = False
+
+    for line in raw.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            if normalized_lines and not previous_blank:
+                normalized_lines.append("")
+            previous_blank = True
+            continue
+
+        # Conserva listas y numeraciones, pero limpia espacios internos redundantes.
+        compact = re.sub(r"[ \t]+", " ", stripped)
+        normalized_lines.append(compact)
+        previous_blank = False
+
+    while normalized_lines and normalized_lines[-1] == "":
+        normalized_lines.pop()
+
+    return "\n".join(normalized_lines).strip()
 
 
 def _stream_preview_text(texto: str) -> str:
     preview = ollama.limpiar_respuesta(texto or "")
-    preview = _single_paragraph_text(preview)
-    if CHAT_RESPONSE_MAX_CHARS > 0 and len(preview) > CHAT_RESPONSE_MAX_CHARS:
-        preview = preview[:CHAT_RESPONSE_MAX_CHARS]
+    preview = _normalize_response_text(preview)
     return preview
 
 
@@ -432,6 +539,10 @@ def _looks_structured_response(texto: str) -> bool:
     if raw[0] in "{[":
         return True
     if raw.startswith(("dict(", "json", "python")):
+        return True
+    if "\n" in raw:
+        return True
+    if re.search(r"(^|\s)(?:\d+\.\s|[•\-]\s)", raw):
         return True
     markers = ("vino_sugerido", "maridaje", "nota_de_cata", "\":", "':", "{'", '{"')
     return any(marker in raw for marker in markers)
@@ -794,45 +905,83 @@ def _tarifa_quick_replies(
     missing: list[str],
     scope: str | None = None,
     family: str | None = None,
+    lang: str = "es",
 ) -> list[dict]:
     if not missing:
         return []
+    
+    # Traducciones
+    labels = {
+        "es": {
+            "nacional": "Nacional",
+            "internacional": "Internacional",
+            "ems": "Express Mail Service (EMS)",
+            "prioritario": "Prioritario",
+            "correo_prioritario_lc_ao": "Correo Prioritario LC/AO",
+            "eca": "Correspondencia Agrupada (ECA)",
+            "pliegos_oficiales": "Pliegos Oficiales",
+            "sacas_m": "Sacas M",
+            "ems_contratos": "EMS Contratos",
+            "super_express": "Super Express",
+            "encomiendas": "Encomiendas Postales",
+            "super_express_documentos": "Super Express Documentos",
+            "super_express_paquetes": "Super Express Paquetes",
+        },
+        "en": {
+            "nacional": "National",
+            "internacional": "International",
+            "ems": "Express Mail Service (EMS)",
+            "prioritario": "Priority",
+            "correo_prioritario_lc_ao": "Priority LC/AO Mail",
+            "eca": "Grouped Correspondence (ECA)",
+            "pliegos_oficiales": "Official Documents",
+            "sacas_m": "M Bags",
+            "ems_contratos": "EMS Contracts",
+            "super_express": "Super Express",
+            "encomiendas": "Postal Parcels",
+            "super_express_documentos": "Super Express Documents",
+            "super_express_paquetes": "Super Express Packages",
+        }
+    }
+    
+    t = labels.get(lang, labels["es"])
+    
     if "alcance" in missing:
         return [
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Internacional", "value": "internacional"},
+            {"label": t["nacional"], "value": "nacional"},
+            {"label": t["internacional"], "value": "internacional"},
         ]
     if "tipo_nacional" in missing:
         return [
-            {"label": "Express Mail Service (EMS)", "value": "ems"},
-            {"label": "Prioritario", "value": "encomienda"},
-            {"label": "Correo Prioritario LC/AO", "value": "correo prioritario lc/ao nacional"},
-            {"label": "Correspondencia Agrupada (ECA)", "value": "eca nacional"},
-            {"label": "Pliegos Oficiales", "value": "pliegos oficiales nacional"},
-            {"label": "Sacas M", "value": "sacas m nacional"},
-            {"label": "EMS Contratos", "value": "ems contratos nacional"},
-            {"label": "Super Express", "value": "super express nacional"},
+            {"label": t["ems"], "value": "ems"},
+            {"label": t["prioritario"], "value": "encomienda"},
+            {"label": t["correo_prioritario_lc_ao"], "value": "correo prioritario lc/ao nacional"},
+            {"label": t["eca"], "value": "eca nacional"},
+            {"label": t["pliegos_oficiales"], "value": "pliegos oficiales nacional"},
+            {"label": t["sacas_m"], "value": "sacas m nacional"},
+            {"label": t["ems_contratos"], "value": "ems contratos nacional"},
+            {"label": t["super_express"], "value": "super express nacional"},
         ]
     if "tipo_internacional" in missing:
         return [
-            {"label": "Express Mail Service (EMS)", "value": "ems"},
-            {"label": "Encomiendas Postales", "value": "encomienda"},
-            {"label": "Correo Prioritario LC/AO", "value": "correo prioritario lc/ao internacional"},
-            {"label": "Correspondencia Agrupada (ECA)", "value": "eca internacional"},
-            {"label": "Pliegos Oficiales", "value": "pliegos oficiales internacional"},
-            {"label": "Sacas M", "value": "sacas m internacional"},
-            {"label": "Super Express Documentos", "value": "super express documentos internacional"},
-            {"label": "Super Express Paquetes", "value": "super express paquetes internacional"},
+            {"label": t["ems"], "value": "ems"},
+            {"label": t["encomiendas"], "value": "encomienda"},
+            {"label": t["correo_prioritario_lc_ao"], "value": "correo prioritario lc/ao internacional"},
+            {"label": t["eca"], "value": "eca internacional"},
+            {"label": t["pliegos_oficiales"], "value": "pliegos oficiales internacional"},
+            {"label": t["sacas_m"], "value": "sacas m internacional"},
+            {"label": t["super_express_documentos"], "value": "super express documentos internacional"},
+            {"label": t["super_express_paquetes"], "value": "super express paquetes internacional"},
         ]
     if "alcance_ems" in missing:
         return [
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Internacional", "value": "internacional"},
+            {"label": t["nacional"], "value": "nacional"},
+            {"label": t["internacional"], "value": "internacional"},
         ]
     if "alcance_encomienda" in missing:
         return [
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Internacional", "value": "internacional"},
+            {"label": t["nacional"], "value": "nacional"},
+            {"label": t["internacional"], "value": "internacional"},
         ]
     if "peso" in missing:
         return [
@@ -969,7 +1118,7 @@ def _tarifa_quick_replies(
     return []
 
 
-def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.TarifaRequest) -> dict | None:
+def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.TarifaRequest, lang: str = "es") -> dict | None:
     """
     Completa consultas de tarifa en varios turnos usando estado temporal de sesión.
     Retorna un payload listo para jsonify() cuando corresponde interceptar el turno;
@@ -1077,7 +1226,7 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
 
     missing = _missing_tarifa_fields(scope, peso, columna, family=family, level=level)
     if missing:
-        quick_replies = _tarifa_quick_replies(missing, scope=scope, family=family)
+        quick_replies = _tarifa_quick_replies(missing, scope=scope, family=family, lang=lang)
         session.set_pendiente_tarifa(
             sid,
             {
@@ -1456,9 +1605,10 @@ def reindexar() -> bool:
                 texto = p.get("texto_extraido") or ""
                 if texto:
                     nombre_pdf = p.get("nombre_archivo") or f"PDF {idx + 1}"
+                    key = _pdf_source_key(p, idx)
                     pdf_chunks, pdf_ids, pdf_meta = rag.documento_a_chunks(
                         texto,
-                        prefijo=f"pdf_{idx}",
+                        prefijo=f"pdf_{key}",
                         metadata_base={
                             "source_type": "pdf",
                             "source_name": nombre_pdf,
@@ -1466,6 +1616,7 @@ def reindexar() -> bool:
                             "source_url": p.get("url", ""),
                             "source_page": p.get("pagina_fuente", ""),
                             "extraction_method": p.get("metodo_extraccion", ""),
+                            "pdf_key": key,
                         },
                     )
                     chunks += pdf_chunks; ids += pdf_ids; metadatas += pdf_meta
@@ -1519,6 +1670,40 @@ def reindexar() -> bool:
     return success
 
 
+def _cargar_historia_directamente() -> str:
+    """Carga el archivo de historia directamente como fallback cuando RAG no encuentra nada."""
+    try:
+        historia_path = HISTORIA_FILE
+        if not os.path.isabs(historia_path):
+            historia_path = os.path.join(os.path.dirname(DATA_FILE), os.path.basename(historia_path))
+        
+        if not os.path.exists(historia_path):
+            return ""
+        
+        with open(historia_path, "r", encoding="utf-8") as f:
+            historia = json.load(f)
+        
+        if not isinstance(historia, list):
+            return ""
+        
+        partes = []
+        for item in historia:
+            if not isinstance(item, dict):
+                continue
+            titulo = item.get("titulo", "").strip()
+            contenido = item.get("contenido", "").strip()
+            if contenido:
+                if titulo:
+                    partes.append(f"# {titulo}\n{contenido}")
+                else:
+                    partes.append(contenido)
+        
+        return "\n\n".join(partes)
+    except Exception as e:
+        print(f"   Error cargando historia directamente: {e}")
+        return ""
+
+
 # ─────────────────────────────────────────────
 #  INICIALIZACIÓN
 # ─────────────────────────────────────────────
@@ -1529,7 +1714,7 @@ def inicializar():
     print(f"\n🤖 Iniciando {NOMBRE}...")
 
     SUCURSALES = location.cargar_sucursales(SUCURSALES_FILE)
-    print(f"  📍 Sucursales cargadas: {len(SUCURSALES)}")
+    print(f"    Sucursales cargadas: {len(SUCURSALES)}")
     if not SUCURSALES:
         print(f"  ⚠️  ADVERTENCIA: No se encontraron sucursales en {SUCURSALES_FILE}")
         print(f"     Ejecuta el scraper: python scraper/runner.py")
@@ -1578,8 +1763,13 @@ async def chat(request: Request):
     if not pregunta:
         raise HTTPException(status_code=400, detail="Pregunta vacía")
 
-    # resolver el idioma lo antes posible para usarlo también en respuestas
-    lang = idiomas.resolver_idioma(data.get("lang"), pregunta)
+    # Priorizar el idioma seleccionado manualmente; si no viene, detectar por el texto.
+    lang_manual = idiomas.resolver_idioma((data or {}).get("lang"), "")
+    lang = lang_manual or idiomas.detectar_idioma(pregunta)
+    print(
+        f"DEBUG: Mensaje: '{pregunta}', "
+        f"Idioma manual: {lang_manual or 'none'}, idioma usado: {lang}"
+    )
 
     # ── Consulta de rastreo 100% determinista (API externa)
     if tracking_mode:
@@ -1610,7 +1800,7 @@ async def chat(request: Request):
     if TARIFF_DETERMINISTIC_ONLY:
         pendiente_tarifa = session.get_pendiente_tarifa(sid) or {}
         if tarifa_mode:
-            tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta, tarifa_req)
+            tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta, tarifa_req, lang)
             if tarifa_payload is not None:
                 tarifa_payload["lang"] = lang
                 return _finalizar_chat_response(
@@ -1693,7 +1883,7 @@ async def chat(request: Request):
                 await _llamar_ollama_cancelable(request, request_id, mensajes)
             )
             respuesta = _postprocess_llm_response(respuesta, respuesta_chat_vacio(lang, pregunta))
-            respuesta = _single_paragraph_text(respuesta)
+            respuesta = _normalize_response_text(respuesta)
         except ollama.OllamaCancelled:
             raise HTTPException(status_code=499, detail="Consulta cancelada por el usuario.")
         except Exception:
@@ -1797,62 +1987,100 @@ async def chat(request: Request):
             started_at=started_at,
         )
 
-    # ── 3. ¿Solo nombre de ciudad?
-    geo = intents.detectar_solo_ciudad(pregunta, SUCURSALES)
+    if not LOCATION_USE_LLM_ONLY:
+        scope_ubicacion, payload_scope_ubicacion = _resolver_scope_ubicacion_o_preguntar(sid, pregunta, lang)
+        if payload_scope_ubicacion is not None:
+            return _finalizar_chat_response(
+                sid=sid,
+                request_id=request_id,
+                pregunta=pregunta,
+                payload=payload_scope_ubicacion,
+                started_at=started_at,
+            )
 
-    # ── 4. ¿Consulta de ubicación con palabras clave?
-    if geo is None:
-        geo = intents.detectar_consulta_ubicacion(pregunta, SUCURSALES)
+        sucursales_scope = _filtrar_sucursales_por_scope(SUCURSALES, scope_ubicacion)
 
-    # ── 5. Responder con tarjeta de sucursal
-    if geo is not None:
-        if "nombre" not in geo:
-            nombres = " | ".join(s.get("nombre", "") for s in SUCURSALES)
-            # usar .get para evitar KeyError si la traducción falta en caliente
-            mensaje = t.get("pedir_ciudad")
-            if mensaje is None:
-                # el servidor puede estar ejecutándose con una versión antigua de
-                # idiomas.py; reiniciar lo recargará y evitará este error.
-                mensaje = f"Por favor indica una ciudad válida: {nombres}"
-            else:
-                mensaje = mensaje.format(ciudades=nombres)
+        # ── 3. ¿Solo nombre de ciudad?
+        geo = intents.detectar_solo_ciudad(pregunta, sucursales_scope)
 
-            return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
-                "response": mensaje,
-                "lang"    : lang,
-                "no_translate": True,   # no traducir esta frase cuando el usuario cambie idioma
-            }, started_at=started_at)
+        # ── 4. ¿Consulta de ubicación con palabras clave?
+        if geo is None:
+            geo = intents.detectar_consulta_ubicacion(pregunta, sucursales_scope)
 
-        lat      = geo.get("lat")
-        lng      = geo.get("lng")
-        maps_url = location.generar_maps_url(lat, lng) if lat and lng else None
-        nd       = t["no_disponible"]
+        if scope_ubicacion and _extraer_scope_ubicacion(pregunta) is not None and geo is None:
+            tipo_label = "regionales" if scope_ubicacion == "regionales" else "sucursales"
+            return _finalizar_chat_response(
+                sid=sid,
+                request_id=request_id,
+                pregunta=pregunta,
+                payload={
+                    "response": "🏢    ",
+                    "response_type": "branches_list",
+                    "branches": sucursales_scope,
+                    "message": f"Perfecto, estas son las {tipo_label} disponibles:",
+                    "source_type": "sucursales",
+                    "source_content": f"Sucursales filtradas por tipo: {tipo_label}",
+                    "lang": lang,
+                    "no_translate": True,
+                },
+                started_at=started_at,
+            )
 
-        texto_resp = (
-            f" {geo.get('nombre', '')}\n"
-            f"Dirección : {geo.get('direccion') or nd}\n"
-            f"Teléfono  : {geo.get('telefono') or nd}\n"
-            f"Email     : {geo.get('email') or nd}\n"
-            f"Horario   : {geo.get('horario') or nd}"
-        )
-        if maps_url:
-            texto_resp += f"\nVer en mapa: {maps_url}"
+        # ── 5. Responder con tarjeta de sucursal
+        if geo is not None:
+            session.clear_pendiente_ubicacion(sid)
+            if "nombre" not in geo:
+                nombres = " | ".join(s.get("nombre", "") for s in sucursales_scope)
+                # Respuesta mejorada con lista estructurada de sucursales
+                return _finalizar_chat_response(
+                    sid=sid,
+                    request_id=request_id,
+                    pregunta=pregunta,
+                    payload={
+                        "response": "🏢    ",
+                        "response_type": "branches_list",
+                        "branches": sucursales_scope,
+                        "message": (
+                            "Selecciona una regional para ver sus detalles:"
+                            if scope_ubicacion == "regionales"
+                            else "Selecciona una sucursal para ver sus detalles:"
+                        ),
+                        "source_type": "sucursales",
+                        "source_content": f"Sucursales disponibles: {nombres}",
+                        "lang": lang,
+                    },
+                    started_at=started_at,
+                )
+            lat      = geo.get("lat")
+            lng      = geo.get("lng")
+            maps_url = location.generar_maps_url(lat, lng) if lat and lng else None
+            nd       = t["no_disponible"]
 
-        session.agregar_turno(sid, pregunta, texto_resp)
+            texto_resp = (
+                f" {geo.get('nombre', '')}\n"
+                f"Dirección : {geo.get('direccion') or nd}\n"
+                f"Teléfono  : {geo.get('telefono') or nd}\n"
+                f"Email     : {geo.get('email') or nd}\n"
+                f"Horario   : {geo.get('horario') or nd}"
+            )
+            if maps_url:
+                texto_resp += f"\nVer en mapa: {maps_url}"
 
-        resp_json = {"response": texto_resp, "lang": lang}
-        if lat and lng:
-            resp_json["ubicacion"] = {
-                "nombre"   : geo.get("nombre",    ""),
-                "direccion": geo.get("direccion", ""),
-                "telefono" : geo.get("telefono",  ""),
-                "email"    : geo.get("email",     ""),
-                "horario"  : geo.get("horario",   ""),
-                "lat"      : lat,
-                "lng"      : lng,
-                "maps_url" : maps_url,
-            }
-        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload=resp_json, started_at=started_at)
+            session.agregar_turno(sid, pregunta, texto_resp)
+
+            resp_json = {"response": texto_resp, "lang": lang}
+            if lat and lng:
+                resp_json["ubicacion"] = {
+                    "nombre"   : geo.get("nombre",    ""),
+                    "direccion": geo.get("direccion", ""),
+                    "telefono" : geo.get("telefono",  ""),
+                    "email"    : geo.get("email",     ""),
+                    "horario"  : geo.get("horario",   ""),
+                    "lat"      : lat,
+                    "lng"      : lng,
+                    "maps_url" : maps_url,
+                }
+            return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload=resp_json, started_at=started_at)
 
     if not skill_resolution["in_scope"]:
         respuesta = capabilities.out_of_scope_response()
@@ -1916,6 +2144,14 @@ async def chat(request: Request):
 
     sources = rag_result.get("sources", [])
     valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
+    
+    # Fallback para skill de historia: cargar archivo directamente si RAG no encuentra nada
+    if (not contexto.strip() or not valid_sources) and primary_skill_id == "historia_correos_bolivia":
+        contexto_historia = _cargar_historia_directamente()
+        if contexto_historia:
+            contexto = contexto_historia
+            valid_sources = [{"source_type": "history", "source_name": "historia_institucional.json"}]
+    
     if not contexto.strip() or not valid_sources:
         respuesta = t["sin_info"]
         session.agregar_turno(sid, pregunta, respuesta)
@@ -1965,7 +2201,7 @@ async def chat(request: Request):
         respuesta = await _llamar_ollama_cancelable(request, request_id, mensajes)
         respuesta = ollama.limpiar_respuesta(respuesta)
         respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
-        respuesta = _single_paragraph_text(respuesta)
+        respuesta = _normalize_response_text(respuesta)
         observability.log_event(
             "llm.response",
             lang=lang,
@@ -2054,7 +2290,13 @@ async def chat_stream(request: Request):
     if not pregunta:
         raise HTTPException(status_code=400, detail="Pregunta vacía")
 
-    lang = idiomas.resolver_idioma(data.get("lang"), pregunta)
+    # Priorizar el idioma seleccionado manualmente; si no viene, detectar por el texto.
+    lang_manual = idiomas.resolver_idioma((data or {}).get("lang"), "")
+    lang = lang_manual or idiomas.detectar_idioma(pregunta)
+    print(
+        f"DEBUG STREAM: Mensaje: '{pregunta}', "
+        f"Idioma manual: {lang_manual or 'none'}, idioma usado: {lang}"
+    )
 
     async def instant_end(payload: dict, *, skip_general_log: bool = False):
         final_payload = _finalizar_chat_response(
@@ -2089,7 +2331,7 @@ async def chat_stream(request: Request):
         if TARIFF_DETERMINISTIC_ONLY:
             pendiente_tarifa = session.get_pendiente_tarifa(sid) or {}
             if tarifa_mode:
-                tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta_actual, tarifa_req)
+                tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta_actual, tarifa_req, lang)
                 if tarifa_payload is not None:
                     tarifa_payload["lang"] = lang
                     async for line in instant_end(tarifa_payload, skip_general_log=True):
@@ -2133,7 +2375,7 @@ async def chat_stream(request: Request):
                         yield _stream_line({"type": "token", "content": delta})
                         last_preview = preview
                 respuesta = ollama.limpiar_respuesta("".join(partes))
-                respuesta = _single_paragraph_text(respuesta)
+                respuesta = _normalize_response_text(respuesta)
                 async for line in instant_end({"response": respuesta, "lang": lang}):
                     yield line
                 return
@@ -2175,8 +2417,7 @@ async def chat_stream(request: Request):
                         last_preview = preview
                 respuesta = ollama.limpiar_respuesta("".join(partes))
                 respuesta = _postprocess_llm_response(respuesta, respuesta_chat_vacio(lang, pregunta_actual))
-                respuesta = _single_paragraph_text(respuesta)
-                respuesta = _truncate_response_safely(respuesta)
+                respuesta = _normalize_response_text(respuesta)
                 session.agregar_turno(sid, pregunta_actual, respuesta)
                 async for line in instant_end(
                     {
@@ -2251,55 +2492,87 @@ async def chat_stream(request: Request):
                 yield line
             return
 
-        geo = intents.detectar_solo_ciudad(pregunta_actual, SUCURSALES)
-        if geo is None:
-            geo = intents.detectar_consulta_ubicacion(pregunta_actual, SUCURSALES)
+        if not LOCATION_USE_LLM_ONLY:
+            scope_ubicacion, payload_scope_ubicacion = _resolver_scope_ubicacion_o_preguntar(
+                sid, pregunta_actual, lang
+            )
+            if payload_scope_ubicacion is not None:
+                async for line in instant_end(payload_scope_ubicacion):
+                    yield line
+                return
 
-        if geo is not None:
-            if "nombre" not in geo:
-                nombres = " | ".join(s.get("nombre", "") for s in SUCURSALES)
-                mensaje = t.get("pedir_ciudad")
-                if mensaje is None:
-                    mensaje = f"Por favor indica una ciudad válida: {nombres}"
-                else:
-                    mensaje = mensaje.format(ciudades=nombres)
+            sucursales_scope = _filtrar_sucursales_por_scope(SUCURSALES, scope_ubicacion)
+            geo = intents.detectar_solo_ciudad(pregunta_actual, sucursales_scope)
+            if geo is None:
+                geo = intents.detectar_consulta_ubicacion(pregunta_actual, sucursales_scope)
+
+            if scope_ubicacion and _extraer_scope_ubicacion(pregunta_actual) is not None and geo is None:
+                tipo_label = "regionales" if scope_ubicacion == "regionales" else "sucursales"
                 async for line in instant_end(
-                    {"response": mensaje, "lang": lang, "no_translate": True}
+                    {
+                        "response": "🏢    ",
+                        "response_type": "branches_list",
+                        "branches": sucursales_scope,
+                        "message": f"Perfecto, estas son las {tipo_label} disponibles:",
+                        "lang": lang,
+                        "no_translate": True,
+                    }
                 ):
                     yield line
                 return
 
-            lat = geo.get("lat")
-            lng = geo.get("lng")
-            maps_url = location.generar_maps_url(lat, lng) if lat and lng else None
-            nd = t["no_disponible"]
+            if geo is not None:
+                session.clear_pendiente_ubicacion(sid)
+                if "nombre" not in geo:
+                    # Respuesta mejorada con lista estructurada de sucursales
+                    async for line in instant_end(
+                        {
+                            "response": "🏢    ",
+                            "response_type": "branches_list",
+                            "branches": sucursales_scope,
+                            "message": (
+                                "Selecciona una regional para ver sus detalles:"
+                                if scope_ubicacion == "regionales"
+                                else "Selecciona una sucursal para ver sus detalles:"
+                            ),
+                            "lang": lang,
+                            "no_translate": True
+                        }
+                    ):
+                        yield line
+                    return
 
-            texto_resp = (
-                f" {geo.get('nombre', '')}\n"
-                f"Dirección : {geo.get('direccion') or nd}\n"
-                f"Teléfono  : {geo.get('telefono') or nd}\n"
-                f"Email     : {geo.get('email') or nd}\n"
-                f"Horario   : {geo.get('horario') or nd}"
-            )
-            if maps_url:
-                texto_resp += f"\nVer en mapa: {maps_url}"
+                lat = geo.get("lat")
+                lng = geo.get("lng")
+                maps_url = location.generar_maps_url(lat, lng) if lat and lng else None
+                nd = t["no_disponible"]
 
-            session.agregar_turno(sid, pregunta_actual, texto_resp)
-            payload = {"response": texto_resp, "lang": lang}
-            if lat and lng:
-                payload["ubicacion"] = {
-                    "nombre": geo.get("nombre", ""),
-                    "direccion": geo.get("direccion", ""),
-                    "telefono": geo.get("telefono", ""),
-                    "email": geo.get("email", ""),
-                    "horario": geo.get("horario", ""),
-                    "lat": lat,
-                    "lng": lng,
-                    "maps_url": maps_url,
-                }
-            async for line in instant_end(payload):
-                yield line
-            return
+                texto_resp = (
+                    f" {geo.get('nombre', '')}\n"
+                    f"Dirección : {geo.get('direccion') or nd}\n"
+                    f"Teléfono  : {geo.get('telefono') or nd}\n"
+                    f"Email     : {geo.get('email') or nd}\n"
+                    f"Horario   : {geo.get('horario') or nd}"
+                )
+                if maps_url:
+                    texto_resp += f"\nVer en mapa: {maps_url}"
+
+                session.agregar_turno(sid, pregunta_actual, texto_resp)
+                payload = {"response": texto_resp, "lang": lang}
+                if lat and lng:
+                    payload["ubicacion"] = {
+                        "nombre": geo.get("nombre", ""),
+                        "direccion": geo.get("direccion", ""),
+                        "telefono": geo.get("telefono", ""),
+                        "email": geo.get("email", ""),
+                        "horario": geo.get("horario", ""),
+                        "lat": lat,
+                        "lng": lng,
+                        "maps_url": maps_url,
+                    }
+                async for line in instant_end(payload):
+                    yield line
+                return
 
         if not skill_resolution["in_scope"]:
             respuesta = capabilities.out_of_scope_response()
@@ -2364,6 +2637,15 @@ async def chat_stream(request: Request):
 
         sources = rag_result.get("sources", [])
         valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
+        
+        # Fallback para skill de historia en streaming: cargar archivo directamente si RAG no encuentra nada
+        primary_skill_id = (skill_resolution.get("primary_skill") or {}).get("id")
+        if (not contexto.strip() or not valid_sources) and primary_skill_id == "historia_correos_bolivia":
+            contexto_historia = _cargar_historia_directamente()
+            if contexto_historia:
+                contexto = contexto_historia
+                valid_sources = [{"source_type": "history", "source_name": "historia_institucional.json"}]
+        
         if not contexto.strip() or not valid_sources:
             respuesta = _truncate_response_safely(t["sin_info"])
             session.agregar_turno(sid, pregunta_actual, respuesta)
@@ -2425,7 +2707,7 @@ async def chat_stream(request: Request):
 
             respuesta = ollama.limpiar_respuesta("".join(partes))
             respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
-            respuesta = _single_paragraph_text(respuesta)
+            respuesta = _normalize_response_text(respuesta)
             observability.log_event(
                 "llm.response",
                 lang=lang,
@@ -2448,7 +2730,6 @@ async def chat_stream(request: Request):
                 respuesta = t["sin_info"]
 
             should_cache = bool(respuesta and respuesta != t["sin_info"]) and bool(valid_sources) and len(respuesta) >= 40
-            respuesta = _truncate_response_safely(respuesta)
 
             if should_cache:
                 cache.set_response(
@@ -2892,9 +3173,31 @@ def conversations_clear():
 
 @router.get("/pdfs")
 def listar_pdfs():
+    pdfs = capabilities.listar_pdfs()
+    chunk_stats = rag.pdf_chunk_counts()
+    by_pdf_key = chunk_stats.get("by_pdf_key", {}) or {}
+    by_source_name = chunk_stats.get("by_source_name", {}) or {}
+    enriched = []
+    total_chunks = 0
+
+    for idx, item in enumerate(pdfs):
+        registro = dict(item)
+        key = _pdf_source_key(registro, idx)
+        nombre = str(registro.get("nombre_archivo") or "").strip()
+
+        chunks_indexados = int(by_pdf_key.get(key, 0))
+        if chunks_indexados <= 0 and nombre:
+            chunks_indexados = int(by_source_name.get(nombre, 0))
+
+        registro["chunks_indexados"] = chunks_indexados
+        total_chunks += chunks_indexados
+        enriched.append(registro)
+
+    resumen = capabilities.resumen_pdfs()
+    resumen["chunks_indexados_total"] = total_chunks
     return ({
-        "pdfs": capabilities.listar_pdfs(),
-        "resumen": capabilities.resumen_pdfs(),
+        "pdfs": enriched,
+        "resumen": resumen,
     })
 
 
@@ -3102,6 +3405,7 @@ async def cancelar_tarifa(request: Request):
 async def iniciar_tarifa(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    # Usar el idioma seleccionado manualmente para los mensajes del sistema
     lang = idiomas.resolver_idioma((data or {}).get("lang"), "")
     try:
         _persistir_flujo_tarifa(sid, status="cancelled")
@@ -3119,7 +3423,7 @@ async def iniciar_tarifa(request: Request):
         },
     )
     missing = ["alcance"]
-    msg = "¿Será nacional o internacional?"
+    msg = "Rates mode activated. What service do you want to use?" if lang == "en" else "¿Será nacional o internacional?"
     session.append_tarifa_flow_turn(
         sid,
         user_text="(inicio modo tarifas)",
@@ -3131,9 +3435,128 @@ async def iniciar_tarifa(request: Request):
         "sid": sid,
         "lang": lang,
         "response": msg,
-        "quick_replies": _tarifa_quick_replies(missing),
+        "quick_replies": _tarifa_quick_replies(missing, lang=lang),
         "tarifa": {"ok": False, "pending": True, "start": True, "missing": missing},
     }
+
+
+# ─────────────────────────────────────────────
+#  ESCALACIÓN A HUMANO
+# ─────────────────────────────────────────────
+
+@router.post("/escalate")
+async def escalate_to_human(request: Request):
+    """
+    Crea un ticket de escalación para atención humana.
+    
+    Body JSON:
+    {
+        "message": "consulta del usuario",
+        "reason": "low_confidence|error|user_request|complex_query",
+        "email": "usuario@correo.com" (opcional),
+        "phone": "+591..." (opcional),
+        "priority": "low|medium|high|urgent"
+    }
+    """
+    from core import escalation
+    
+    try:
+        data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    except:
+        data = {}
+    
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    lang = idiomas.resolver_idioma((data or {}).get("lang"), "")
+    
+    ticket = escalation.create_ticket(
+        session_id=sid,
+        user_message=data.get("message", ""),
+        reason=data.get("reason", "user_request"),
+        user_email=data.get("email", ""),
+        user_phone=data.get("phone", ""),
+        priority=data.get("priority", "medium")
+    )
+    
+    # Mensaje según idioma
+    msgs = {
+        "es": f"✅ Tu solicitud #{ticket['id']} ha sido enviada. Un agente te contactará pronto.",
+        "en": f"✅ Your request #{ticket['id']} has been sent. An agent will contact you soon.",
+        "qu": f"✅ Mañakuyniyki #{ticket['id']} kachasqa. Huq agente qanwan rimanqa.",
+        "ay": f"✅ Manti #{ticket['id']} waliq’utaya. Huq agente qanwa jap’i.",
+    }
+    
+    return {
+        "ok": True,
+        "ticket_id": ticket["id"],
+        "sid": sid,
+        "lang": lang,
+        "response": msgs.get(lang, msgs["es"]),
+        "escalation": {
+            "status": ticket["status"],
+            "priority": ticket["priority"],
+            "created_at": ticket["created_at"]
+        },
+        "quick_replies": [
+            {"label": {"es": "Volver al chat", "en": "Back to chat", "qu": "Yapay rimay", "ay": "Jan uñsti"}.get(lang, "Volver al chat"), "value": "__menu__"}
+        ]
+    }
+
+
+@router.get("/escalation/tickets")
+async def get_escalation_tickets(request: Request):
+    """Obtiene tickets pendientes (para panel de agentes)."""
+    from core import escalation
+    
+    # En producción agregar autenticación
+    tickets = escalation.get_pending_tickets()
+    stats = escalation.get_ticket_stats()
+    
+    return {
+        "ok": True,
+        "tickets": tickets[:20],  # Limitar a 20 más recientes
+        "stats": stats
+    }
+
+
+@router.post("/escalation/{ticket_id}/assign")
+async def assign_ticket(ticket_id: str, request: Request):
+    """Asigna ticket a un agente."""
+    from core import escalation
+    
+    try:
+        data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    except:
+        data = {}
+    
+    agent = data.get("agent", "Agente")
+    ticket = escalation.assign_ticket(ticket_id, agent)
+    
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado")
+    
+    return {"ok": True, "ticket": ticket}
+
+
+@router.post("/escalation/{ticket_id}/resolve")
+async def resolve_ticket(ticket_id: str, request: Request):
+    """Resuelve un ticket."""
+    from core import escalation
+    
+    try:
+        data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    except:
+        data = {}
+    
+    ticket = escalation.resolve_ticket(
+        ticket_id,
+        data.get("resolution", ""),
+        data.get("notes", "")
+    )
+    
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket no encontrado")
+    
+    return {"ok": True, "ticket": ticket}
 
 
 @router.post("/tracking/start")
@@ -3145,7 +3568,7 @@ async def iniciar_tracking(request: Request):
         "ok": True,
         "sid": sid,
         "lang": lang,
-        "response": _tracking_prompt_message(),
+        "response": _tracking_prompt_message(lang),
         "quick_replies": [],
         "tracking": {"ok": False, "pending": True, "start": True, "requires_code": True},
     }
@@ -3159,6 +3582,113 @@ async def cancelar_tracking(request: Request):
         "ok": True,
         "sid": sid,
         "tracking": {"pending": False, "cancelled": True},
+    }
+
+
+# ─────────────────────────────────────────────
+#  GEOLOCALIZACIÓN - SUCURSAL MÁS CERCANA
+# ─────────────────────────────────────────────
+
+def _calcular_distancia_haversine(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Calcula distancia en km usando fórmula de Haversine."""
+    import math
+    R = 6371  # Radio de la Tierra en km
+    dLat = math.radians(lat2 - lat1)
+    dLon = math.radians(lng2 - lng1)
+    a = (math.sin(dLat / 2) * math.sin(dLat / 2) +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+         math.sin(dLon / 2) * math.sin(dLon / 2))
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
+@router.post("/sucursal/cercana")
+async def sucursal_mas_cercana(request: Request):
+    """
+    Recibe latitud/longitud del usuario y devuelve la sucursal más cercana.
+    
+    Body JSON:
+    {
+        "lat": -16.5000,
+        "lng": -68.1500,
+        "lang": "es" (opcional)
+    }
+    """
+    try:
+        data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    except:
+        data = {}
+    
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    lang = idiomas.resolver_idioma((data or {}).get("lang"), "")
+    
+    # Validar coordenadas - NO permitir 0,0 porque eso es el default cuando no se envía nada
+    try:
+        lat = float(data.get("lat"))
+        lng = float(data.get("lng"))
+    except (ValueError, TypeError):
+        logger.info(f"[GEO] Coordenadas inválidas recibidas: lat={data.get('lat')}, lng={data.get('lng')}")
+        raise HTTPException(status_code=400, detail="Coordenadas inválidas o no proporcionadas")
+    
+    # Rechazar 0,0 explícitamente (probablemente error de frontend) y validar rangos
+    if (lat == 0 and lng == 0) or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+        logger.info(f"[GEO] Rechazando coordenadas: lat={lat}, lng={lng}")
+        raise HTTPException(status_code=400, detail="Coordenadas no válidas. Asegúrate de permitir el acceso a tu ubicación.")
+    
+    if not SUCURSALES:
+        return {
+            "ok": False,
+            "error": "No hay sucursales cargadas",
+            "sid": sid,
+            "lang": lang,
+        }
+    
+    # Encontrar sucursal más cercana
+    sucursal_cercana = None
+    min_distancia = float('inf')
+    
+    for suc in SUCURSALES:
+        suc_lat = suc.get("lat")
+        suc_lng = suc.get("lng")
+        if suc_lat is None or suc_lng is None:
+            continue
+        try:
+            distancia = _calcular_distancia_haversine(lat, lng, float(suc_lat), float(suc_lng))
+            if distancia < min_distancia:
+                min_distancia = distancia
+                sucursal_cercana = suc
+        except:
+            continue
+    
+    if not sucursal_cercana:
+        return {
+            "ok": False,
+            "error": "No se pudo determinar sucursal cercana",
+            "sid": sid,
+            "lang": lang,
+        }
+    
+    # Mensaje según idioma
+    msgs = {
+        "es": f"  La sucursal más cercana es **{sucursal_cercana.get('nombre', 'Sucursal')}** a {min_distancia:.1f} km de tu ubicación.",
+        "en": f"  The nearest branch is **{sucursal_cercana.get('nombre', 'Branch')}** {min_distancia:.1f} km from your location.",
+        "qu": f"  Aswan kay punku **{sucursal_cercana.get('nombre', 'Punku')}** {min_distancia:.1f} km maypi kanki.",
+        "ay": f"  Jupaxa wali uñjsañata **{sucursal_cercana.get('nombre', 'Uñjsaña')}** {min_distancia:.1f} km jan wali uñjsañata.",
+    }
+    
+    sucursal_dict = location.sucursal_a_dict(sucursal_cercana) if hasattr(location, 'sucursal_a_dict') else dict(sucursal_cercana)
+    sucursal_dict["distancia_km"] = round(min_distancia, 1)
+    
+    return {
+        "ok": True,
+        "sid": sid,
+        "lang": lang,
+        "response": msgs.get(lang, msgs["es"]),
+        "sucursal": sucursal_dict,
+        "mi_ubicacion": {"lat": lat, "lng": lng},
+        "quick_replies": [
+            {"label": {"es": "🗺️ Ver en mapa", "en": "🗺️ View on map", "qu": "🗺️ Mapa", "ay": "🗺️ Mapa uñja"}.get(lang, "🗺️ Ver en mapa"), "value": f"__mapa_sucursal__{sucursal_cercana.get('nombre', '')}"}
+        ]
     }
 
 

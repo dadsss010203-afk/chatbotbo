@@ -33,6 +33,33 @@ def translate_texts(texts: list[str], lang: str, ollama_module) -> tuple[list[st
     if not texts:
         return [], "none"
 
+    # 1. Primero intentar con Ollama local (más rápido, sin dependencia de internet)
+    target_lang = LANG_NAMES.get(lang, "español")
+    input_json = json.dumps(texts, ensure_ascii=False)
+    prompt = (
+        f"Eres un traductor profesional. Traduce la siguiente lista de mensajes al idioma **{target_lang}**. "
+        "La entrada es una lista JSON. Debes devolver SOLO una lista JSON con las traducciones en el mismo orden. "
+        "No añadas explicaciones, ni números de índice, solo el JSON resultante.\n\n"
+        f"Entrada:\n{input_json}"
+    )
+
+    try:
+        respuesta = ollama_module.llamar_ollama(
+            [{"role": "user", "content": prompt}],
+            opciones={"temperature": 0.1}
+        )
+        respuesta = ollama_module.limpiar_respuesta(respuesta)
+
+        match = re.search(r"\[.*\]", respuesta, re.DOTALL)
+        if match:
+            json_str = match.group(0)
+            traducciones = json.loads(json_str)
+            if isinstance(traducciones, list) and len(traducciones) == len(texts):
+                return traducciones, "ollama"
+    except Exception:
+        pass
+
+    # 2. Fallback a deep_translator si Ollama falla
     if _translator_available:
         try:
             translated = []
@@ -43,6 +70,7 @@ def translate_texts(texts: list[str], lang: str, ollama_module) -> tuple[list[st
         except Exception:
             pass
 
+    # 3. Último fallback a LibreTranslate online
     try:
         translated = []
         for text in texts:
@@ -59,28 +87,5 @@ def translate_texts(texts: list[str], lang: str, ollama_module) -> tuple[list[st
     except Exception:
         pass
 
-    target_lang = LANG_NAMES.get(lang, "español")
-    input_json = json.dumps(texts, ensure_ascii=False)
-    prompt = (
-        f"Eres un traductor profesional. Traduce la siguiente lista de mensajes al idioma **{target_lang}**. "
-        "La entrada es una lista JSON. Debes devolver SOLO una lista JSON con las traducciones en el mismo orden. "
-        "No añadas explicaciones, ni números de índice, solo el JSON resultante.\n\n"
-        f"Entrada:\n{input_json}"
-    )
-
-    respuesta = ollama_module.llamar_ollama([{"role": "user", "content": prompt}])
-    respuesta = ollama_module.limpiar_respuesta(respuesta)
-
-    match = re.search(r"\[.*\]", respuesta, re.DOTALL)
-    if not match:
-        return texts, "fallback_original"
-
-    json_str = match.group(0)
-    try:
-        traducciones = json.loads(json_str)
-    except json.JSONDecodeError:
-        return texts, "fallback_original"
-
-    if isinstance(traducciones, list) and len(traducciones) == len(texts):
-        return traducciones, "ollama"
+    # Si todo falla, devolver textos originales
     return texts, "fallback_original"
