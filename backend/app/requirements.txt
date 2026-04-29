@@ -40,7 +40,8 @@ aiofiles==24.1.0
 asyncio-contextmanager==1.0.1
 celery==5.3.6
 qdrant-client==1.10.0
-onnxruntime==1.15.1
+onnxruntime==1.15.1; python_version < "3.12"
+onnxruntime==1.17.3; python_version >= "3.12"
 tritonclient[http]==2.26.0
 
 # ── Scraper
@@ -60,3 +61,4 @@ python-dateutil==2.9.0
 # deep-translator usa Google/Facebook/Microsoft gratis
 # (se instala opcionalmente, no es crítico si falla)
 deep-translator==1.11.4
+

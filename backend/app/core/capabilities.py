@@ -6,6 +6,7 @@ Registro ejecutable de skills, PDFs y recursos del bot.
 import json
 import os
 import re
+import shutil
 import unicodedata
 import hashlib
 from datetime import datetime
@@ -163,10 +164,26 @@ SUPPORTED_SKILL_CATEGORY_IDS = {item["id"] for item in SUPPORTED_SKILL_CATEGORIE
 
 SKILL_SCOPE_KEYWORDS = {
     "correos", "agbc", "postal", "postales", "envio", "envíos", "envios", "paquete", "paquetes",
-    "rastreo", "seguimiento", "servicio", "servicios",
+    "rastreo", "seguimiento", "guia", "guía", "tracking", "ems", "encomienda",
     "reclamo", "queja", "quejas", "estafa", "fraude", "seguridad", "filatelia", "sello", "sellos",
-    "oficina", "oficinas", "sucursal", "sucursales", "contacto", "historia", "estampilla", "estampillas",
+    "oficina", "oficinas", "sucursal", "sucursales", "estampilla", "estampillas",
 }
+
+SKILL_GENERIC_WORDS_BY_ID = {
+    "servicios_correos": {"servicio", "servicios"},
+    "historia_correos_bolivia": {"historia", "origen", "evolucion", "antecedentes"},
+    "estado_plataforma": {"estado", "sistema", "skills", "capacidades"},
+}
+
+POSTAL_CONTEXT_HINTS = {
+    "correos", "agbc", "postal", "postales", "envio", "envios", "guia", "tracking", "rastreo",
+    "sucursal", "oficina", "filatelia", "reclamo", "queja", "ems", "encomienda", "paquete",
+}
+
+ROLE_OVERRIDE_PATTERNS = (
+    "ahora eres", "olvida que eres", "actua como", "actúa como", "haz de cuenta que eres",
+    "pretende ser", "finge ser", "desde ahora eres", "comportate como", "compórtate como",
+)
 
 GENERIC_TRIGGER_TERMS = {
     "info", "informacion", "información", "ayuda", "consulta", "consultas",
@@ -273,6 +290,22 @@ def _tokenizar_trigger(trigger: str) -> list[str]:
         seen.add(limpio)
         tokens.append(limpio)
     return tokens
+
+
+def _contains_whole_phrase(texto: str, phrase: str) -> bool:
+    base = _normalizar_match_text(texto)
+    target = _normalizar_match_text(phrase)
+    if not base or not target:
+        return False
+    pattern = r"(?<![a-z0-9])" + r"\s+".join(re.escape(part) for part in target.split()) + r"(?![a-z0-9])"
+    return re.search(pattern, base) is not None
+
+
+def looks_like_role_override(pregunta: str) -> bool:
+    texto = _normalizar_match_text(pregunta)
+    if not texto:
+        return False
+    return any(_contains_whole_phrase(texto, pattern) for pattern in ROLE_OVERRIDE_PATTERNS)
 
 
 def _validar_trigger(trigger: str) -> tuple[str, list[str]]:
@@ -477,26 +510,34 @@ def get_active_skills() -> list[dict]:
 def resolve_skills_for_query(pregunta: str) -> dict:
     texto = _normalizar_match_text(pregunta)
     palabras = set(texto.split())
+    has_postal_context = bool(palabras.intersection(POSTAL_CONTEXT_HINTS)) or "correos" in texto or "agbc" in texto
     skills = get_active_skills()
     matches = []
 
     for skill in skills:
         score = 0
+        skill_generic_words = SKILL_GENERIC_WORDS_BY_ID.get(skill["id"], set())
         for token in skill.get("trigger_tokens", []):
-            if token and token in texto:
+            if token and _contains_whole_phrase(texto, token):
+                if token in skill_generic_words and not has_postal_context:
+                    continue
                 score += max(3, len(token.split()) * 2)
                 continue
             token_words = [word for word in token.split() if len(word) >= 4]
             if token_words and all(word in palabras for word in token_words):
+                if set(token_words).issubset(skill_generic_words) and not has_postal_context:
+                    continue
                 score += max(2, len(token_words))
         for word in skill.get("trigger_words", []):
+            if word in skill_generic_words and not has_postal_context:
+                continue
             if word in palabras:
                 score += 1
         if skill["id"] == "oficinas_contacto" and any(word in texto for word in ("donde", "direccion", "ubicacion", "horario", "telefono")):
             score += 2
         if skill["id"] == "rastreo_envios" and any(word in texto for word in ("codigo", "guia", "tracking", "seguimiento", "rastreo", "envio", "paquete")):
             score += 3
-        if skill["id"] == "servicios_correos" and any(word in texto for word in ("servicio", "ems", "certificado", "ordinario", "encomienda")):
+        if skill["id"] == "servicios_correos" and any(word in texto for word in ("ems", "certificado", "ordinario", "encomienda", "giros", "paqueteria")):
             score += 2
         if skill["id"] == "reclamos_quejas" and any(word in texto for word in ("reclamo", "queja", "demora", "extraviado", "perdido")):
             score += 2
@@ -519,13 +560,18 @@ def resolve_skills_for_query(pregunta: str) -> dict:
             if item["match_score"] >= 7 and score_gap <= 3:
                 filtered.append(item)
         matches = filtered
-    in_scope = bool(matches) or any(token in texto.split() for token in SKILL_SCOPE_KEYWORDS) or "correos" in texto or "agbc" in texto
+    strong_matches = [item for item in matches if int(item.get("match_score") or 0) >= 5]
+    in_scope = bool(strong_matches) or any(token in palabras for token in SKILL_SCOPE_KEYWORDS) or "correos" in texto or "agbc" in texto
+
+    if looks_like_role_override(pregunta) and not has_postal_context:
+        in_scope = False
+        strong_matches = []
 
     return {
         "in_scope": in_scope,
-        "matched_skills": matches,
-        "primary_skill": matches[0] if matches else None,
-        "skill_ids": [item["id"] for item in matches],
+        "matched_skills": strong_matches,
+        "primary_skill": strong_matches[0] if strong_matches else None,
+        "skill_ids": [item["id"] for item in strong_matches],
     }
 
 
@@ -554,7 +600,9 @@ def preferred_sources_for_skill(skill: dict | None) -> list[str]:
     categoria = skill.get("categoria")
 
     if skill_id == "historia_correos_bolivia":
-        return ["pdf", "history", "json_data", "section", "web_main", "branch"]
+        # Para historia institucional priorizamos primero las fuentes históricas
+        # curadas antes que PDFs genéricos de servicios.
+        return ["history", "json_data", "pdf", "section", "web_main", "branch"]
     if skill_id == "filatelia_boliviana" or categoria == "documental":
         return ["pdf", "json_data", "history", "section", "web_main", "branch"]
     if skill_id == "oficinas_contacto":
@@ -881,20 +929,65 @@ def get_runtime_capabilities(
     }
 
 
+def detectar_codigo_seguimiento(pregunta: str) -> str | None:
+    """Detecta códigos de seguimiento bolivianos (terminan en BO) o internacionales."""
+    import re
+    
+    texto = (pregunta or "").strip().upper()
+    if not texto:
+        return None
+    
+    # Patrones comunes de códigos de seguimiento (de más específico a más general)
+    patrones = [
+        # Formato boliviano específico: cualquier combinación que termine en BO
+        r'[A-Z]\d+[A-Z]?\d*BO',               # Ej: C0007A02018BO, R123456789BO
+        # Formato internacional XX123456789XX
+        r'[A-Z]{2}\d{9}[A-Z]{2}',              # Ej: ES123456789CN
+        # Solo números (12-14 dígitos)
+        r'\d{12,14}',                          # Ej: 123456789012
+        # Letra + números (8-13 dígitos)
+        r'[A-Z]\d{8,13}',                      # Ej: C123456789
+    ]
+    
+    for patron in patrones:
+        match = re.search(patron, texto)
+        if match:
+            codigo = match.group(0)
+            print(f"[TRACKING] Código detectado: {codigo}")
+            return codigo
+    
+    print(f"[TRACKING] No se detectó código en: {texto[:50]}")
+    return None
+
+
+# Test al importar
+if __name__ == "__main__":
+    # Probar con el código del usuario
+    test_codigo = "C0007A02018BO"
+    resultado = detectar_codigo_seguimiento(test_codigo)
+    print(f"Test '{test_codigo}': {resultado}")
+
+
 def detectar_consulta_especial(pregunta: str) -> str | None:
-    texto = (pregunta or "").strip().lower()
+    texto = _normalizar_match_text(pregunta)
     if not texto:
         return None
 
-    if any(token in texto for token in ("skill", "skills", "habilidad", "habilidades")):
+    # Detectar código de seguimiento primero
+    codigo = detectar_codigo_seguimiento(pregunta)
+    if codigo:
+        print(f"[CONSULTA_ESPECIAL] Detectado tracking con código: {codigo}")
+        return "tracking"
+
+    if any(_contains_whole_phrase(texto, token) for token in ("skill", "skills", "habilidad", "habilidades")):
         return "skills"
-    if any(token in texto for token in ("rag", "chroma", "embeddings", "chunks", "base vectorial")):
+    if any(_contains_whole_phrase(texto, token) for token in ("rag", "chroma", "embeddings", "chunks", "base vectorial")):
         return "rag_local"
-    if any(token in texto for token in ("estado del sistema", "status del sistema", "estado bot", "estado del bot")):
+    if any(_contains_whole_phrase(texto, token) for token in ("estado del sistema", "status del sistema", "estado bot", "estado del bot")):
         return "system_status"
-    if any(token in texto for token in ("sucursales cargadas", "resumen de sucursales", "estado de sucursales")):
+    if any(_contains_whole_phrase(texto, token) for token in ("sucursales cargadas", "resumen de sucursales", "estado de sucursales")):
         return "branches_summary"
-    if any(token in texto for token in ("genera", "generar", "que puedes hacer", "capacidades del bot")):
+    if any(_contains_whole_phrase(texto, token) for token in ("que puedes hacer", "capacidades del bot", "que sabes hacer")):
         return "generar"
     return None
 
@@ -1023,7 +1116,17 @@ def guardar_pdf_subido(
     nombre_archivo = _sanitize_filename(file_storage.filename)
     os.makedirs(PDF_DIR, exist_ok=True)
     ruta_real = os.path.join(PDF_DIR, nombre_archivo)
-    file_storage.save(ruta_real)
+
+    if hasattr(file_storage, "save"):
+        file_storage.save(ruta_real)
+    else:
+        file_obj = getattr(file_storage, "file", file_storage)
+        try:
+            file_obj.seek(0)
+        except Exception:
+            pass
+        with open(ruta_real, "wb") as out:
+            shutil.copyfileobj(file_obj, out)
 
     clean_mode_resolved = _resolve_clean_mode(clean_mode)
 
@@ -1268,7 +1371,7 @@ def actualizar_texto_pdf(nombre_archivo: str, texto_extraido: str | None) -> dic
     return {"ok": True, "pdf": registro}
 
 
-def execute_special_query(tipo: str, runtime_capabilities: dict) -> dict:
+def execute_special_query(tipo: str, runtime_capabilities: dict, pregunta: str = "") -> dict:
     if tipo == "skills":
         return {
             "kind": "skills",
@@ -1293,6 +1396,14 @@ def execute_special_query(tipo: str, runtime_capabilities: dict) -> dict:
     if tipo == "branches_summary":
         result = _branches_summary(runtime_capabilities)
         return {"kind": "branches", "payload": result, "response": result["text"]}
+    if tipo == "tracking":
+        codigo = detectar_codigo_seguimiento(pregunta)
+        url_tracking = f"https://trackingbo.correos.gob.bo:8100/search?tracking={codigo}"
+        return {
+            "kind": "tracking",
+            "payload": {"codigo": codigo, "url": url_tracking},
+            "response": f"Detecté el código de seguimiento: **{codigo}**\n\nPuedes consultar el estado de tu envío en:\n🔗 {url_tracking}\n\nSi prefieres, puedo ayudarte a interpretar la información una vez que accedas al enlace.",
+        }
     raise ValueError(f"Consulta especial no soportada: {tipo}")
 
 

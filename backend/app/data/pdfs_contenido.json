@@ -82,5 +82,19 @@
     "archivo_guardado": false,
     "content_hash": "6a58253410f172f4",
     "clean_mode": "aggressive"
+  },
+  {
+    "url": "",
+    "archivo_local": "",
+    "nombre_archivo": "Aprendizaje_por_Destilación_en_LLMs.pdf",
+    "tamano_bytes": 59847,
+    "texto_extraido": "--- Página 1 ---\nEl Aprendizaje por Destilación (o Knowledge Distillation) es una técnica en la que un modelo\npequeño y eficiente (llamado Estudiante) aprende a imitar el comportamiento y el rendimiento\nde un modelo mucho más grande y complejo (llamado Maestro).\nImagina que quieres que un smartphone tenga la inteligencia de una supercomputadora: no\npuedes meter el hardware de la supercomputadora en el teléfono, así que haces que el\nteléfono \"estudie\" cómo responde la supercomputadora para copiar su razonamiento.\n1. ¿Cómo funciona el proceso?\nEn lugar de que el modelo Estudiante aprenda directamente de los datos \"crudos\" (como texto\nde internet), aprende de las predicciones del Maestro.\n● El Maestro (Teacher): Un LLM masivo (como GPT-4 o Llama-3 70B) que ya sabe mucho\npero es lento y costoso de ejecutar.\n● El Estudiante (Student): Un modelo pequeño (como DistilBERT o Llama-3 8B) que es\nrápido y ligero.\n● La \"Receta\": El Maestro procesa un texto y genera una distribución de probabilidades (no\nsolo la respuesta final, sino qué tan seguro está de cada palabra). El Estudiante intenta\nque su propia distribución de probabilidades sea lo más parecida posible a la del\nMaestro.\n2. ¿Por qué es útil?\nLa destilación es fundamental para llevar la IA al mundo real por tres razones principales:\nBeneficio Descripción\nVelocidad Los modelos destilados son mucho más\nrápidos en generar respuestas (baja latencia).\nCosto Requieren menos memoria RAM y potencia de\ncómputo (GPU), lo que reduce la factura de la\nnube.\n\n--- Página 2 ---\nPortabilidad Permite ejecutar LLMs directamente en\ndispositivos locales como laptops o teléfonos\nmóviles.\n3. Tipos de Destilación en LLMs\nExisten principalmente dos formas de hacerlo hoy en día:\nA. Destilación de Logits (Caja Negra/Blanca)\nEl Estudiante intenta copiar las puntuaciones matemáticas exactas que el Maestro asigna a\ncada palabra posible. Esto requiere acceso a las capas internas del modelo Maestro.\nB. Destilación por Generación (Ajuste Fino con Instrucciones)\nEs la más común actualmente. Se usa un modelo gigante para generar miles de ejemplos de\n\"Pregunta y Respuesta\" de alta calidad. Luego, se entrena al modelo pequeño usando esos\ndatos.\nEjemplo: Usas GPT-4 para generar 50,000 explicaciones complejas de física y\nluego entrenas a un modelo pequeño solo con esos textos para que aprenda ese\nestilo de razonamiento.\n4. El \"Costo\" de la Destilación\nAunque es una técnica poderosa, tiene un límite: el Estudiante rara vez supera al Maestro. Al\ndestilar, se suele perder un poco de la \"creatividad\" o la capacidad de generalización en temas\nmuy diversos que tiene el modelo gigante, volviéndose un especialista más que un todólogo.\n¿Estás pensando en aplicar destilación para un proyecto específico o te interesa más la teoría\ndetrás de modelos como los de la familia Hugging Face?",
+    "longitud_texto": 2832,
+    "metodo_extraccion": "manual_edit",
+    "pagina_fuente": "aprendizaje",
+    "subido_manual": true,
+    "archivo_guardado": false,
+    "content_hash": "9a6a671db737c587",
+    "clean_mode": "aggressive"
   }
 ]
