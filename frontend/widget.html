@@ -5,37 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chat Bubble - Correos de Bolivia</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="widget.css">
+  <link rel="stylesheet" href="/widget.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
-<!-- Chat Bubble -->
 <button id="chat-bubble" onclick="toggleChat()" aria-label="Abrir asistente">
-  <svg viewBox="0 0 24 24"><path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+  <img src="/logo_chatbot.png" alt="Chatbot Logo" class="bubble-logo" style="width: 95px; height: 95px; object-fit: cover; object-position: center; border-radius: 8px;">
   <div id="badge"></div>
 </button>
 
-<!-- Chat Window -->
 <div id="chat-window">
   <div id="translate-banner"></div>
 
-  <!-- Header -->
   <header>
     <div class="h-inner">
       <div class="h-row1">
         <div class="h-brand">
           <div>
             <div class="h-name">Correos de Bolivia</div>
-            <div class="h-sub">Agencia Boliviana de Correos</div>
           </div>
         </div>
         <div class="h-btns">
-          <button class="hb" onclick="clearConv()" title="Limpiar conversación">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-          </button>
-          <button class="hb" onclick="openMap()" title="Ver sucursales">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-          </button>
           <button class="hb" onclick="minimize()" title="Minimizar">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
           </button>
@@ -48,21 +39,24 @@
         <div class="langs">
           <button class="lpill on" data-lang="es" onclick="setLang('es')">🇧🇴 ES</button>
           <button class="lpill" data-lang="en" onclick="setLang('en')">🇺🇸 EN</button>
-          <button class="lpill" data-lang="fr" onclick="setLang('fr')">🇫🇷 FR</button>
-          <button class="lpill" data-lang="pt" onclick="setLang('pt')">🇧🇷 PT</button>
-          <button class="lpill" data-lang="zh" onclick="setLang('zh')">🇨🇳 ZH</button>
-          <button class="lpill" data-lang="ru" onclick="setLang('ru')">🇷🇺 RU</button>
         </div>
       </div>
     </div>
     <div class="h-stripe"></div>
   </header>
 
-  <!-- Chat Area: solo chips, sin .wc-sub ni .wc-sep -->
-  <div id="chat">
+  <div id="chat"></div>
+
+  <div id="sucursal-menu" style="display:none;position:absolute;bottom:70px;right:11px;background:var(--white);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shd2);overflow:hidden;z-index:100;animation:winIn 0.2s cubic-bezier(.22,1,.36,1)">
+    <button onclick="closeSucursalMenu();openMap();" style="display:flex;align-items:center;gap:9px;width:100%;padding:10px 16px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:500;color:var(--ink2);transition:background 0.18s;white-space:nowrap;">
+      Ver todas las sucursales
+    </button>
+    <div style="height:1px;background:var(--border);margin:0 10px"></div>
+    <button onclick="closeSucursalMenu();findNearestBranch();" style="display:flex;align-items:center;gap:9px;width:100%;padding:10px 16px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:500;color:var(--ink2);transition:background 0.18s;white-space:nowrap;">
+      La más cercana a mí
+    </button>
   </div>
 
-  <!-- Form Area -->
   <div id="form-area">
     <form id="form">
       <input id="input" type="text" placeholder="Escriba su consulta aquí…" autocomplete="off"/>
@@ -72,15 +66,20 @@
       <button type="submit" id="send">
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
+      <button type="button" id="refresh-btn" onclick="clearConv()" title="Nueva conversación" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.3s;">
+        <svg viewBox="0 0 24 24" style="width:75%;height:75%;" fill="var(--ink3)">
+          <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+        </svg>
+      </button>
     </form>
     <div class="f-meta">
       <span class="f-hint">Enter para enviar</span>
       <button type="button" id="tarifa-toggle" class="tarifa-toggle" onclick="toggleTarifaMode()">Tarifas</button>
-      <span class="f-brand">Powered by <b>AGBC IA</b></span>
+      <button type="button" id="tracking-toggle" class="tracking-toggle" onclick="toggleTrackingMode()">Rastreo</button>
+      <button type="button" id="nearby-toggle" class="nearby-toggle" onclick="toggleSucursalMenu()">Sucursales</button>
     </div>
   </div>
 
-  <!-- Confirm Bar -->
   <div id="confirm-bar">
     <p>¿Borrar <span>toda la conversación</span>?</p>
     <div class="c-btns">
@@ -90,14 +89,10 @@
   </div>
 </div>
 
-<!-- Map Modal -->
 <div id="mapa-modal">
   <div id="mapa-cnt">
     <div id="mapa-hdr">
-      <div>
-        <h3>Red de Sucursales</h3>
-        <small>Agencia Boliviana de Correos · Bolivia</small>
-      </div>
+      <div><h3>Red de Sucursales</h3><small>Correos de Bolivia</small></div>
       <button id="close-map" onclick="closeMap()">
         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>

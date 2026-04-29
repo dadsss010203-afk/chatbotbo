@@ -78,6 +78,8 @@ class TestTarifasSkill(unittest.TestCase):
 
     def test_resolve_scope(self):
         self.assertEqual(tarifas_skill.resolve_scope("EMS Nacional"), "nacional")
+        self.assertEqual(tarifas_skill.resolve_scope("encomienda_nacional"), "encomienda_nacional")
+        self.assertEqual(tarifas_skill.resolve_scope("super_express_paquetes_internacional"), "super_express_paquetes_internacional")
         self.assertEqual(tarifas_skill.resolve_scope("tarifa internacional"), "internacional")
         self.assertEqual(tarifas_skill.resolve_scope("mi encomienda nacional"), "encomienda_nacional")
         self.assertEqual(tarifas_skill.resolve_scope("encomienda internacional"), "encomienda_internacional")

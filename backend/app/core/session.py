@@ -25,6 +25,7 @@ MAX_SESIONES_MEMORIA = int(os.environ.get("MAX_SESIONES_MEMORIA", "2000"))
 historiales: dict = {}
 _ultimo_acceso: dict = {}
 _pendiente_tarifa: dict = {}
+_pendiente_ubicacion: dict = {}
 _flujo_tarifa: dict = {}
 _lock = threading.Lock()
 
@@ -37,6 +38,7 @@ def _eliminar_sid(sid: str) -> None:
     historiales.pop(sid, None)
     _ultimo_acceso.pop(sid, None)
     _pendiente_tarifa.pop(sid, None)
+    _pendiente_ubicacion.pop(sid, None)
     _flujo_tarifa.pop(sid, None)
 
 
@@ -144,6 +146,35 @@ def clear_pendiente_tarifa(sid: str) -> None:
     """Limpia el estado temporal de tarifa de la sesión."""
     with _lock:
         _pendiente_tarifa.pop(sid, None)
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+
+
+def set_pendiente_ubicacion(sid: str, data: dict) -> None:
+    """Guarda estado temporal para desambiguar consultas de ubicación."""
+    with _lock:
+        _purgar_sesiones_expiradas()
+        _pendiente_ubicacion[sid] = data or {}
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+
+
+def get_pendiente_ubicacion(sid: str) -> dict | None:
+    """Obtiene el estado temporal de ubicación de la sesión."""
+    with _lock:
+        _purgar_sesiones_expiradas()
+        _ultimo_acceso[sid] = _ahora_ts()
+        _enforce_max_sesiones()
+        data = _pendiente_ubicacion.get(sid)
+        if not isinstance(data, dict):
+            return None
+        return dict(data)
+
+
+def clear_pendiente_ubicacion(sid: str) -> None:
+    """Limpia el estado temporal de ubicación de la sesión."""
+    with _lock:
+        _pendiente_ubicacion.pop(sid, None)
         _ultimo_acceso[sid] = _ahora_ts()
         _enforce_max_sesiones()
 

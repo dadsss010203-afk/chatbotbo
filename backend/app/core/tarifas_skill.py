@@ -18,6 +18,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from core.cache import get_tariff, set_tariff
+from core import tarifas_sqlite
 
 
 BASE_APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -130,6 +131,8 @@ SKILL_CONFIG = {
 
 DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("TARIFF_SKILL_TIMEOUT", "18"))
 DEFAULT_RETRIES = int(os.environ.get("TARIFF_SKILL_RETRIES", "1"))
+CACHE_ENGINE = os.environ.get("TARIFF_ENGINE", "sqlite").strip().lower()
+TARIFF_SQLITE_FALLBACK_LEGACY = os.environ.get("TARIFF_SQLITE_FALLBACK_LEGACY", "true").strip().lower() in ("1", "true", "yes")
 CACHE_TTL_SECONDS = int(os.environ.get("TARIFF_CACHE_TTL_SECONDS", "60"))
 CACHE_MAX_ITEMS = int(os.environ.get("TARIFF_CACHE_MAX_ITEMS", "256"))
 _CACHE: dict[tuple[str, str, str, str], tuple[float, dict]] = {}
@@ -510,6 +513,8 @@ def resolve_scope(value: str | None) -> str | None:
     t = _normalize_text(value or "")
     if not t:
         return None
+    if t in SKILL_CONFIG:
+        return t
     if t in {"nacional", "ems nacional", "local", "bolivia"}:
         return "nacional"
     if t in {"internacional", "ems internacional", "exterior"}:
@@ -994,6 +999,40 @@ def _cache_set(scope: str, peso: str, columna: str, xlsx: str | None, data: dict
     _CACHE[(scope, peso, columna, xlsx or "")] = (time.time(), data)
 
 
+def _parse_keyvalue_output(raw: str, exit_code: int) -> dict:
+    """Parsea salida en formato clave=valor del runtime Python y convierte a dict."""
+    text = (raw or "").strip()
+    if not text:
+        return {"ok": False, "error": "La skill de tarifas no devolvió salida", "exit_code": exit_code}
+
+    # Verificar errores conocidos
+    low = _normalize_text(text)
+    if "peso fuera de rango" in low or "precio vacio" in low:
+        return {"ok": False, "error": "Peso fuera de rango para este tarifario", "error_code": "out_of_range", "raw": text}
+
+    # Parsear formato clave=valor
+    result = {"ok": True}
+    for line in text.splitlines():
+        if "=" in line:
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip()
+            if key == "rango_min_g":
+                result.setdefault("rango", {})["min_g"] = value
+            elif key == "rango_max_g":
+                result.setdefault("rango", {})["max_g"] = value
+            elif key == "precio":
+                try:
+                    result["precio"] = int(float(value))
+                except:
+                    result["precio"] = value
+            else:
+                result[key] = value
+    if "precio" not in result:
+        return {"ok": False, "error": "No se pudo extraer precio de la salida", "raw": text}
+    return result
+
+
 def _parse_wrapper_output(raw: str, exit_code: int) -> dict:
     text = (raw or "").strip()
     if not text:
@@ -1033,7 +1072,7 @@ def _parse_wrapper_output(raw: str, exit_code: int) -> dict:
     }
 
 
-def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None) -> dict:
+def _ejecutar_tarifa_legacy(peso: str, columna: str, scope: str, xlsx: str | None = None) -> dict:
     scope = (scope or "").strip().lower()
     ok, err = skill_ready(scope)
     if not ok:
@@ -1055,7 +1094,16 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
     if cached is not None:
         return {**cached, "cached": True}
 
-    cmd = ["bash", wrapper, "--peso", peso, "--columna", columna]
+    # En Windows, ejecutar el runtime Python directamente (los wrappers .sh no funcionan)
+    is_windows = os.name == 'nt'
+    if is_windows:  # Windows
+        # Convertir ruta del wrapper a ruta del runtime
+        # skillX/tools/calcular_hojaX_json.sh -> skillX/runtime/calcular_hojaX_runtime.py
+        runtime_path = wrapper.replace("\\tools\\", "\\runtime\\").replace("/tools/", "/runtime/")
+        runtime_path = runtime_path.replace("_json.sh", "_runtime.py")
+        cmd = ["python", runtime_path, "--peso", peso, "--columna", columna, "--json"]
+    else:
+        cmd = ["bash", wrapper, "--peso", peso, "--columna", columna]
     if xlsx:
         cmd.extend(["--xlsx", xlsx])
 
@@ -1078,7 +1126,12 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
             last = {"ok": False, "error": f"Error ejecutando skill de tarifas: {exc}"}
             continue
 
-        parsed = _parse_wrapper_output(proc.stdout or proc.stderr or "", proc.returncode)
+        output = proc.stdout or proc.stderr or ""
+        # En Windows: convertir formato clave=valor a JSON
+        if is_windows and output:
+            parsed = _parse_keyvalue_output(output, proc.returncode)
+        else:
+            parsed = _parse_wrapper_output(output, proc.returncode)
         if parsed.get("ok"):
             parsed["scope"] = scope
             parsed["skill_id"] = cfg["skill_id"]
@@ -1089,6 +1142,58 @@ def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None
     if isinstance(last, dict):
         last["scope"] = scope
     return last
+
+
+def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None) -> dict:
+    scope = (scope or "").strip().lower()
+    ok, err = skill_ready(scope)
+    if not ok:
+        return {"ok": False, "error": err}
+
+    cfg = SKILL_CONFIG[scope]
+    allowed_cols = cfg["columns"]
+    peso = (peso or "").strip().lower()
+    columna = (columna or "").strip().upper()
+
+    if not peso:
+        return {"ok": False, "error": "Falta peso"}
+    if columna not in allowed_cols:
+        return {"ok": False, "error": f"Columna inválida para EMS {scope}: {columna}"}
+
+    cached = get_tariff(scope, peso, columna, xlsx)
+    if cached is not None:
+        return {**cached, "cached": True}
+
+    # Si llega xlsx custom, forzamos motor legado para respetar compatibilidad.
+    force_legacy = bool((xlsx or "").strip())
+    prefer_sqlite = (CACHE_ENGINE == "sqlite") and not force_legacy
+
+    if prefer_sqlite:
+        sqlite_result = tarifas_sqlite.calculate_tariff(
+            scope=scope,
+            peso=peso,
+            columna=columna,
+            skill_config=SKILL_CONFIG,
+            auto_seed=True,
+        )
+        if sqlite_result.get("ok"):
+            sqlite_result["scope"] = scope
+            sqlite_result["skill_id"] = cfg["skill_id"]
+            sqlite_result["engine"] = "sqlite"
+            set_tariff(scope, peso, columna, sqlite_result, xlsx)
+            return sqlite_result
+
+        if not TARIFF_SQLITE_FALLBACK_LEGACY:
+            sqlite_result["scope"] = scope
+            sqlite_result["engine"] = "sqlite"
+            return sqlite_result
+
+    legacy_result = _ejecutar_tarifa_legacy(peso=peso, columna=columna, scope=scope, xlsx=xlsx)
+    if legacy_result.get("ok"):
+        legacy_result["engine"] = "legacy"
+    else:
+        legacy_result["engine"] = "legacy"
+    return legacy_result
 
 
 def format_tarifa_response(resultado: dict) -> str:
