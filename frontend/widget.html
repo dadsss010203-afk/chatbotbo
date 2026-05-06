@@ -45,7 +45,14 @@
     <div class="h-stripe"></div>
   </header>
 
-  <div id="chat"></div>
+  <div id="chat">
+    <div class="welcome" id="welcomeCard">
+      <div class="wc-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
+      <div class="wc-title"> </div>
+      <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
+      <div class="wc-sep"><div class="wc-sep-l"></div><div class="wc-sep-d"></div><div class="wc-sep-l"></div></div>
+    </div>
+  </div>
 
   <div id="sucursal-menu" style="display:none;position:absolute;bottom:70px;right:11px;background:var(--white);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--shd2);overflow:hidden;z-index:100;animation:winIn 0.2s cubic-bezier(.22,1,.36,1)">
     <button onclick="closeSucursalMenu();openMap();" style="display:flex;align-items:center;gap:9px;width:100%;padding:10px 16px;border:none;background:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.78rem;font-weight:500;color:var(--ink2);transition:background 0.18s;white-space:nowrap;">

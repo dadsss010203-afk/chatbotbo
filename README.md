@@ -362,6 +362,49 @@ Y se valida con mensajes de error claros.
 
 También existe un endpoint genérico `POST /api` que actúa como proxy para compatibilidad con integraciones anteriores.
 
+### 8.4 Implantación del widget en una página web
+
+Para colocar el chatbot en una página web real, incluye el loader embebible antes de cerrar `</body>`.
+
+```html
+<script
+  src="https://TU-DOMINIO-CHATBOT/widget-embed.js"
+  data-lang="es"
+  data-position="right"
+  defer>
+</script>
+```
+
+Ejemplo local con Docker:
+
+```html
+<script
+  src="http://localhost:5000/widget-embed.js"
+  data-lang="es"
+  data-position="right"
+  defer>
+</script>
+```
+
+El archivo `widget-embed.js` crea un `iframe` flotante y carga internamente `/widget.html`, `/widget.css`, `/widget.js` y `/api` desde el dominio del chatbot. Esto evita conflictos de CSS, IDs y JavaScript con la página donde se implanta.
+
+Opciones disponibles por atributos `data-*`:
+
+| Atributo | Valores | Descripción |
+|---|---|---|
+| `data-lang` | `es`, `en` | Idioma inicial del widget. |
+| `data-position` | `right`, `left` | Lado donde aparece la burbuja. |
+| `data-z-index` | número | Prioridad visual sobre otros elementos. |
+| `data-open-width` | número | Ancho del iframe cuando el chat está abierto. |
+| `data-open-height` | número | Alto del iframe cuando el chat está abierto. |
+
+Requisitos de despliegue:
+
+- Publicar el backend por HTTPS en producción.
+- Permitir que el dominio de la página cargue `https://TU-DOMINIO-CHATBOT/widget-embed.js`.
+- Mantener accesibles `/widget.html`, `/widget.css`, `/widget.js`, `/logo_chatbot.png` y `/api`.
+- Para usar geolocalización de sucursales, la página anfitriona también debe estar servida por HTTPS.
+
 ---
 
 ## 9. Datos y scraper

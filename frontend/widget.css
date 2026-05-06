@@ -42,6 +42,15 @@ body {
   min-height: 100vh;
 }
 
+body.widget-shell {
+  background: transparent;
+}
+
+body.widget-shell {
+  margin: 0;
+  overflow: hidden;
+}
+
 
 /* ─── Page & Hero ──────────────────────────────── */
 .page {

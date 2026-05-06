@@ -5,6 +5,8 @@
 // ─── CONFIGURACIÓN ────────────────────────────────────────────────────
 let API_URL = '/api';
 let lang    = 'es';
+let embedMode = false;
+let widgetPos = 'right';
 
 // ─── ESTADO ────────────────────────────────────────────────────────────
 let chatOpen    = false;
@@ -14,6 +16,7 @@ let ctrl        = null;
 let tarifaMode  = false;
 let trackingMode = false;
 let qrLibPromise = null;
+let welcomeLoaded = false;
 
 // ─── TEXTOS POR IDIOMA ────────────────────────────────────────────────
 const TX = {
@@ -87,6 +90,14 @@ console.log('Widget.js cargando...');
     if (s.dataset.lang) lang    = s.dataset.lang;
   }
 
+  const params = new URLSearchParams(window.location.search || '');
+  if (params.get('api')) API_URL = params.get('api').replace(/\/+$/, '');
+  if (params.get('lang')) lang = params.get('lang');
+  if (params.get('embed') === '1') embedMode = true;
+  if (params.get('pos') === 'left') widgetPos = 'left';
+  if (s && s.dataset.pos === 'left') widgetPos = 'left';
+  if (embedMode) document.body.classList.add('widget-shell');
+
   const baseUrl = s
     ? s.src.replace(/\/widget\.js.*$/, '')
     : API_URL.replace(/\/api$/, '');
@@ -108,29 +119,8 @@ console.log('Widget.js cargando...');
   // Si el widget ya está en el DOM (chatbot.html nativo) inyectar contenido de widget.html
   const existingWindow = document.getElementById('chat-window');
   if (existingWindow) {
-    console.log('chat-window existe (modo página directa), inyectando contenido de widget.html...');
-    // Inyectar contenido de widget.html
-    fetch(baseUrl + '/widget.html')
-      .then(res => {
-        if (!res.ok) throw new Error('widget.html HTTP ' + res.status);
-        return res.text();
-      })
-      .then(html => {
-        // Extraer solo el contenido del chat-window del HTML
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const newWindow = doc.getElementById('chat-window');
-        if (newWindow) {
-          existingWindow.innerHTML = newWindow.innerHTML;
-          // Configurar API_URL desde el atributo data-api del script
-          if (s && s.dataset.api) {
-            API_URL = s.dataset.api.replace(/\/+$/, '');
-          }
-          console.log('Contenido inyectado. API_URL:', API_URL);
-          setTimeout(() => initWidget(s), 100);
-        }
-      })
-      .catch(err => console.error('No se pudo cargar widget.html:', err));
+    console.log('chat-window existe, inicializando widget ya presente en el DOM...');
+    setTimeout(() => initWidget(s), 100);
     return;
   }
 
@@ -159,7 +149,7 @@ console.log('Widget.js cargando...');
 // ─── INICIALIZAR ──────────────────────────────────────────────────────
 function initWidget(s) {
   console.log('initWidget llamado');
-  if (s && s.dataset.pos === 'left') {
+  if (widgetPos === 'left') {
     const bubble = document.getElementById('chat-bubble');
     const win    = document.getElementById('chat-window');
     if (bubble) { bubble.style.left = '28px';  bubble.style.right = 'auto'; }
@@ -194,16 +184,10 @@ function initWidget(s) {
     });
   }
 
-  // Mostrar mensaje de bienvenida como burbuja del bot
-  // (aparece debajo de los chips y NO desaparece al escribir)
-  setTimeout(() => {
-    const t = TX[lang] || TX.es;
-    addWelcomeMsg(t.welcome);
-  }, 200);
-
   if (lang !== 'es') setLang(lang);
   setTarifaModeUI();
   setTrackingModeUI();
+  notifyEmbedState(false);
 
   console.log('Chat Bubble Widget - Correos de Bolivia cargado');
 }
@@ -372,6 +356,18 @@ function now() {
   return new Date().toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
 }
 
+function notifyEmbedState(open) {
+  if (!embedMode || window.parent === window) return;
+  window.parent.postMessage({ type: 'chatbotbo:state', open }, '*');
+}
+
+window.addEventListener('message', (event) => {
+  const data = event.data || {};
+  if (data.type !== 'chatbotbo:command') return;
+  if (data.action === 'open' && !chatOpen) toggleChat();
+  if (data.action === 'close' && chatOpen) minimize();
+});
+
 // ─── TOGGLE CHAT ──────────────────────────────────────────────────────
 function toggleChat() {
   console.log('toggleChat llamado, chatOpen actual:', chatOpen);
@@ -393,13 +389,19 @@ function toggleChat() {
   }
   if (chatOpen) {
     document.getElementById('badge').style.display = 'none';
+    if (!welcomeLoaded) {
+      welcomeLoaded = true;
+      loadWelcome();
+    }
     setTimeout(() => document.getElementById('input').focus(), 420);
   }
+  notifyEmbedState(chatOpen);
 }
 
 function minimize() {
   document.getElementById('chat-window').classList.remove('open');
   chatOpen = false;
+  notifyEmbedState(false);
 }
 
 // ─── IDIOMA ───────────────────────────────────────────────────────────
@@ -507,8 +509,8 @@ function mkAv(t) {
   const a = document.createElement('div');
   a.className = 'av';
   a.innerHTML = t === 'u'
-    ? '<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>'
-    : '<svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>';
+    ? '<svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4-1.3 4-4s-1.3-4-4-4-4 1.3-4 4 1.3 4 4 4zm0 2c-2.7 0-8 1.35-8 4v2h16v-2c0-2.65-5.3-4-8-4z"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>';
   return a;
 }
 
@@ -524,6 +526,35 @@ async function rateConversation(logId, rating, likeBtn, dislikeBtn) {
     if (dislikeBtn) dislikeBtn.classList.toggle('active-dislike', rating === 'dislike');
   } catch (e) {
     console.warn('No se pudo guardar rating:', e);
+  }
+}
+
+function buildWelcomeCard() {
+  const t = TX[lang] || TX.es;
+  const wc = document.createElement('div');
+  wc.className = 'welcome';
+  wc.id = 'welcomeCard';
+  wc.innerHTML = `
+    <div class="wc-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
+    <div class="wc-title"> </div>
+    <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
+    <div class="wc-sep"><div class="wc-sep-l"></div><div class="wc-sep-d"></div><div class="wc-sep-l"></div></div>
+    <div class="chips" id="chips-container">
+      ${t.chips.map(c => `<button class="chip" onclick="suggest(this)">${c}</button>`).join('')}
+    </div>`;
+  return wc;
+}
+
+async function loadWelcome() {
+  await new Promise(resolve => setTimeout(resolve, 300));
+  showTyping();
+  await new Promise(resolve => setTimeout(resolve, 900));
+  removeTyping();
+  try {
+    const data = await (await fetch(`${API_URL}/welcome?lang=${lang}`)).json();
+    addMsg(data.response, 'b', false, null, false);
+  } catch (e) {
+    addMsg('Bienvenido al asistente oficial de la Agencia Boliviana de Correos. ¿En qué le puedo ayudar?', 'b', false, null, false);
   }
 }
 
@@ -770,6 +801,33 @@ function quickRepliesFromTarifa(data) {
 
 
 // ─── ENVIAR MENSAJE ───────────────────────────────────────────────────
+function createStreamingBotMessage() {
+  document.getElementById('welcomeCard')?.remove();
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg b';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bub';
+  bubble.textContent = '';
+  bubble.dataset.original = '';
+
+  const tm = document.createElement('span');
+  tm.className = 'msg-time';
+  tm.textContent = now();
+
+  const body = document.createElement('div');
+  body.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start';
+  body.appendChild(bubble);
+  body.appendChild(tm);
+
+  wrap.appendChild(mkAv('b'));
+  wrap.appendChild(body);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
+  return { wrap, body, bubble };
+}
+
 async function addTrackingQR(trackingUrl, codigo) {
   if (!trackingUrl) return;
   const chat = document.getElementById('chat');
@@ -854,49 +912,103 @@ async function sendMsg(msg) {
   ctrl = new AbortController();
   currentRequestId = newRequestId();
   try {
-    const res  = await fetch(`${API_URL}/chat`, {
+    const res  = await fetch(`${API_URL}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg, lang, sid, request_id: currentRequestId, tarifa_mode: tarifaMode, tracking_mode: trackingMode }),
       signal: ctrl.signal
     });
-    const data = await res.json();
-    console.log('Respuesta del backend:', data);
-    if (data && data.sid) {
-      sid = data.sid;
-      localStorage.setItem('chat_sid', sid);
-    }
-    removeTyping();
-    const bye = data.despedida === true;
-    const isBranchesList = data?.response_type === 'branches_list' && Array.isArray(data?.branches);
-    if (isBranchesList) {
-      addBranchesList(data.branches, data.message || '');
-    } else {
-      addMsg(
-        data.response || data.error || 'Sin respuesta disponible',
-        'b',
-        bye,
-        data.ubicacion || null,
-        data.no_translate === true,
-        data.conversation_log_id || null
-      );
-    }
-    if (data?.tarifa?.requires_mode) {
-      tarifaMode = false;
-      setTarifaModeUI();
-    }
-    const trackingUrl = data?.tracking?.tracking_url || data?.tracking_url || data?.tracking?.url || null;
-    const trackingCode = data?.tracking?.codigo || data?.tracking_code || data?.codigo || data?.tracking?.code || null;
-    if (trackingUrl) {
-      await addTrackingQR(trackingUrl, trackingCode);
-    }
-    addQuickReplies((Array.isArray(data.quick_replies) && data.quick_replies.length > 0) ? data.quick_replies : quickRepliesFromTarifa(data));
-    if (bye) {
-      inp.disabled = true;
-      inp.placeholder = (TX[lang] || TX.es).bye;
-      setStop(false);
-      document.getElementById('send').disabled = true;
-      return;
+    if (!res.ok || !res.body) throw new Error('stream_failed');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamMsg = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const data = JSON.parse(line);
+
+        if (data.type === 'start') {
+          if (data.sid) {
+            sid = data.sid;
+            localStorage.setItem('chat_sid', sid);
+          }
+          continue;
+        }
+
+        if (data.type === 'token') {
+          if (!streamMsg) {
+            removeTyping();
+            streamMsg = createStreamingBotMessage();
+            streamMsg._fullText = '';
+          }
+          streamMsg._fullText += data.content || '';
+          streamMsg.bubble.textContent = streamMsg._fullText;
+          streamMsg.bubble.dataset.original = streamMsg._fullText;
+          const chat = document.getElementById('chat');
+          chat.scrollTop = chat.scrollHeight;
+          continue;
+        }
+
+        if (data.type === 'end') {
+          if (data.sid) {
+            sid = data.sid;
+            localStorage.setItem('chat_sid', sid);
+          }
+          removeTyping();
+
+          const bye = data.despedida === true;
+          const isBranchesList = data?.response_type === 'branches_list' && Array.isArray(data?.branches);
+          if (isBranchesList) {
+            if (streamMsg) streamMsg.wrap.remove();
+            streamMsg = null;
+            addBranchesList(data.branches, data.message || '');
+          } else if (streamMsg) {
+            const finalText = data.response || streamMsg.bubble.textContent || 'Sin respuesta disponible';
+            streamMsg.bubble.textContent = finalText;
+            streamMsg.bubble.dataset.original = finalText;
+            if (!bye && data.no_translate !== true) {
+              autoTranslateBubble(streamMsg.bubble, finalText);
+            }
+          } else {
+            addMsg(
+              data.response || data.error || 'Sin respuesta disponible',
+              'b',
+              bye,
+              data.ubicacion || null,
+              data.no_translate === true,
+              data.conversation_log_id || null
+            );
+          }
+
+          if (data?.tarifa?.requires_mode) {
+            tarifaMode = false;
+            setTarifaModeUI();
+          }
+          const trackingUrl = data?.tracking?.tracking_url || data?.tracking_url || data?.tracking?.url || null;
+          const trackingCode = data?.tracking?.codigo || data?.tracking_code || data?.codigo || data?.tracking?.code || null;
+          if (trackingUrl) {
+            await addTrackingQR(trackingUrl, trackingCode);
+          }
+          addQuickReplies((Array.isArray(data.quick_replies) && data.quick_replies.length > 0) ? data.quick_replies : quickRepliesFromTarifa(data));
+          if (bye) {
+            inp.disabled = true;
+            inp.placeholder = (TX[lang] || TX.es).bye;
+            setStop(false);
+            document.getElementById('send').disabled = true;
+            return;
+          }
+        }
+      }
     }
   } catch (e) {
     removeTyping();
@@ -955,7 +1067,7 @@ async function doClear() {
   chat.innerHTML = '';
   const t  = TX[lang] || TX.es;
 
-  addWelcomeMsg(t.welcome);
+  chat.appendChild(buildWelcomeCard());
 
   const inp = document.getElementById('input');
   inp.disabled    = false;
@@ -967,6 +1079,8 @@ async function doClear() {
   setTrackingModeUI();
   busy = false;
   setStop(false);
+  welcomeLoaded = true;
+  loadWelcome();
 }
 
 // ─── SUCURSAL MENU ────────────────────────────────────────────────────
