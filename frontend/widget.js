@@ -7,6 +7,7 @@ let API_URL = '/api';
 let lang    = 'es';
 let embedMode = false;
 let widgetPos = 'right';
+let embedViewportMode = 'desktop';
 
 // ─── ESTADO ────────────────────────────────────────────────────────────
 let chatOpen    = false;
@@ -17,6 +18,7 @@ let tarifaMode  = false;
 let trackingMode = false;
 let qrLibPromise = null;
 let welcomeLoaded = false;
+let openDelayTimer = null;
 
 // ─── TEXTOS POR IDIOMA ────────────────────────────────────────────────
 const TX = {
@@ -94,9 +96,14 @@ console.log('Widget.js cargando...');
   if (params.get('api')) API_URL = params.get('api').replace(/\/+$/, '');
   if (params.get('lang')) lang = params.get('lang');
   if (params.get('embed') === '1') embedMode = true;
+  if (params.get('viewport') === 'mobile') embedViewportMode = 'mobile';
   if (params.get('pos') === 'left') widgetPos = 'left';
   if (s && s.dataset.pos === 'left') widgetPos = 'left';
-  if (embedMode) document.body.classList.add('widget-shell');
+  if (embedMode) {
+    document.documentElement.classList.add('widget-shell');
+    document.body.classList.add('widget-shell');
+    setEmbedViewportMode(embedViewportMode === 'mobile');
+  }
 
   const baseUrl = s
     ? s.src.replace(/\/widget\.js.*$/, '')
@@ -358,11 +365,98 @@ function now() {
 
 function notifyEmbedState(open) {
   if (!embedMode || window.parent === window) return;
-  window.parent.postMessage({ type: 'chatbotbo:state', open }, '*');
+  const payload = { type: 'chatbotbo:state', open };
+  window.parent.postMessage(payload, '*');
+  if (open) {
+    setTimeout(() => window.parent.postMessage(payload, '*'), 80);
+    setTimeout(() => window.parent.postMessage(payload, '*'), 250);
+  }
+}
+
+function setEmbedViewportMode(isMobile) {
+  if (!embedMode) return;
+  embedViewportMode = isMobile ? 'mobile' : 'desktop';
+  const root = document.documentElement;
+  root.classList.add('widget-shell');
+  root.classList.toggle('embed-mobile', isMobile);
+  root.classList.toggle('embed-desktop', !isMobile);
+  document.body.classList.add('widget-shell');
+  document.body.classList.toggle('embed-mobile', isMobile);
+  document.body.classList.toggle('embed-desktop', !isMobile);
+}
+
+function setEmbedViewportSize(width, height) {
+  if (!embedMode) return;
+  const root = document.documentElement;
+  const numericWidth = Number(width);
+  const numericHeight = Number(height);
+  if (Number.isFinite(numericWidth) && numericWidth > 0) {
+    root.style.setProperty('--embed-vw', `${Math.ceil(numericWidth)}px`);
+  }
+  if (Number.isFinite(numericHeight) && numericHeight > 0) {
+    root.style.setProperty('--embed-vh', `${Math.ceil(numericHeight)}px`);
+  }
+}
+
+function setChatOpenClass(open) {
+  document.documentElement.classList.toggle('chat-is-open', open);
+  document.body.classList.toggle('chat-is-open', open);
+}
+
+function showChatWindow() {
+  const chatWindow = document.getElementById('chat-window');
+  if (!chatWindow) {
+    console.error('chat-window no encontrado');
+    return;
+  }
+  setChatOpenClass(true);
+  chatWindow.classList.add('open');
+  chatWindow.style.opacity = '';
+  document.getElementById('badge').style.display = 'none';
+  if (!welcomeLoaded) {
+    welcomeLoaded = true;
+    loadWelcome();
+  }
+  setTimeout(() => document.getElementById('input').focus(), 420);
+}
+
+function openChat() {
+  if (chatOpen || openDelayTimer) return;
+  chatOpen = true;
+  notifyEmbedState(true);
+  if (embedMode) {
+    const delay = embedViewportMode === 'mobile' ? 80 : 120;
+    openDelayTimer = setTimeout(() => {
+      openDelayTimer = null;
+      showChatWindow();
+    }, delay);
+    return;
+  }
+  showChatWindow();
+}
+
+function closeChat() {
+  if (openDelayTimer) {
+    clearTimeout(openDelayTimer);
+    openDelayTimer = null;
+  }
+  const chatWindow = document.getElementById('chat-window');
+  if (chatWindow) {
+    chatWindow.classList.remove('open');
+    chatWindow.style.opacity = '';
+  }
+  chatOpen = false;
+  setChatOpenClass(false);
+  notifyEmbedState(false);
 }
 
 window.addEventListener('message', (event) => {
   const data = event.data || {};
+  if (data.type === 'chatbotbo:viewport') {
+    setEmbedViewportMode(Boolean(data.mobile));
+    setEmbedViewportSize(data.width, data.height);
+    return;
+  }
   if (data.type !== 'chatbotbo:command') return;
   if (data.action === 'open' && !chatOpen) toggleChat();
   if (data.action === 'close' && chatOpen) minimize();
@@ -371,39 +465,15 @@ window.addEventListener('message', (event) => {
 // ─── TOGGLE CHAT ──────────────────────────────────────────────────────
 function toggleChat() {
   console.log('toggleChat llamado, chatOpen actual:', chatOpen);
-  chatOpen = !chatOpen;
-  console.log('Nuevo chatOpen:', chatOpen);
-  document.body.classList.toggle('chat-is-open', chatOpen);
-  const chatWindow = document.getElementById('chat-window');
-  console.log('chat-window element:', chatWindow);
-  if (chatWindow) {
-    chatWindow.classList.toggle('open', chatOpen);
-    // Forzar opacidad correcta
-    chatWindow.style.opacity = chatOpen ? '1' : '0';
-    console.log('Clase open toggled. Nueva clase:', chatWindow.className);
-    console.log('Contenido HTML del chat-window:', chatWindow.innerHTML.substring(0, 200));
-    const style = window.getComputedStyle(chatWindow);
-    console.log('Display:', style.display);
-    console.log('Opacity:', style.opacity);
-  } else {
-    console.error('chat-window no encontrado');
+  if (chatOpen || openDelayTimer) {
+    closeChat();
+    return;
   }
-  if (chatOpen) {
-    document.getElementById('badge').style.display = 'none';
-    if (!welcomeLoaded) {
-      welcomeLoaded = true;
-      loadWelcome();
-    }
-    setTimeout(() => document.getElementById('input').focus(), 420);
-  }
-  notifyEmbedState(chatOpen);
+  openChat();
 }
 
 function minimize() {
-  document.getElementById('chat-window').classList.remove('open');
-  chatOpen = false;
-  document.body.classList.remove('chat-is-open');
-  notifyEmbedState(false);
+  closeChat();
 }
 
 // ─── IDIOMA ───────────────────────────────────────────────────────────

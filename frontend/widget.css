@@ -27,6 +27,8 @@
   --shd: 0 4px 20px rgba(122,79,0,0.13), 0 1px 4px rgba(122,79,0,0.08);
   --shd2: 0 20px 70px rgba(122,79,0,0.18), 0 4px 16px rgba(122,79,0,0.11);
   --r2: 20px;
+  --embed-vw: 100vw;
+  --embed-vh: 100dvh;
 }
 
 /* ─── Reset & Base ─────────────────────────────── */
@@ -42,11 +44,23 @@ body {
   min-height: 100vh;
 }
 
+html.widget-shell,
 body.widget-shell {
   background: transparent;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  overflow: hidden;
 }
 
-body.widget-shell {
+html.widget-shell.embed-mobile.chat-is-open,
+html.widget-shell.embed-mobile.chat-is-open body,
+body.widget-shell.embed-mobile.chat-is-open {
+  width: 100vw;
+  width: var(--embed-vw, 100vw);
+  height: 100vh;
+  height: 100dvh;
+  height: var(--embed-vh, 100dvh);
   margin: 0;
   overflow: hidden;
 }
@@ -291,6 +305,12 @@ body.widget-shell {
 
 #chat-bubble .bubble-logo {
   display: block;
+  width: 95px;
+  height: 95px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 8px;
+  pointer-events: none;
 }
 
 #badge {
@@ -313,12 +333,12 @@ body.widget-shell {
 /* ─── Chat Window ──────────────────────────────── */
 #chat-window {
   position: fixed;
-  bottom: 94px;
+  bottom: 112px;
   right: 22px;
-  width: 340px;
+  width: 380px;
   max-width: calc(100vw - 44px);
   height: 500px;
-  max-height: calc(100vh - 120px);
+  max-height: calc(100vh - 140px);
   background: var(--white);
   border-radius: var(--r2);
   box-shadow: var(--shd2), 0 0 0 1px var(--border2);
@@ -332,6 +352,44 @@ body.widget-shell {
   display: flex;
   opacity: 1;
   animation: winIn 0.42s cubic-bezier(.22,1,.36,1);
+}
+
+body.widget-shell.embed-mobile.chat-is-open #chat-bubble {
+  display: none;
+}
+
+body.widget-shell.embed-desktop.chat-is-open #chat-window {
+  bottom: 112px;
+  width: 390px;
+}
+
+body.widget-shell.embed-mobile.chat-is-open #chat-window {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  width: var(--embed-vw, 100vw) !important;
+  min-width: 100vw !important;
+  min-width: var(--embed-vw, 100vw) !important;
+  max-width: 100vw !important;
+  max-width: var(--embed-vw, 100vw) !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  height: var(--embed-vh, 100dvh) !important;
+  min-height: 100vh !important;
+  min-height: 100dvh !important;
+  min-height: var(--embed-vh, 100dvh) !important;
+  max-height: 100vh !important;
+  max-height: 100dvh !important;
+  max-height: var(--embed-vh, 100dvh) !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  transform: none !important;
+  animation: none !important;
+  z-index: 1000 !important;
 }
 
 @keyframes winIn {
@@ -667,6 +725,11 @@ header::after {
 
 .msg.b {
   align-self: flex-start;
+}
+
+.msg > div:not(.av) {
+  min-width: 0;
+  max-width: 100%;
 }
 
 @keyframes msgIn {
@@ -1194,7 +1257,8 @@ header::after {
 
 /* ─── Responsive ───────────────────────────────── */
 @media (max-width: 480px) {
-  #chat-window {
+  body:not(.widget-shell) #chat-window,
+  body.widget-shell.embed-mobile #chat-window {
     width: 100%;
     max-width: 100%;
     height: 100%;
@@ -1204,13 +1268,30 @@ header::after {
     right: 0;
     border-radius: 0;
   }
-  #chat-bubble {
+
+  body:not(.widget-shell) #chat-bubble,
+  body.widget-shell.embed-mobile #chat-bubble {
     bottom: 18px;
     right: 18px;
   }
 
-  body.chat-is-open #chat-bubble {
+  body:not(.widget-shell) .msg,
+  body.widget-shell.embed-mobile .msg {
+    width: 100%;
+  }
+
+  body:not(.widget-shell) .bub,
+  body.widget-shell.embed-mobile .bub {
+    max-width: calc(100% - 42px);
+  }
+
+  body:not(.widget-shell).chat-is-open #chat-bubble,
+  body.widget-shell.embed-mobile.chat-is-open #chat-bubble {
     display: none;
+  }
+
+  body.widget-shell.embed-mobile.chat-is-open #chat-window {
+    border-radius: 0;
   }
 }
 
@@ -1223,7 +1304,7 @@ header::after {
 
 @media (min-width: 1200px) {
   #chat-window {
-    width: 360px;
+    width: 390px;
     height: 520px;
   }
 }

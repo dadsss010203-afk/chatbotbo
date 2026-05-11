@@ -2,18 +2,19 @@
 <html lang="es">
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title> Mi sitio con asistente</title>
 </head>
 <body>
     <h1> BIENVENIDO</h1>
     <p>Este es un ejemplo de página que usa el chatbot de la AGBC.</p>
 
-    <!--  CORRECTO: data-api apunta a /api -->
+    <!-- Loader embebible: crea un iframe aislado para evitar conflictos de CSS/JS -->
     <script
-        src="http://localhost:5000/widget.js"
-        data-api="http://localhost:5000/api"
+        src="http://localhost:5000/widget-embed.js?v=responsive"
         data-lang="es"
-        data-pos="right">
+        data-position="left"
+        defer>
     </script>
 </body>
 </html>

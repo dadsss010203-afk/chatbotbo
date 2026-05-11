@@ -368,9 +368,9 @@ Para colocar el chatbot en una página web real, incluye el loader embebible ant
 
 ```html
 <script
-  src="https://TU-DOMINIO-CHATBOT/widget-embed.js"
+  src="https://TU-DOMINIO-CHATBOT/widget-embed.js?v=responsive"
   data-lang="es"
-  data-position="right"
+  data-position="left"
   defer>
 </script>
 ```
@@ -379,14 +379,16 @@ Ejemplo local con Docker:
 
 ```html
 <script
-  src="http://localhost:5000/widget-embed.js"
+  src="http://localhost:5000/widget-embed.js?v=responsive"
   data-lang="es"
-  data-position="right"
+  data-position="left"
   defer>
 </script>
 ```
 
 El archivo `widget-embed.js` crea un `iframe` flotante y carga internamente `/widget.html`, `/widget.css`, `/widget.js` y `/api` desde el dominio del chatbot. Esto evita conflictos de CSS, IDs y JavaScript con la página donde se implanta.
+
+Para mostrarlo al lado derecho cambia `data-position="left"` por `data-position="right"`.
 
 Opciones disponibles por atributos `data-*`:
 
