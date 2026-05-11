@@ -31,7 +31,7 @@ Este repositorio contiene:
 ### 2.1 Servicios principales
 
 - `ollama`: servidor de modelo de lenguaje local.
-- `ollama-setup`: contenedor auxiliar que descarga y crea el modelo `correos-bot`.
+- `ollama-setup`: contenedor auxiliar que descarga `llama3.2:1b` y crea el modelo `correos-bot`.
 - `redis`: broker/result backend de Celery y cache de respuesta/embeddings.
 - `qdrant`: vector store para búsqueda semántica.
 - `chatbot`: backend FastAPI.

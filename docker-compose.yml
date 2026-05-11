@@ -43,7 +43,7 @@ services:
           sleep 3
         done
         echo 'Descargando modelo base llama3.2:1b...'
-        until ollama pull qwen2.5:7b-instruct-q4_K_M; do
+        until ollama pull llama3.2:1b; do
           echo 'Fallo de red durante el pull. Reintentando en 20s...'
           sleep 20
         done
