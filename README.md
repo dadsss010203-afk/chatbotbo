@@ -540,5 +540,3 @@ Si usas `.env`, colócalo en `backend/app/.env`.
 - `core/updater.py` ejecuta scraper y reindexa periódicamente.
 
 ---
-
-> Este README documenta con detalle la implementación actual. Si quieres, puedo también generar un diagrama de arquitectura y un ejemplo de payloads JSON para cada endpoint. 
