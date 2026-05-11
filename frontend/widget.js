@@ -373,6 +373,7 @@ function toggleChat() {
   console.log('toggleChat llamado, chatOpen actual:', chatOpen);
   chatOpen = !chatOpen;
   console.log('Nuevo chatOpen:', chatOpen);
+  document.body.classList.toggle('chat-is-open', chatOpen);
   const chatWindow = document.getElementById('chat-window');
   console.log('chat-window element:', chatWindow);
   if (chatWindow) {
@@ -401,6 +402,7 @@ function toggleChat() {
 function minimize() {
   document.getElementById('chat-window').classList.remove('open');
   chatOpen = false;
+  document.body.classList.remove('chat-is-open');
   notifyEmbedState(false);
 }
 

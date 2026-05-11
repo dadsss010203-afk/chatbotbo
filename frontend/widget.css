@@ -1208,6 +1208,10 @@ header::after {
     bottom: 18px;
     right: 18px;
   }
+
+  body.chat-is-open #chat-bubble {
+    display: none;
+  }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {

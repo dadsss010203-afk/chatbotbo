@@ -97,6 +97,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);min-height:100vh}
     border-radius:0;
   }
   #chat-bubble{bottom:18px;right:18px}
+  body.chat-is-open #chat-bubble{display:none}
 }
 #chat-window.open{display:flex;animation:winIn 0.42s cubic-bezier(.22,1,.36,1)}
 @keyframes winIn{from{opacity:0;transform:translateY(32px) scale(0.92)}to{opacity:1;transform:translateY(0) scale(1)}}
@@ -295,6 +296,7 @@ header::after{content:'';position:absolute;top:-28px;right:-12px;width:120px;hei
     border-radius:0;
   }
   #chat-bubble{bottom:18px;right:18px}
+  body.chat-is-open #chat-bubble{display:none}
 }
 
 
@@ -670,7 +672,7 @@ function stopResp(){
   ctrl=null;
   currentRequestId='';
 }
-function minimize(){document.getElementById('chat-window').classList.remove('open');chatOpen=false;}
+function minimize(){document.getElementById('chat-window').classList.remove('open');chatOpen=false;document.body.classList.remove('chat-is-open');}
 function now(){return new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});}
 function setTarifaModeUI(){
   const btn=document.getElementById('tarifa-toggle');
@@ -794,6 +796,7 @@ async function toggleTrackingMode(){
 
 function toggleChat(){
   chatOpen=!chatOpen;
+  document.body.classList.toggle('chat-is-open', chatOpen);
   document.getElementById('chat-window').classList.toggle('open',chatOpen);
   if(chatOpen){
     document.getElementById('badge').style.display='none';
