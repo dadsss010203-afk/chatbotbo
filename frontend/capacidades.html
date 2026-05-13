@@ -4038,7 +4038,7 @@
           </div>
           <div class="toolbar">
             <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
-            <button class="btn btn-danger" type="button" onclick="clearResponseCache()">Limpiar cache respuestas</button>
+            <button class="btn btn-danger" id="btn-clear-redis-cache" type="button" onclick="clearRedisCache()">Limpiar cache Redis</button>
           </div>
         </div>
         <div class="section-summary" id="cache-summary"></div>
@@ -6280,12 +6280,80 @@ async function rebuildRag() {
   }
 }
 
-function deleteResponseCache() {
-  demoNotice("La limpieza de elementos temporales no ejecuta cambios reales en esta demo.");
+async function deleteResponseCache(cacheId) {
+  const id = String(cacheId || "").trim();
+  if (!id) return;
+  const confirmed = window.confirm("¿Eliminar esta respuesta cacheada?");
+  if (!confirmed) return;
+
+  try {
+    await fetchJson(`/api/cache/responses/${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    });
+    await loadAll();
+  } catch (err) {
+    openModal("detail", {
+      title: "Error al limpiar cache",
+      subtitle: "No se pudo eliminar la respuesta cacheada.",
+      html: `<div class="detail-empty">${escapeHtml(err.message || "Error desconocido")}</div>`
+    });
+  }
+}
+
+async function clearRedisCache() {
+  const confirmed = window.confirm("Se eliminará todo el cache Redis de la DB configurada: respuestas, RAG, embeddings, tarifas y otras claves de cache. ¿Continuar?");
+  if (!confirmed) return;
+
+  const btn = document.getElementById("btn-clear-redis-cache");
+  const originalText = btn?.textContent || "Limpiar cache Redis";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Limpiando...";
+  }
+
+  try {
+    const result = await fetchJson("/api/cache/clear", {
+      method: "POST"
+    });
+    await loadAll();
+
+    const namespaces = result?.namespaces_before || {};
+    openModal("detail", {
+      title: "Cache Redis limpiado",
+      subtitle: `${Number(result?.deleted || 0)} claves eliminadas.`,
+      html: `
+        <div class="detail-grid">
+          <div class="detail-card">
+            <h5>Resultado</h5>
+            <div class="detail-line"><span>Claves antes</span><strong>${escapeHtml(String(result?.keys_before ?? 0))}</strong></div>
+            <div class="detail-line"><span>Eliminadas</span><strong>${escapeHtml(String(result?.deleted ?? 0))}</strong></div>
+          </div>
+          <div class="detail-card">
+            <h5>Namespaces limpiados</h5>
+            <div class="detail-line"><span>RAG</span><strong>${escapeHtml(String(namespaces.rag ?? 0))}</strong></div>
+            <div class="detail-line"><span>Embeddings</span><strong>${escapeHtml(String(namespaces.embeddings ?? 0))}</strong></div>
+            <div class="detail-line"><span>Tarifas</span><strong>${escapeHtml(String(namespaces.tarifas ?? 0))}</strong></div>
+            <div class="detail-line"><span>Respuestas</span><strong>${escapeHtml(String(namespaces.respuestas ?? 0))}</strong></div>
+          </div>
+        </div>
+      `
+    });
+  } catch (err) {
+    openModal("detail", {
+      title: "Error al limpiar Redis",
+      subtitle: "No se pudo ejecutar la limpieza.",
+      html: `<div class="detail-empty">${escapeHtml(err.message || "Error desconocido")}</div>`
+    });
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
 }
 
 function clearResponseCache() {
-  demoNotice("La limpieza general fue reemplazada por una vista previa informativa.");
+  return clearRedisCache();
 }
 
 function deleteConversation() {

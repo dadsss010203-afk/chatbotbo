@@ -267,25 +267,61 @@ def clear_tarifa_flow(sid: str) -> None:
         _enforce_max_sesiones()
 
 
-def _trim_history_by_chars(history: list[dict], max_chars: int) -> list[dict]:
+def _recent_complete_turns(history: list[dict], max_turns: int) -> list[dict]:
+    """Devuelve turnos completos user+assistant, empezando por los más recientes."""
     if not history:
+        return []
+    if max_turns <= 0:
+        return []
+
+    turns = []
+    pending_assistant = None
+    for entry in reversed(history):
+        role = entry.get("role")
+        if role == "assistant":
+            pending_assistant = entry
+            continue
+        if role == "user" and pending_assistant is not None:
+            turns.append([entry, pending_assistant])
+            pending_assistant = None
+            if len(turns) >= max_turns:
+                break
+
+    selected = []
+    for turn in reversed(turns):
+        selected.extend(turn)
+    return selected
+
+
+def _trim_complete_turns_by_chars(history: list[dict], max_chars: int) -> list[dict]:
+    if not history or max_chars <= 0:
         return history
     if sum(len(entry.get("content", "")) for entry in history) <= max_chars:
         return history
-    trimmed = []
+
+    turns = [history[i:i + 2] for i in range(0, len(history), 2)]
+    trimmed_turns = []
     chars = 0
-    for entry in reversed(history):
-        content = entry.get("content", "")
-        if chars + len(content) > max_chars and trimmed:
+    for turn in reversed(turns):
+        turn_chars = sum(len(entry.get("content", "")) for entry in turn)
+        if chars + turn_chars > max_chars and trimmed_turns:
             break
-        trimmed.append(entry)
-        chars += len(content)
-    return list(reversed(trimmed))
+        trimmed_turns.append(turn)
+        chars += turn_chars
+
+    selected = []
+    for turn in reversed(trimmed_turns):
+        selected.extend(turn)
+    return selected
 
 
 def historial_reciente(sid: str) -> list:
     """
-    Devuelve los últimos MAX_HISTORIAL mensajes del historial.
+    Devuelve hasta MAX_HISTORIAL turnos completos del historial.
+
+    Cada turno incluye la pregunta del usuario y la respuesta del bot. Esto
+    evita pasar al modelo mensajes sueltos y garantiza que la última respuesta
+    tenga su pregunta asociada como contexto.
     Listo para incluir en el prompt de Ollama.
     """
     with _lock:
@@ -293,8 +329,8 @@ def historial_reciente(sid: str) -> list:
         hist = historiales.setdefault(sid, [])
         _ultimo_acceso[sid] = _ahora_ts()
         _enforce_max_sesiones()
-        trimmed = hist[-MAX_HISTORIAL:]
-        return _trim_history_by_chars(trimmed, MAX_HISTORY_CHARS)
+        complete_turns = _recent_complete_turns(hist, MAX_HISTORIAL)
+        return _trim_complete_turns_by_chars(complete_turns, MAX_HISTORY_CHARS)
 
 
 def total_sesiones() -> int:

@@ -567,6 +567,14 @@ def resolve_skills_for_query(pregunta: str) -> dict:
         in_scope = False
         strong_matches = []
 
+    # Si el usuario pregunta por otra institución de correos (FedEx, DHL, etc.),
+    # marcar como fuera de scope para evitar que el flujo de ubicación o el
+    # RAG respondan como si fuera una consulta legítima de AGBC.
+    from core import intents as _intents
+    if _intents.es_consulta_otra_institucion(pregunta):
+        in_scope = False
+        strong_matches = []
+
     return {
         "in_scope": in_scope,
         "matched_skills": strong_matches,

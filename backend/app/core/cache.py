@@ -90,23 +90,6 @@ def set_json(key: str, data: dict, ttl: int = REDIS_CACHE_TTL) -> bool:
         return False
 
 
-def get_pickle(key: str) -> Optional[Any]:
-    """Obtiene y deserializa pickle del caché."""
-    val = get(key)
-    if val:
-        try:
-            return pickle.loads(val)
-        except Exception:
-            return None
-    return None
-
-
-def set_pickle(key: str, data: Any, ttl: int = REDIS_CACHE_TTL) -> bool:
-    """Serializa y guarda pickle en caché."""
-    try:
-        return set(key, pickle.dumps(data), ttl)
-    except Exception:
-        return False
 
 
 def delete(key: str) -> bool:
@@ -143,20 +126,17 @@ def clear_pattern(pattern: str) -> int:
 #  CACHÉ DE EMBEDDINGS
 # ─────────────────────────────────────────────
 
-def get_embedding(text: str) -> Optional[list]:
-    """Obtiene embedding cacheado."""
+def get_embedding(texto: str, model_name: str = "default") -> Optional[list[float]]:
     if not REDIS_EMBEDDING_CACHE:
         return None
-    key = _make_key("emb", text)
-    return get_pickle(key)
+    key = f"embed:{model_name}:{hashlib.md5(texto.encode('utf-8')).hexdigest()}"
+    return get_json(key)
 
-
-def set_embedding(text: str, vector: list) -> bool:
-    """Guarda embedding en caché."""
+def set_embedding(texto: str, vector: list[float], model_name: str = "default") -> bool:
     if not REDIS_EMBEDDING_CACHE:
         return False
-    key = _make_key("emb", text)
-    return set_pickle(key, vector, ttl=86400)  # 24h para embeddings
+    key = f"embed:{model_name}:{hashlib.md5(texto.encode('utf-8')).hexdigest()}"
+    return set_json(key, vector, ttl=86400)  # 24h para embeddings
 
 
 # ─────────────────────────────────────────────
@@ -329,6 +309,21 @@ def delete_response_cache(cache_id: str) -> bool:
 def clear_response_cache() -> int:
     """Limpia toda la caché de respuestas finales."""
     return clear_pattern("resp:*")
+
+
+def clear_all_cache() -> dict:
+    """Limpia todas las claves de la DB Redis configurada para caché."""
+    if not _redis_available:
+        return {"available": False, "deleted": 0}
+
+    before = get_namespace_stats()
+    deleted = clear_pattern("*")
+    return {
+        "available": True,
+        "deleted": int(deleted or 0),
+        "keys_before": int(before.get("keys") or 0),
+        "namespaces_before": before.get("namespaces") or {},
+    }
 
 
 # ─────────────────────────────────────────────

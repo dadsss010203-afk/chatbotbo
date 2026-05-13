@@ -140,7 +140,7 @@ Funciones clave:
 - `get_sid()` crea/retorna un UUID de sesión.
 - `get_historial(sid)` devuelve el historial de conversación.
 - `agregar_turno(sid, pregunta, respuesta)` mantiene un historial limitado.
-- `historial_reciente(sid)` regresa mensajes recientes para el prompt.
+- `historial_reciente(sid)` regresa turnos completos recientes para el prompt.
 - `total_sesiones()` cuenta sesiones activas.
 
 ### 5.2 Flujo de cotización postal
@@ -474,9 +474,10 @@ docker compose up --build
 | `BATCH_SIZE` | Batch embeddings | `500` |
 | `N_RESULTADOS` | Resultados RAG | `2` (app) / `3` (worker) |
 | `CHATBOT_GENERAL_ONLY` | Solo modo local sin RAG | `false` |
+| `LOCATION_USE_LLM_ONLY` | Forzar ubicaciones por LLM/RAG en lugar del flujo determinístico | `false` |
 | `REQUIRE_EVIDENCE` | Exigir evidencia literal | `false` |
 | `HORAS_ACTUALIZACION` | Intervalo de actualización automática | `24` |
-| `MAX_HISTORIAL` | Mensajes de historial en prompt | `3` |
+| `MAX_HISTORIAL` | Turnos completos de historial en prompt | `3` |
 | `SESSION_TTL_MINUTES` | Expiración de sesión | `180` |
 
 ### 10.4 Nota Triton

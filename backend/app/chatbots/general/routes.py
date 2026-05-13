@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 import requests
 import json
-from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, Form
+from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, Form, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
 from celery.result import AsyncResult
 
@@ -45,8 +45,19 @@ from chatbots.general.config import (
 )
 
 # ─────────────────────────────────────────────
-#  ROUTER
+#  ROUTER Y MIDDLEWARE ADMIN
 # ─────────────────────────────────────────────
+
+ADMIN_TOKEN = os.environ.get("ADMIN_API_TOKEN", "")
+
+async def require_admin(request: Request):
+    if not ADMIN_TOKEN:
+        return  # Sin token configurado, deshabilitado por compatibilidad
+    auth = request.headers.get("Authorization", "")
+    if auth != f"Bearer {ADMIN_TOKEN}":
+        raise HTTPException(status_code=401, detail="No autorizado")
+
+router = APIRouter()
 router = APIRouter(prefix="/api")   # rutas en /api/*
 logger = logging.getLogger("chatbotbo.general.routes")
 
@@ -56,7 +67,7 @@ REINDEX_DEBOUNCE_SECONDS = int(os.environ.get("REINDEX_DEBOUNCE_SECONDS", "30"))
 CHAT_RESPONSE_MAX_CHARS = int(os.environ.get("CHAT_RESPONSE_MAX_CHARS", "0"))
 LLM_TARIFF_ORCHESTRATOR = os.environ.get("LLM_TARIFF_ORCHESTRATOR", "true").strip().lower() in ("1", "true", "yes")
 TARIFF_DETERMINISTIC_ONLY = os.environ.get("TARIFF_DETERMINISTIC_ONLY", "true").strip().lower() in ("1", "true", "yes")
-LOCATION_USE_LLM_ONLY = True
+LOCATION_USE_LLM_ONLY = os.environ.get("LOCATION_USE_LLM_ONLY", "false").strip().lower() in ("1", "true", "yes")
 TRACKING_API_URL = os.environ.get(
     "TRACKING_API_URL",
     "https://trackingbo.correos.gob.bo:8100/api/public/tracking/eventos",
@@ -373,7 +384,8 @@ def _filtrar_sucursales_por_scope(sucursales: list[dict], scope: str | None) -> 
     if scope == "regionales":
         return [s for s in sucursales if _es_regional(s)]
     if scope == "sucursales":
-        return [s for s in sucursales if not _es_regional(s)]
+        filtradas = [s for s in sucursales if not _es_regional(s)]
+        return filtradas or list(sucursales)
     return list(sucursales)
 
 
@@ -399,32 +411,42 @@ def _parece_consulta_ubicacion(texto: str, sucursales: list[dict]) -> bool:
     )
 
 
+def _detectar_geo_ubicacion(
+    pregunta: str,
+    sucursales_scope: list[dict],
+    *,
+    fallback_sucursales: list[dict] | None = None,
+) -> dict | None:
+    geo = intents.detectar_solo_ciudad(pregunta, sucursales_scope)
+    if geo is None:
+        geo = intents.detectar_consulta_ubicacion(pregunta, sucursales_scope)
+    if geo is not None or not fallback_sucursales:
+        return geo
+    geo = intents.detectar_solo_ciudad(pregunta, fallback_sucursales)
+    if geo is None:
+        geo = intents.detectar_consulta_ubicacion(pregunta, fallback_sucursales)
+    return geo
+
+
 def _payload_pregunta_scope_ubicacion(lang: str, *, reask: bool = False) -> dict:
     if lang == "en":
         msg = (
-            "Do you mean locations of regional offices or branches?"
+            "I can help you find our offices nationwide. 📍 Are you looking for a Regional Office (main) or a specific Branch? Send the name of the department"
             if not reask
-            else "I need that detail first: regional offices or branches?"
+            else "I need that detail first: regional office or branch? Send the name of the department"
         )
-        label_regionales = "Regional Offices"
-        label_sucursales = "Branches"
     else:
         msg = (
-            "¿Te refieres a ubicación de regionales o de sucursales?"
+            "Puedo ayudarte a encontrar nuestras oficinas en todo el país. 📍 ¿Buscas una Oficina Regional (principal) o una Sucursal específica? envía el nombre del departamento"
             if not reask
-            else "Para ubicarte bien, primero indícame: ¿regionales o sucursales?"
+            else "Para ubicarte bien, primero indícame: ¿regionales o sucursales? envía el nombre del departamento"
         )
-        label_regionales = "Regionales"
-        label_sucursales = "Sucursales"
 
     return {
         "response": msg,
         "lang": lang,
         "no_translate": True,
-        "quick_replies": [
-            {"label": label_regionales, "value": "__ubicacion_regionales__"},
-            {"label": label_sucursales, "value": "__ubicacion_sucursales__"},
-        ],
+        "quick_replies": [],
         "location_disambiguation": True,
     }
 
@@ -434,6 +456,11 @@ def _resolver_scope_ubicacion_o_preguntar(sid: str, pregunta: str, lang: str) ->
     if scope:
         session.clear_pendiente_ubicacion(sid)
         return scope, None
+
+    geo = _detectar_geo_ubicacion(pregunta, SUCURSALES)
+    if geo is not None and ("nombre" in geo or geo.get("ciudad") is not None):
+        session.clear_pendiente_ubicacion(sid)
+        return None, None
 
     pendiente = session.get_pendiente_ubicacion(sid) or {}
     if pendiente:
@@ -457,21 +484,70 @@ def _estimate_message_tokens(message: dict) -> int:
     return rag.estimate_tokens(texto) + 4
 
 
+def _split_complete_turns(messages: list[dict]) -> list[list[dict]]:
+    """Agrupa historial como turnos user+assistant, ignorando mensajes sueltos."""
+    turns = []
+    pending_assistant = None
+    for entry in reversed(messages):
+        role = entry.get("role")
+        if role == "assistant":
+            pending_assistant = entry
+            continue
+        if role == "user" and pending_assistant is not None:
+            turns.append([entry, pending_assistant])
+            pending_assistant = None
+    return list(reversed(turns))
+
+
+def _flatten_turns(turns: list[list[dict]]) -> list[dict]:
+    flattened = []
+    for turn in turns:
+        flattened.extend(turn)
+    return flattened
+
+
 def _trim_messages_to_token_budget(messages: list[dict], max_tokens: int) -> list[dict]:
     if not messages:
         return messages
+    if max_tokens <= 0 or len(messages) <= 2:
+        return messages
     system_message = messages[0]
-    remaining = messages[1:]
+    current_user_message = messages[-1]
+    if current_user_message.get("role") != "user":
+        remaining = messages[1:]
+        current_tokens = _estimate_message_tokens(system_message)
+        trimmed = []
+        for message in reversed(remaining):
+            tokens = _estimate_message_tokens(message)
+            if current_tokens + tokens > max_tokens:
+                break
+            trimmed.append(message)
+            current_tokens += tokens
+        trimmed = list(reversed(trimmed))
+        return [system_message] + trimmed
+
+    history_messages = messages[1:-1]
+    turns = _split_complete_turns(history_messages)
+    protected_turns = turns[-1:]
+    older_turns = turns[:-1]
+    protected_tail = _flatten_turns(protected_turns) + [current_user_message]
+
     current_tokens = _estimate_message_tokens(system_message)
-    trimmed = []
-    for message in reversed(remaining):
-        tokens = _estimate_message_tokens(message)
+    current_tokens += sum(_estimate_message_tokens(message) for message in protected_tail)
+
+    selected_older_turns = []
+    for turn in reversed(older_turns):
+        tokens = sum(_estimate_message_tokens(message) for message in turn)
         if current_tokens + tokens > max_tokens:
             break
-        trimmed.append(message)
+        selected_older_turns.append(turn)
         current_tokens += tokens
-    trimmed = list(reversed(trimmed))
-    return [system_message] + trimmed
+
+    return (
+        [system_message]
+        + _flatten_turns(list(reversed(selected_older_turns)))
+        + protected_tail
+    )
 
 
 def _postprocess_llm_response(texto: str, sin_info: str) -> str:
@@ -1757,6 +1833,9 @@ async def chat(request: Request):
     request_id = _resolve_chat_request_id(data, sid)
     started_at = time.perf_counter()
     pregunta = data.get("message", "").strip()
+    MAX_MESSAGE_LENGTH = 2000
+    if len(pregunta) > MAX_MESSAGE_LENGTH:
+        pregunta = pregunta[:MAX_MESSAGE_LENGTH]
     tarifa_mode = bool(data.get("tarifa_mode", False))
     tracking_mode = bool(data.get("tracking_mode", False))
 
@@ -1987,6 +2066,57 @@ async def chat(request: Request):
             started_at=started_at,
         )
 
+    # ── 3. Filtro de instituciones externas (FedEx, DHL, UPS, etc.)
+    # Debe ejecutarse ANTES del flujo de ubicación para evitar que
+    # "¿dónde queda FedEx?" entre al flujo de sucursales de AGBC.
+    if intents.es_consulta_otra_institucion(pregunta):
+        respuesta_ext = (
+            "Solo puedo ayudarte con información de la Agencia Boliviana de Correos (AGBC). "
+            "Para consultas sobre otras empresas de envíos, te sugiero contactarlas directamente.\n\n"
+            "¿Puedo ayudarte con algo de Correos de Bolivia?"
+        )
+        session.agregar_turno(sid, pregunta, respuesta_ext)
+        return _finalizar_chat_response(
+            sid=sid,
+            request_id=request_id,
+            pregunta=pregunta,
+            payload={
+                "response": respuesta_ext,
+                "lang": lang,
+                "skill_resolution": {
+                    "in_scope": False,
+                    "primary_skill": None,
+                    "matched_skills": [],
+                },
+            },
+            started_at=started_at,
+        )
+
+    # ── 4. Filtro de información sensible/técnica (IP, modelo, credenciales, etc.)
+    if intents.es_consulta_info_sensible(pregunta):
+        respuesta_sens = (
+            "Por seguridad, no puedo compartir información técnica interna. "
+            "Soy ChatbotBO, el asistente de la Agencia Boliviana de Correos.\n\n"
+            "Puedo ayudarte con: envíos, rastreo, sucursales, tarifas y servicios postales. "
+            "¿En qué puedo ayudarte? 📬"
+        )
+        session.agregar_turno(sid, pregunta, respuesta_sens)
+        return _finalizar_chat_response(
+            sid=sid,
+            request_id=request_id,
+            pregunta=pregunta,
+            payload={
+                "response": respuesta_sens,
+                "lang": lang,
+                "skill_resolution": {
+                    "in_scope": False,
+                    "primary_skill": None,
+                    "matched_skills": [],
+                },
+            },
+            started_at=started_at,
+        )
+
     if not LOCATION_USE_LLM_ONLY:
         scope_ubicacion, payload_scope_ubicacion = _resolver_scope_ubicacion_o_preguntar(sid, pregunta, lang)
         if payload_scope_ubicacion is not None:
@@ -2000,12 +2130,11 @@ async def chat(request: Request):
 
         sucursales_scope = _filtrar_sucursales_por_scope(SUCURSALES, scope_ubicacion)
 
-        # ── 3. ¿Solo nombre de ciudad?
-        geo = intents.detectar_solo_ciudad(pregunta, sucursales_scope)
-
-        # ── 4. ¿Consulta de ubicación con palabras clave?
-        if geo is None:
-            geo = intents.detectar_consulta_ubicacion(pregunta, sucursales_scope)
+        geo = _detectar_geo_ubicacion(
+            pregunta,
+            sucursales_scope,
+            fallback_sucursales=SUCURSALES if scope_ubicacion == "sucursales" else None,
+        )
 
         if scope_ubicacion and _extraer_scope_ubicacion(pregunta) is not None and geo is None:
             tipo_label = "regionales" if scope_ubicacion == "regionales" else "sucursales"
@@ -2284,6 +2413,9 @@ async def chat_stream(request: Request):
     request_id = _resolve_chat_request_id(data, sid)
     started_at = time.perf_counter()
     pregunta = data.get("message", "").strip()
+    MAX_MESSAGE_LENGTH = 2000
+    if len(pregunta) > MAX_MESSAGE_LENGTH:
+        pregunta = pregunta[:MAX_MESSAGE_LENGTH]
     tarifa_mode = bool(data.get("tarifa_mode", False))
     tracking_mode = bool(data.get("tracking_mode", False))
 
@@ -2492,6 +2624,51 @@ async def chat_stream(request: Request):
                 yield line
             return
 
+        # ── Filtro de instituciones externas (FedEx, DHL, UPS, etc.)
+        if intents.es_consulta_otra_institucion(pregunta_actual):
+            respuesta_ext = (
+                "Solo puedo ayudarte con información de la Agencia Boliviana de Correos (AGBC). "
+                "Para consultas sobre otras empresas de envíos, te sugiero contactarlas directamente.\n\n"
+                "¿Puedo ayudarte con algo de Correos de Bolivia? 📬"
+            )
+            session.agregar_turno(sid, pregunta_actual, respuesta_ext)
+            async for line in instant_end(
+                {
+                    "response": respuesta_ext,
+                    "lang": lang,
+                    "skill_resolution": {
+                        "in_scope": False,
+                        "primary_skill": None,
+                        "matched_skills": [],
+                    },
+                }
+            ):
+                yield line
+            return
+
+        # ── Filtro de información sensible/técnica (IP, modelo, credenciales, etc.)
+        if intents.es_consulta_info_sensible(pregunta_actual):
+            respuesta_sens = (
+                "Por seguridad, no puedo compartir información técnica interna. "
+                "Soy ChatbotBO, el asistente de la Agencia Boliviana de Correos.\n\n"
+                "Puedo ayudarte con: envíos, rastreo, sucursales, tarifas y servicios postales. "
+                "¿En qué puedo ayudarte? 📬"
+            )
+            session.agregar_turno(sid, pregunta_actual, respuesta_sens)
+            async for line in instant_end(
+                {
+                    "response": respuesta_sens,
+                    "lang": lang,
+                    "skill_resolution": {
+                        "in_scope": False,
+                        "primary_skill": None,
+                        "matched_skills": [],
+                    },
+                }
+            ):
+                yield line
+            return
+
         if not LOCATION_USE_LLM_ONLY:
             scope_ubicacion, payload_scope_ubicacion = _resolver_scope_ubicacion_o_preguntar(
                 sid, pregunta_actual, lang
@@ -2502,9 +2679,11 @@ async def chat_stream(request: Request):
                 return
 
             sucursales_scope = _filtrar_sucursales_por_scope(SUCURSALES, scope_ubicacion)
-            geo = intents.detectar_solo_ciudad(pregunta_actual, sucursales_scope)
-            if geo is None:
-                geo = intents.detectar_consulta_ubicacion(pregunta_actual, sucursales_scope)
+            geo = _detectar_geo_ubicacion(
+                pregunta_actual,
+                sucursales_scope,
+                fallback_sucursales=SUCURSALES if scope_ubicacion == "sucursales" else None,
+            )
 
             if scope_ubicacion and _extraer_scope_ubicacion(pregunta_actual) is not None and geo is None:
                 tipo_label = "regionales" if scope_ubicacion == "regionales" else "sucursales"
@@ -2994,7 +3173,15 @@ def cache_responses_clear():
     return {"ok": True, "deleted": deleted}
 
 
-@router.get("/conversations")
+@router.post("/cache/clear", dependencies=[Depends(require_admin)])
+def cache_clear_all():
+    result = cache.clear_all_cache()
+    if not result.get("available"):
+        raise HTTPException(status_code=503, detail="Redis no disponible")
+    return {"ok": True, **result}
+
+
+@router.get("/conversations", dependencies=[Depends(require_admin)])
 def conversations_list(limit: int = 300, offset: int = 0, q: str = ""):
     payload = conversation_logs.list_conversations(limit=limit, offset=offset, q=q)
     payload["stats"] = conversation_logs.stats()
@@ -3169,7 +3356,7 @@ async def conversations_rate(request: Request, log_id: int):
     return {"ok": True, "id": log_id, "rating": rating_map[raw_rating]}
 
 
-@router.post("/conversations/clear")
+@router.post("/conversations/clear", dependencies=[Depends(require_admin)])
 def conversations_clear():
     deleted = conversation_logs.clear_conversations()
     return {"ok": True, "deleted": deleted}

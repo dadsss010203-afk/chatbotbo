@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════
    WIDGET JS - Correos de Bolivia Chat Bubble
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -678,19 +678,28 @@ function addMsg(text, type, bye = false, loc = null, noTranslate = false, conver
     const card = document.createElement('div');
     card.className = 'scard';
     card.classList.add('no-translate');
+    const escapeHTML = (str) => {
+      if (!str) return '';
+      return String(str).replace(/[&<>'"]/g, 
+        tag => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        }[tag] || tag)
+      );
+    };
+    
     card.innerHTML = `
       <div class="sc-head">
         <div class="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
-        <div class="sc-htxt"><strong>${loc.nombre || 'Sucursal AGBC'}</strong><span>Sucursal AGBC</span></div>
+        <div class="sc-htxt"><strong>${escapeHTML(loc.nombre) || 'Sucursal AGBC'}</strong><span>Sucursal AGBC</span></div>
       </div>
       <div class="sc-body">
-        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>${loc.direccion || 'No disponible'}</span></div>
-        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>${loc.telefono || 'No disponible'}</span></div>
-        ${loc.email ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>${loc.email}</span></div>` : ''}
+        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>${escapeHTML(loc.direccion) || 'No disponible'}</span></div>
+        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>${escapeHTML(loc.telefono) || 'No disponible'}</span></div>
+        ${loc.email ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>${escapeHTML(loc.email)}</span></div>` : ''}
         <div class="sc-sep"></div>
-        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 12 2zm.5 5v6l5.25 3.15-.75 1.23L11 14V7h1.5z"/></svg><span>${loc.horario || 'No disponible'}</span></div>
+        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 12 2zm.5 5v6l5.25 3.15-.75 1.23L11 14V7h1.5z"/></svg><span>${escapeHTML(loc.horario) || 'No disponible'}</span></div>
       </div>
-      ${loc.maps_url ? `<a class="sc-cta" href="${loc.maps_url}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Ver en Google Maps</a>` : ''}
+      ${loc.maps_url ? `<a class="sc-cta" href="${escapeHTML(loc.maps_url)}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Ver en Google Maps</a>` : ''}
     `;
     wrap.appendChild(mkAv(type));
     wrap.appendChild(card);

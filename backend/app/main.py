@@ -140,11 +140,16 @@ async def rate_limit_middleware(request: Request, call_next):
     return response
 
 
+ALLOWED_ORIGINS = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:5000,http://127.0.0.1:5000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 observability.init_app(app)
