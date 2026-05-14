@@ -1,0 +1,822 @@
+{
+    "nacional": {
+        "categories": [
+            {
+                "value": "EMS NAT",
+                "label": "EMS Nacional"
+            },
+            {
+                "value": "MI ENCOMIENDA",
+                "label": "Mi Encomienda Nacional"
+            },
+            {
+                "value": "LC/AO NAT",
+                "label": "LC/AO Nacional"
+            },
+            {
+                "value": "ECA NAT",
+                "label": "ECA Nacional"
+            },
+            {
+                "value": "PLIEGOS NAT",
+                "label": "Pliegos Oficiales Nacional"
+            },
+            {
+                "value": "SACAS M NAT",
+                "label": "Sacas M Nacional"
+            },
+            {
+                "value": "SUPER NAT",
+                "label": "Super Express Nacional"
+            }
+        ],
+        "destinations": [
+            {
+                "value": "local_1",
+                "label": "Area Urbana (Hasta 2.5 Km)"
+            },
+            {
+                "value": "local_2",
+                "label": "Area Urbana (Hasta 5 Km)"
+            },
+            {
+                "value": "local_3",
+                "label": "Area Urbana (Hasta 7.5 Km)"
+            },
+            {
+                "value": "local_4",
+                "label": "Area Urbana (Hasta 10 Km)"
+            },
+            {
+                "value": "nacional_beni",
+                "label": "Beni"
+            },
+            {
+                "value": "nacional_chuquisaca",
+                "label": "Chuquisaca"
+            },
+            {
+                "value": "nacional_cochabamba",
+                "label": "Cochabamba"
+            },
+            {
+                "value": "nacional_la_paz",
+                "label": "La Paz"
+            },
+            {
+                "value": "nacional_oruro",
+                "label": "Oruro"
+            },
+            {
+                "value": "nacional_pando",
+                "label": "Pando"
+            },
+            {
+                "value": "nacional_potosi",
+                "label": "Potosí"
+            },
+            {
+                "value": "nacional_santa_cruz",
+                "label": "Santa Cruz"
+            },
+            {
+                "value": "nacional_tarija",
+                "label": "Tarija"
+            },
+            {
+                "value": "cui_cap_chuquisaca",
+                "label": "Chuquisaca"
+            },
+            {
+                "value": "cui_cap_cochabamba",
+                "label": "Cochabamba"
+            },
+            {
+                "value": "cui_cap_la_paz",
+                "label": "La Paz"
+            },
+            {
+                "value": "cui_cap_oruro",
+                "label": "Oruro"
+            },
+            {
+                "value": "cui_cap_pando",
+                "label": "Pando"
+            },
+            {
+                "value": "cui_cap_potosi",
+                "label": "Potosí"
+            },
+            {
+                "value": "cui_cap_santa_cruz",
+                "label": "Santa Cruz"
+            },
+            {
+                "value": "cui_cap_tarija",
+                "label": "Tarija"
+            },
+            {
+                "value": "cui_int",
+                "label": "Cuidades Intermedias"
+            },
+            {
+                "value": "cui1",
+                "label": "Trinidad / Cobija"
+            },
+            {
+                "value": "cui2",
+                "label": "Riberalta / Guayaramerin"
+            },
+            {
+                "value": "pro_dentro",
+                "label": "Provincia Dentro Departamento"
+            },
+            {
+                "value": "pro_otro",
+                "label": "Provincia en Otro Departamento"
+            }
+        ]
+    },
+    "internacional": {
+        "categories": [
+            {
+                "value": "EMS INT",
+                "label": "EMS Internacional"
+            },
+            {
+                "value": "ENCOMIENDA",
+                "label": "Encomienda Internacional"
+            },
+            {
+                "value": "LC/AO INT",
+                "label": "LC/AO Internacional"
+            },
+            {
+                "value": "ECA INT",
+                "label": "ECA Internacional"
+            },
+            {
+                "value": "PLIEGOS INT",
+                "label": "Pliegos Oficiales Internacional"
+            },
+            {
+                "value": "SACAS M INT",
+                "label": "Sacas M Internacional"
+            }
+        ],
+        "destinations": [
+            {
+                "value": "dest_a_argentina",
+                "label": "Argentina"
+            },
+            {
+                "value": "dest_a_brasil",
+                "label": "Brasil"
+            },
+            {
+                "value": "dest_a_chile",
+                "label": "Chile"
+            },
+            {
+                "value": "dest_a_colombia",
+                "label": "Colombia"
+            },
+            {
+                "value": "dest_a_ecuador",
+                "label": "Ecuador"
+            },
+            {
+                "value": "dest_a_guyana",
+                "label": "Guyana"
+            },
+            {
+                "value": "dest_a_paraguay",
+                "label": "Paraguay"
+            },
+            {
+                "value": "dest_a_peru",
+                "label": "Perú"
+            },
+            {
+                "value": "dest_a_surinam",
+                "label": "Surinam"
+            },
+            {
+                "value": "dest_a_uruguay",
+                "label": "Uruguay"
+            },
+            {
+                "value": "dest_a_venezuela",
+                "label": "Venezuela"
+            },
+            {
+                "value": "dest_b_belice",
+                "label": "Belice"
+            },
+            {
+                "value": "dest_b_costa_rica",
+                "label": "Costa Rica"
+            },
+            {
+                "value": "dest_b_el_salvador",
+                "label": "El Salvador"
+            },
+            {
+                "value": "dest_b_guatemala",
+                "label": "Guatemala"
+            },
+            {
+                "value": "dest_b_honduras",
+                "label": "Honduras"
+            },
+            {
+                "value": "dest_b_nicaragua",
+                "label": "Nicaragua"
+            },
+            {
+                "value": "dest_b_panama",
+                "label": "Panamá"
+            },
+            {
+                "value": "dest_b_antigua_barbuda",
+                "label": "Antigua y Barbuda"
+            },
+            {
+                "value": "dest_b_bahamas",
+                "label": "Bahamas"
+            },
+            {
+                "value": "dest_b_barbados",
+                "label": "Barbados"
+            },
+            {
+                "value": "dest_b_cuba",
+                "label": "Cuba"
+            },
+            {
+                "value": "dest_b_dominica",
+                "label": "Dominica"
+            },
+            {
+                "value": "dest_b_republica_dominicana",
+                "label": "República Dominicana"
+            },
+            {
+                "value": "dest_b_granada",
+                "label": "Granada"
+            },
+            {
+                "value": "dest_b_haiti",
+                "label": "Haití"
+            },
+            {
+                "value": "dest_b_jamaica",
+                "label": "Jamaica"
+            },
+            {
+                "value": "dest_b_san_cristobal_nieves",
+                "label": "San Cristóbal y Nieves"
+            },
+            {
+                "value": "dest_b_santa_lucia",
+                "label": "Santa Lucía"
+            },
+            {
+                "value": "dest_b_san_vicente_granadinas",
+                "label": "San Vicente y las Granadinas"
+            },
+            {
+                "value": "dest_b_trinidad_tobago",
+                "label": "Trinidad y Tobago"
+            },
+            {
+                "value": "dest_b_puerto_rico",
+                "label": "Puerto Rico"
+            },
+            {
+                "value": "dest_c_canada",
+                "label": "Canadá"
+            },
+            {
+                "value": "dest_c_eeuu",
+                "label": "Estados Unidos"
+            },
+            {
+                "value": "dest_c_mexico",
+                "label": "México"
+            },
+            {
+                "value": "dest_d_alemania",
+                "label": "Alemania"
+            },
+            {
+                "value": "dest_d_andorra",
+                "label": "Andorra"
+            },
+            {
+                "value": "dest_d_austria",
+                "label": "Austria"
+            },
+            {
+                "value": "dest_d_belgica",
+                "label": "Bélgica"
+            },
+            {
+                "value": "dest_d_bielorrusia",
+                "label": "Bielorrusia"
+            },
+            {
+                "value": "dest_d_bosnia_herzegovina",
+                "label": "Bosnia y Herzegovina"
+            },
+            {
+                "value": "dest_d_bulgaria",
+                "label": "Bulgaria"
+            },
+            {
+                "value": "dest_d_chipre",
+                "label": "Chipre"
+            },
+            {
+                "value": "dest_d_croacia",
+                "label": "Croacia"
+            },
+            {
+                "value": "dest_d_dinamarca",
+                "label": "Dinamarca"
+            },
+            {
+                "value": "dest_d_eslovaquia",
+                "label": "Eslovaquia"
+            },
+            {
+                "value": "dest_d_eslovenia",
+                "label": "Eslovenia"
+            },
+            {
+                "value": "dest_d_espana",
+                "label": "España"
+            },
+            {
+                "value": "dest_d_estonia",
+                "label": "Estonia"
+            },
+            {
+                "value": "dest_d_finlandia",
+                "label": "Finlandia"
+            },
+            {
+                "value": "dest_d_francia",
+                "label": "Francia"
+            },
+            {
+                "value": "dest_d_grecia",
+                "label": "Grecia"
+            },
+            {
+                "value": "dest_d_hungria",
+                "label": "Hungría"
+            },
+            {
+                "value": "dest_d_irlanda",
+                "label": "Irlanda"
+            },
+            {
+                "value": "dest_d_islandia",
+                "label": "Islandia"
+            },
+            {
+                "value": "dest_d_italia",
+                "label": "Italia"
+            },
+            {
+                "value": "dest_d_kosovo",
+                "label": "Kosovo"
+            },
+            {
+                "value": "dest_d_letonia",
+                "label": "Letonia"
+            },
+            {
+                "value": "dest_d_liechtenstein",
+                "label": "Liechtenstein"
+            },
+            {
+                "value": "dest_d_lituania",
+                "label": "Lituania"
+            },
+            {
+                "value": "dest_d_luxemburgo",
+                "label": "Luxemburgo"
+            },
+            {
+                "value": "dest_d_macedonia_norte",
+                "label": "Macedonia del Norte"
+            },
+            {
+                "value": "dest_d_malta",
+                "label": "Malta"
+            },
+            {
+                "value": "dest_d_monaco",
+                "label": "Mónaco"
+            },
+            {
+                "value": "dest_d_montenegro",
+                "label": "Montenegro"
+            },
+            {
+                "value": "dest_d_noruega",
+                "label": "Noruega"
+            },
+            {
+                "value": "dest_d_paises_bajos",
+                "label": "Países Bajos"
+            },
+            {
+                "value": "dest_d_polonia",
+                "label": "Polonia"
+            },
+            {
+                "value": "dest_d_portugal",
+                "label": "Portugal"
+            },
+            {
+                "value": "dest_d_reino_unido",
+                "label": "Reino Unido"
+            },
+            {
+                "value": "dest_d_republica_checa",
+                "label": "República Checa"
+            },
+            {
+                "value": "dest_d_rumania",
+                "label": "Rumania"
+            },
+            {
+                "value": "dest_d_rusia",
+                "label": "Rusia"
+            },
+            {
+                "value": "dest_d_san_marino",
+                "label": "San Marino"
+            },
+            {
+                "value": "dest_d_serbia",
+                "label": "Serbia"
+            },
+            {
+                "value": "dest_d_suecia",
+                "label": "Suecia"
+            },
+            {
+                "value": "dest_d_suiza",
+                "label": "Suiza"
+            },
+            {
+                "value": "dest_d_ucrania",
+                "label": "Ucrania"
+            },
+            {
+                "value": "dest_d_vaticano",
+                "label": "Vaticano"
+            },
+            {
+                "value": "dest_d_arabia_saudita",
+                "label": "Arabia Saudita"
+            },
+            {
+                "value": "dest_d_barein",
+                "label": "Baréin"
+            },
+            {
+                "value": "dest_d_catar",
+                "label": "Catar"
+            },
+            {
+                "value": "dest_d_chipre",
+                "label": "Chipre"
+            },
+            {
+                "value": "dest_d_emiratos_arabes",
+                "label": "Emiratos Árabes Unidos"
+            },
+            {
+                "value": "dest_d_irak",
+                "label": "Irak"
+            },
+            {
+                "value": "dest_d_iran",
+                "label": "Irán"
+            },
+            {
+                "value": "dest_d_israel",
+                "label": "Israel"
+            },
+            {
+                "value": "dest_d_jordania",
+                "label": "Jordania"
+            },
+            {
+                "value": "dest_d_kuwait",
+                "label": "Kuwait"
+            },
+            {
+                "value": "dest_d_libano",
+                "label": "Líbano"
+            },
+            {
+                "value": "dest_d_oman",
+                "label": "Omán"
+            },
+            {
+                "value": "dest_d_palestina",
+                "label": "Palestina"
+            },
+            {
+                "value": "dest_d_siria",
+                "label": "Siria"
+            },
+            {
+                "value": "dest_d_turquia",
+                "label": "Turquía"
+            },
+            {
+                "value": "dest_d_yemen",
+                "label": "Yemen"
+            },
+            {
+                "value": "dest_e_argelia",
+                "label": "Argelia"
+            },
+            {
+                "value": "dest_e_angola",
+                "label": "Angola"
+            },
+            {
+                "value": "dest_e_benin",
+                "label": "Benín"
+            },
+            {
+                "value": "dest_e_botsuana",
+                "label": "Botsuana"
+            },
+            {
+                "value": "dest_e_burkina_faso",
+                "label": "Burkina Faso"
+            },
+            {
+                "value": "dest_e_burundi",
+                "label": "Burundi"
+            },
+            {
+                "value": "dest_e_cabo_verde",
+                "label": "Cabo Verde"
+            },
+            {
+                "value": "dest_e_camerun",
+                "label": "Camerún"
+            },
+            {
+                "value": "dest_e_chad",
+                "label": "Chad"
+            },
+            {
+                "value": "dest_e_comoras",
+                "label": "Comoras"
+            },
+            {
+                "value": "dest_e_congo",
+                "label": "Congo"
+            },
+            {
+                "value": "dest_e_costa_marfil",
+                "label": "Costa de Marfil"
+            },
+            {
+                "value": "dest_e_djibouti",
+                "label": "Djibouti"
+            },
+            {
+                "value": "dest_e_egipto",
+                "label": "Egipto"
+            },
+            {
+                "value": "dest_e_eritrea",
+                "label": "Eritrea"
+            },
+            {
+                "value": "dest_e_esuatini",
+                "label": "Esuatini"
+            },
+            {
+                "value": "dest_e_etiopia",
+                "label": "Etiopía"
+            },
+            {
+                "value": "dest_e_gabon",
+                "label": "Gabón"
+            },
+            {
+                "value": "dest_e_gambia",
+                "label": "Gambia"
+            },
+            {
+                "value": "dest_e_ghana",
+                "label": "Ghana"
+            },
+            {
+                "value": "dest_e_guinea",
+                "label": "Guinea"
+            },
+            {
+                "value": "dest_e_guinea_bisau",
+                "label": "Guinea-Bisáu"
+            },
+            {
+                "value": "dest_e_guinea_ecuatorial",
+                "label": "Guinea Ecuatorial"
+            },
+            {
+                "value": "dest_e_kenia",
+                "label": "Kenia"
+            },
+            {
+                "value": "dest_e_lesoto",
+                "label": "Lesoto"
+            },
+            {
+                "value": "dest_e_liberia",
+                "label": "Liberia"
+            },
+            {
+                "value": "dest_e_libia",
+                "label": "Libia"
+            },
+            {
+                "value": "dest_e_madagascar",
+                "label": "Madagascar"
+            },
+            {
+                "value": "dest_e_malawi",
+                "label": "Malawi"
+            },
+            {
+                "value": "dest_e_mali",
+                "label": "Malí"
+            },
+            {
+                "value": "dest_e_marruecos",
+                "label": "Marruecos"
+            },
+            {
+                "value": "dest_e_mauricio",
+                "label": "Mauricio"
+            },
+            {
+                "value": "dest_e_mauritania",
+                "label": "Mauritania"
+            },
+            {
+                "value": "dest_e_mozambique",
+                "label": "Mozambique"
+            },
+            {
+                "value": "dest_e_namibia",
+                "label": "Namibia"
+            },
+            {
+                "value": "dest_e_niger",
+                "label": "Níger"
+            },
+            {
+                "value": "dest_e_nigeria",
+                "label": "Nigeria"
+            },
+            {
+                "value": "dest_e_republica_centroafricana",
+                "label": "República Centroafricana"
+            },
+            {
+                "value": "dest_e_republica_democratica_congo",
+                "label": "República Democrática del Congo"
+            },
+            {
+                "value": "dest_e_ruanda",
+                "label": "Ruanda"
+            },
+            {
+                "value": "dest_e_santo_tome_principe",
+                "label": "Santo Tomé y Príncipe"
+            },
+            {
+                "value": "dest_e_senegal",
+                "label": "Senegal"
+            },
+            {
+                "value": "dest_e_seychelles",
+                "label": "Seychelles"
+            },
+            {
+                "value": "dest_e_sierra_leona",
+                "label": "Sierra Leona"
+            },
+            {
+                "value": "dest_e_somalia",
+                "label": "Somalia"
+            },
+            {
+                "value": "dest_e_sudafrica",
+                "label": "Sudáfrica"
+            },
+            {
+                "value": "dest_e_sudan",
+                "label": "Sudán"
+            },
+            {
+                "value": "dest_e_sudan_sur",
+                "label": "Sudán del Sur"
+            },
+            {
+                "value": "dest_e_tanzania",
+                "label": "Tanzania"
+            },
+            {
+                "value": "dest_e_togo",
+                "label": "Togo"
+            },
+            {
+                "value": "dest_e_tunez",
+                "label": "Túnez"
+            },
+            {
+                "value": "dest_e_uganda",
+                "label": "Uganda"
+            },
+            {
+                "value": "dest_e_zambia",
+                "label": "Zambia"
+            },
+            {
+                "value": "dest_e_zimbabue",
+                "label": "Zimbabue"
+            },
+            {
+                "value": "dest_e_australia",
+                "label": "Australia"
+            },
+            {
+                "value": "dest_e_fiyi",
+                "label": "Fiyi"
+            },
+            {
+                "value": "dest_e_islas_marshall",
+                "label": "Islas Marshall"
+            },
+            {
+                "value": "dest_e_islas_salomon",
+                "label": "Islas Salomón"
+            },
+            {
+                "value": "dest_e_kiribati",
+                "label": "Kiribati"
+            },
+            {
+                "value": "dest_e_micronesia",
+                "label": "Micronesia"
+            },
+            {
+                "value": "dest_e_nauru",
+                "label": "Nauru"
+            },
+            {
+                "value": "dest_e_nueva_zelanda",
+                "label": "Nueva Zelanda"
+            },
+            {
+                "value": "dest_e_palaos",
+                "label": "Palaos"
+            },
+            {
+                "value": "dest_e_papua_nueva_guinea",
+                "label": "Papúa Nueva Guinea"
+            },
+            {
+                "value": "dest_e_samoa",
+                "label": "Samoa"
+            },
+            {
+                "value": "dest_e_tonga",
+                "label": "Tonga"
+            },
+            {
+                "value": "dest_e_tuvalu",
+                "label": "Tuvalu"
+            },
+            {
+                "value": "dest_e_vanuatu",
+                "label": "Vanuatu"
+            }
+        ]
+    }
+}

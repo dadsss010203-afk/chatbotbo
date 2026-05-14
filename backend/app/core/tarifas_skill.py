@@ -13,12 +13,10 @@ import difflib
 import json
 import os
 import re
-import subprocess
-import time
 import unicodedata
+import requests
 from dataclasses import dataclass
 from core.cache import get_tariff, set_tariff
-from core import tarifas_sqlite
 
 
 BASE_APP_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -129,13 +127,106 @@ SKILL_CONFIG = {
     },
 }
 
-DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("TARIFF_SKILL_TIMEOUT", "18"))
-DEFAULT_RETRIES = int(os.environ.get("TARIFF_SKILL_RETRIES", "1"))
-CACHE_ENGINE = os.environ.get("TARIFF_ENGINE", "sqlite").strip().lower()
-TARIFF_SQLITE_FALLBACK_LEGACY = os.environ.get("TARIFF_SQLITE_FALLBACK_LEGACY", "true").strip().lower() in ("1", "true", "yes")
-CACHE_TTL_SECONDS = int(os.environ.get("TARIFF_CACHE_TTL_SECONDS", "60"))
-CACHE_MAX_ITEMS = int(os.environ.get("TARIFF_CACHE_MAX_ITEMS", "256"))
-_CACHE: dict[tuple[str, str, str, str], tuple[float, dict]] = {}
+POSTAR_API_URL = os.environ.get("POSTAR_API_URL", "https://postar.correos.gob.bo:8104/api/calcular").strip()
+POSTAR_API_TIMEOUT = int(os.environ.get("POSTAR_API_TIMEOUT", "20"))
+POSTAR_API_VERIFY_SSL = os.environ.get("POSTAR_API_VERIFY_SSL", "false").strip().lower() in ("1", "true", "yes")
+POSTAR_DEFAULT_CERTIFICADO = os.environ.get("POSTAR_DEFAULT_CERTIFICADO", "false").strip().lower() in ("1", "true", "yes")
+POSTAR_DEFAULT_ESPRESO = os.environ.get("POSTAR_DEFAULT_ESPRESO", "false").strip().lower() in ("1", "true", "yes")
+POSTAR_DEFAULT_RECIBO = os.environ.get("POSTAR_DEFAULT_RECIBO", "false").strip().lower() in ("1", "true", "yes")
+POSTAR_OPTIONS_FILE = os.path.join(BASE_APP_DIR, "data", "postar_options_grouped.json")
+POSTAR_DEST_TOKEN_PREFIX = "DEST::"
+POSTAR_DEST_GROUP_TOKEN_PREFIX = "DEST_GROUP::"
+POSTAR_UNSUPPORTED_SCOPES = {
+    "ems_contratos_nacional": "EMS Contratos Nacional",
+    "super_express_documentos_internacional": "Super Express Documentos Internacional",
+    "super_express_paquetes_internacional": "Super Express Paquetes Internacional",
+}
+
+POSTAR_SCOPE_TO_CATEGORY = {
+    "nacional": "EMS NAT",
+    "internacional": "EMS INT",
+    "encomienda_nacional": "MI ENCOMIENDA",
+    "encomienda_internacional": "ENCOMIENDA",
+    "ems_hoja5_nacional": "LC/AO NAT",
+    "ems_hoja6_internacional": "LC/AO INT",
+    "eca_nacional": "ECA NAT",
+    "eca_internacional": "ECA INT",
+    "pliegos_nacional": "PLIEGOS NAT",
+    "pliegos_internacional": "PLIEGOS INT",
+    "sacas_m_nacional": "SACAS M NAT",
+    "sacas_m_internacional": "SACAS M INT",
+    "super_express_nacional": "SUPER NAT",
+}
+
+POSTAR_INT_DEST_GROUPS = (
+    {"prefix": "dest_a_", "label_es": "América del Sur", "label_en": "South America"},
+    {"prefix": "dest_b_", "label_es": "América Central y Caribe", "label_en": "Central America and Caribbean"},
+    {"prefix": "dest_c_", "label_es": "América del Norte", "label_en": "North America"},
+    {"prefix": "dest_d_", "label_es": "Europa y Medio Oriente", "label_en": "Europe and Middle East"},
+    {"prefix": "dest_e_", "label_es": "África, Asia y Oceanía", "label_en": "Africa, Asia and Oceania"},
+)
+
+_POSTAR_INT_DESTINOS = {
+    "C": ("dest_a_argentina", "Argentina (zona A)"),
+    "D": ("dest_b_belice", "Belice (zona B)"),
+    "E": ("dest_c_eeuu", "Estados Unidos (zona C)"),
+    "F": ("dest_d_espana", "España (zona D)"),
+    "G": ("dest_e_argelia", "Argelia (zona E)"),
+}
+
+POSTAR_SCOPE_DESTINATION_BY_COLUMN = {
+    "nacional": {
+        "C": ("local_1", "Area Urbana (Hasta 2.5 Km)"),
+        "D": ("local_2", "Area Urbana (Hasta 5 Km)"),
+        "E": ("local_3", "Area Urbana (Hasta 7.5 Km)"),
+        "F": ("local_4", "Area Urbana (Hasta 10 Km)"),
+        "G": ("nacional_la_paz", "La Paz"),
+        "H": ("nacional_oruro", "Oruro"),
+        "I": ("nacional_pando", "Pando"),
+        "J": ("nacional_beni", "Beni"),
+    },
+    "internacional": dict(_POSTAR_INT_DESTINOS),
+    "encomienda_nacional": {
+        "C": ("cui_cap_la_paz", "Ciudad Capital (La Paz)"),
+        "D": ("cui1", "Trinidad / Cobija"),
+        "E": ("pro_dentro", "Provincia Dentro Departamento"),
+        "F": ("pro_otro", "Provincia en Otro Departamento"),
+    },
+    "encomienda_internacional": dict(_POSTAR_INT_DESTINOS),
+    "ems_hoja5_nacional": {
+        "C": ("local_1", "Area Urbana (Hasta 2.5 Km)"),
+        "D": ("nacional_la_paz", "La Paz"),
+        "E": ("pro_dentro", "Provincia Dentro Departamento"),
+        "F": ("pro_otro", "Provincia en Otro Departamento"),
+        "G": ("cui1", "Trinidad / Cobija"),
+        "H": ("cui2", "Riberalta / Guayaramerin"),
+    },
+    "ems_hoja6_internacional": dict(_POSTAR_INT_DESTINOS),
+    "eca_nacional": {
+        "C": ("local_1", "Area Urbana (Hasta 2.5 Km)"),
+        "D": ("nacional_la_paz", "La Paz"),
+        "E": ("pro_dentro", "Provincia Dentro Departamento"),
+        "F": ("pro_otro", "Provincia en Otro Departamento"),
+        "G": ("cui1", "Trinidad / Cobija"),
+        "H": ("cui2", "Riberalta / Guayaramerin"),
+    },
+    "eca_internacional": dict(_POSTAR_INT_DESTINOS),
+    "pliegos_nacional": {
+        "C": ("local_1", "Area Urbana (Hasta 2.5 Km)"),
+        "D": ("nacional_la_paz", "La Paz"),
+        "E": ("pro_dentro", "Provincia Dentro Departamento"),
+        "F": ("pro_otro", "Provincia en Otro Departamento"),
+    },
+    "pliegos_internacional": dict(_POSTAR_INT_DESTINOS),
+    "sacas_m_nacional": {
+        "C": ("nacional_la_paz", "La Paz"),
+        "D": ("pro_dentro", "Provincia Dentro Departamento"),
+    },
+    "sacas_m_internacional": dict(_POSTAR_INT_DESTINOS),
+    "super_express_nacional": {
+        "C": ("nacional_la_paz", "La Paz"),
+    },
+}
 
 DESTINO_NACIONAL = {
     "cobija": "I",
@@ -500,6 +591,185 @@ def _contains_term(text: str, term: str) -> bool:
     return re.search(pattern, text) is not None
 
 
+def _load_postar_dest_catalog() -> tuple[dict[str, str], list[str]]:
+    label_by_code: dict[str, str] = {}
+    ordered_codes: list[str] = []
+    try:
+        if not os.path.exists(POSTAR_OPTIONS_FILE):
+            return label_by_code, ordered_codes
+        with open(POSTAR_OPTIONS_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        for section in ("nacional", "internacional"):
+            block = data.get(section) or {}
+            for item in block.get("destinations") or []:
+                code = str(item.get("value") or "").strip().lower()
+                label = str(item.get("label") or "").strip()
+                if not code:
+                    continue
+                label_by_code[code] = label or code
+                if code not in ordered_codes:
+                    ordered_codes.append(code)
+    except Exception:
+        return {}, []
+    return label_by_code, ordered_codes
+
+
+POSTAR_LABEL_BY_CODE, POSTAR_DEST_CODES_ORDER = _load_postar_dest_catalog()
+
+
+def _postar_is_international_code(code: str) -> bool:
+    c = (code or "").strip().lower()
+    return c.startswith(("dest_a_", "dest_b_", "dest_c_", "dest_d_", "dest_e_"))
+
+
+def _postar_scope_is_international(scope: str | None) -> bool:
+    sc = (scope or "").strip().lower()
+    return sc in {
+        "internacional",
+        "encomienda_internacional",
+        "ems_hoja6_internacional",
+        "eca_internacional",
+        "pliegos_internacional",
+        "sacas_m_internacional",
+        "super_express_documentos_internacional",
+        "super_express_paquetes_internacional",
+    }
+
+
+def _postar_scope_allows_code(scope: str | None, code: str | None) -> bool:
+    sc = (scope or "").strip().lower()
+    c = (code or "").strip().lower()
+    if not sc or not c:
+        return False
+
+    if sc == "nacional":
+        return c in {"local_1", "local_2", "local_3", "local_4"} or c.startswith("nacional_")
+    if sc == "internacional":
+        return _postar_is_international_code(c)
+    if sc == "encomienda_nacional":
+        return c.startswith("cui_cap_") or c in {"cui1", "pro_dentro", "pro_otro"}
+    if sc == "encomienda_internacional":
+        return _postar_is_international_code(c)
+    if sc in {"ems_hoja5_nacional", "eca_nacional"}:
+        return c in {"local_1", "pro_dentro", "pro_otro", "cui1", "cui2"} or c.startswith("nacional_")
+    if sc in {"ems_hoja6_internacional", "eca_internacional", "pliegos_internacional", "sacas_m_internacional"}:
+        return _postar_is_international_code(c)
+    if sc == "pliegos_nacional":
+        return c in {"local_1", "pro_dentro", "pro_otro"} or c.startswith("nacional_")
+    if sc == "sacas_m_nacional":
+        return c == "pro_dentro" or c.startswith("nacional_")
+    if sc == "super_express_nacional":
+        return c.startswith("nacional_")
+    return False
+
+
+def _encode_postar_destination(code: str) -> str:
+    return f"{POSTAR_DEST_TOKEN_PREFIX}{(code or '').strip().lower()}"
+
+
+def _encode_postar_destination_group(prefix: str) -> str:
+    return f"{POSTAR_DEST_GROUP_TOKEN_PREFIX}{(prefix or '').strip().lower()}"
+
+
+def _decode_postar_destination(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    low = raw.lower()
+    prefix = POSTAR_DEST_TOKEN_PREFIX.lower()
+    if not low.startswith(prefix):
+        return None
+    code = raw[len(POSTAR_DEST_TOKEN_PREFIX):].strip().lower()
+    return code or None
+
+
+def _decode_postar_destination_group(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    low = raw.lower()
+    prefix = POSTAR_DEST_GROUP_TOKEN_PREFIX.lower()
+    if not low.startswith(prefix):
+        return None
+    group_prefix = raw[len(POSTAR_DEST_GROUP_TOKEN_PREFIX):].strip().lower()
+    if group_prefix in {"dest_a_", "dest_b_", "dest_c_", "dest_d_", "dest_e_"}:
+        return group_prefix
+    return None
+
+
+def postar_destination_codes_for_scope(scope: str | None) -> list[str]:
+    sc = (scope or "").strip().lower()
+    if not sc:
+        return []
+    return [code for code in POSTAR_DEST_CODES_ORDER if _postar_scope_allows_code(sc, code)]
+
+
+def resolve_postar_destination_group(value: str | None, scope: str | None) -> str | None:
+    if not _postar_scope_is_international(scope):
+        return None
+    raw = (value or "").strip()
+    if not raw:
+        return None
+
+    token_group = _decode_postar_destination_group(raw)
+    if token_group:
+        return token_group
+
+    raw_norm = _normalize_text(raw)
+    for group in POSTAR_INT_DEST_GROUPS:
+        if raw_norm == _normalize_text(group["label_es"]) or raw_norm == _normalize_text(group["label_en"]):
+            return group["prefix"]
+    return None
+
+
+def resolve_postar_destination_code(value: str | None, scope: str | None) -> str | None:
+    sc = (scope or "").strip().lower()
+    raw = (value or "").strip()
+    if not sc or not raw:
+        return None
+
+    token_code = _decode_postar_destination(raw)
+    if token_code and _postar_scope_allows_code(sc, token_code):
+        return token_code
+
+    code_candidate = raw.lower()
+    if _postar_scope_allows_code(sc, code_candidate):
+        return code_candidate
+
+    value_norm = _normalize_text(raw)
+    for code in postar_destination_codes_for_scope(sc):
+        label_norm = _normalize_text(POSTAR_LABEL_BY_CODE.get(code, code))
+        if value_norm == label_norm:
+            return code
+    return None
+
+
+def postar_scope_requires_destination_group(scope: str | None) -> bool:
+    return _postar_scope_is_international(scope)
+
+
+def postar_destination_group_quick_replies(scope: str | None, lang: str = "es") -> list[dict]:
+    if not _postar_scope_is_international(scope):
+        return []
+    out: list[dict] = []
+    language = (lang or "es").strip().lower()
+    for group in POSTAR_INT_DEST_GROUPS:
+        label = group["label_en"] if language == "en" else group["label_es"]
+        out.append({"label": label, "value": _encode_postar_destination_group(group["prefix"])})
+    return out
+
+
+def postar_destination_quick_replies(scope: str | None, destination_group: str | None = None) -> list[dict]:
+    selected_group = (destination_group or "").strip().lower() or None
+    options: list[dict] = []
+    for code in postar_destination_codes_for_scope(scope):
+        if selected_group and not code.startswith(selected_group):
+            continue
+        label = POSTAR_LABEL_BY_CODE.get(code, code)
+        options.append({"label": label, "value": label})
+    return options
+
+
 def _extract_peso(texto: str) -> str | None:
     m = PESO_RE.search(texto or "")
     if not m:
@@ -805,6 +1075,10 @@ def resolve_columna(value: str | None, scope: str | None = None) -> str | None:
     raw = (value or "").strip()
     if not raw:
         return None
+    if scope is not None:
+        destination_code = resolve_postar_destination_code(raw, scope)
+        if destination_code:
+            return _encode_postar_destination(destination_code)
     if len(raw) == 1:
         col = raw.upper()
         if col in {"B", "C", "D", "E", "F", "G", "H", "I", "J"}:
@@ -827,6 +1101,11 @@ def resolve_columna(value: str | None, scope: str | None = None) -> str | None:
 
 
 def columna_valida_para_scope(columna: str | None, scope: str | None) -> bool:
+    token_code = _decode_postar_destination(columna)
+    sc = (scope or "").strip().lower()
+    if token_code and sc in POSTAR_SCOPE_TO_CATEGORY:
+        return _postar_scope_allows_code(sc, token_code)
+
     col = (columna or "").strip().upper()
     sc = (scope or "").strip().lower()
     if not col or not sc or sc not in SKILL_CONFIG:
@@ -835,6 +1114,13 @@ def columna_valida_para_scope(columna: str | None, scope: str | None) -> bool:
 
 
 def infer_scope_from_columna(columna: str | None) -> str | None:
+    token_code = _decode_postar_destination(columna)
+    if token_code:
+        matching_scopes = [scope for scope in POSTAR_SCOPE_TO_CATEGORY if _postar_scope_allows_code(scope, token_code)]
+        if len(matching_scopes) == 1:
+            return matching_scopes[0]
+        return None
+
     col = (columna or "").strip().upper()
     if not col:
         return None
@@ -847,6 +1133,8 @@ def infer_scope_from_columna(columna: str | None) -> str | None:
 
 def default_columna_for_scope(scope: str | None) -> str | None:
     sc = (scope or "").strip().lower()
+    if sc in POSTAR_SCOPE_TO_CATEGORY:
+        return None
     cfg = SKILL_CONFIG.get(sc)
     if not cfg:
         return None
@@ -969,231 +1257,193 @@ def missing_message(missing: list[str]) -> str:
 
 
 def skill_ready(scope: str) -> tuple[bool, str | None]:
-    cfg = SKILL_CONFIG.get(scope)
-    if not cfg:
+    sc = (scope or "").strip().lower()
+    if not sc or sc not in SKILL_CONFIG:
         return False, f"Scope de tarifa no soportado: {scope}"
-    wrapper = cfg["wrapper"]
-    if not os.path.exists(wrapper):
-        return False, f"No se encontró wrapper de tarifas en: {wrapper}"
+    if sc in POSTAR_UNSUPPORTED_SCOPES:
+        return (
+            False,
+            f"El servicio '{POSTAR_UNSUPPORTED_SCOPES[sc]}' no está disponible en la API POSTAR.",
+        )
+    if sc not in POSTAR_SCOPE_TO_CATEGORY:
+        return False, f"No existe mapeo API para el scope: {sc}"
+    if sc not in POSTAR_SCOPE_DESTINATION_BY_COLUMN:
+        return False, f"No existe mapeo de destinos API para el scope: {sc}"
+    if not POSTAR_API_URL:
+        return False, "No se configuró POSTAR_API_URL"
     return True, None
 
 
-def _cache_get(scope: str, peso: str, columna: str, xlsx: str | None) -> dict | None:
-    key = (scope, peso, columna, xlsx or "")
-    item = _CACHE.get(key)
-    if not item:
+def _parse_peso_to_kg(peso: str) -> float | None:
+    raw = (peso or "").strip().lower().replace(",", ".")
+    if not raw:
         return None
-    ts, data = item
-    if time.time() - ts > CACHE_TTL_SECONDS:
-        _CACHE.pop(key, None)
+    match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([a-z]+)?", raw)
+    if not match:
         return None
-    return data
+    value = float(match.group(1))
+    unit = (match.group(2) or "kg").strip()
+    if unit in {"g", "gr", "gramo", "gramos"}:
+        return value / 1000.0
+    if unit in {"kg", "k", "kilo", "kilos", "kilogramo", "kilogramos"}:
+        return value
+    return None
 
 
-def _cache_set(scope: str, peso: str, columna: str, xlsx: str | None, data: dict) -> None:
-    if CACHE_MAX_ITEMS <= 0:
-        return
-    if len(_CACHE) >= CACHE_MAX_ITEMS:
-        oldest_key = min(_CACHE.items(), key=lambda kv: kv[1][0])[0]
-        _CACHE.pop(oldest_key, None)
-    _CACHE[(scope, peso, columna, xlsx or "")] = (time.time(), data)
+def _resolve_postar_destination(scope: str, columna: str) -> tuple[str, str] | None:
+    token_code = _decode_postar_destination(columna)
+    if token_code and _postar_scope_allows_code(scope, token_code):
+        return token_code, POSTAR_LABEL_BY_CODE.get(token_code, token_code)
+    mapping = POSTAR_SCOPE_DESTINATION_BY_COLUMN.get(scope) or {}
+    return mapping.get((columna or "").strip().upper())
 
 
-def _parse_keyvalue_output(raw: str, exit_code: int) -> dict:
-    """Parsea salida en formato clave=valor del runtime Python y convierte a dict."""
-    text = (raw or "").strip()
-    if not text:
-        return {"ok": False, "error": "La skill de tarifas no devolvió salida", "exit_code": exit_code}
-
-    # Verificar errores conocidos
-    low = _normalize_text(text)
-    if "peso fuera de rango" in low or "precio vacio" in low:
-        return {"ok": False, "error": "Peso fuera de rango para este tarifario", "error_code": "out_of_range", "raw": text}
-
-    # Parsear formato clave=valor
-    result = {"ok": True}
-    for line in text.splitlines():
-        if "=" in line:
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if key == "rango_min_g":
-                result.setdefault("rango", {})["min_g"] = value
-            elif key == "rango_max_g":
-                result.setdefault("rango", {})["max_g"] = value
-            elif key == "precio":
-                try:
-                    result["precio"] = int(float(value))
-                except:
-                    result["precio"] = value
-            else:
-                result[key] = value
-    if "precio" not in result:
-        return {"ok": False, "error": "No se pudo extraer precio de la salida", "raw": text}
-    return result
+def _is_out_of_range_message(value: str) -> bool:
+    t = _normalize_text(value or "")
+    return "fuera de rango" in t or "out of range" in t
 
 
-def _parse_wrapper_output(raw: str, exit_code: int) -> dict:
-    text = (raw or "").strip()
-    if not text:
-        return {"ok": False, "error": "La skill de tarifas no devolvió salida", "exit_code": exit_code}
-
-    low = _normalize_text(text)
-    if "peso fuera de rango" in low or "precio vacio" in low or "precio vacio" in low:
-        return {
-            "ok": False,
-            "error": "Peso fuera de rango para este tarifario",
-            "error_code": "out_of_range",
-            "raw": text,
-            "exit_code": exit_code,
-        }
-
+def _request_postar_tariff(payload: dict) -> dict:
     try:
-        data = json.loads(text)
+        response = requests.post(
+            POSTAR_API_URL,
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            timeout=POSTAR_API_TIMEOUT,
+            verify=POSTAR_API_VERIFY_SSL,
+        )
+    except requests.RequestException as exc:
+        return {"ok": False, "error": f"No se pudo conectar con la API de tarifas: {exc}"}
+
+    data: dict | None
+    try:
+        parsed = response.json()
+        data = parsed if isinstance(parsed, dict) else None
+    except ValueError:
+        data = None
+
+    if response.status_code >= 400:
+        detail = ""
         if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
+            detail = str(data.get("message") or data.get("error") or data.get("detail") or "").strip()
+        if not detail:
+            detail = (response.text or "").strip()[:300]
+        result = {"ok": False, "error": f"POSTAR devolvió HTTP {response.status_code}. {detail}".strip()}
+        if _is_out_of_range_message(detail):
+            result["error_code"] = "out_of_range"
+        return result
 
-    m = re.search(r"\{.*\}", text, flags=re.DOTALL)
-    if m:
-        try:
-            data = json.loads(m.group(0))
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "La API POSTAR devolvió una respuesta no JSON válida."}
 
-    return {
-        "ok": False,
-        "error": "No se pudo parsear JSON de la skill de tarifas",
-        "raw": text,
-        "exit_code": exit_code,
-    }
+    success = data.get("success")
+    if success is False:
+        detail = str(data.get("message") or data.get("error") or "La API POSTAR no pudo calcular la tarifa.")
+        result = {"ok": False, "error": detail}
+        if _is_out_of_range_message(detail):
+            result["error_code"] = "out_of_range"
+        return result
 
+    tarifa_raw = data.get("tarifa")
+    if tarifa_raw is None:
+        return {"ok": False, "error": "La API POSTAR no devolvió el campo 'tarifa'."}
+    try:
+        tarifa = float(tarifa_raw)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "La API POSTAR devolvió una tarifa inválida."}
 
-def _ejecutar_tarifa_legacy(peso: str, columna: str, scope: str, xlsx: str | None = None) -> dict:
-    scope = (scope or "").strip().lower()
-    ok, err = skill_ready(scope)
-    if not ok:
-        return {"ok": False, "error": err}
-
-    cfg = SKILL_CONFIG[scope]
-    allowed_cols = cfg["columns"]
-    wrapper = cfg["wrapper"]
-
-    peso = (peso or "").strip().lower()
-    columna = (columna or "").strip().upper()
-
-    if not peso:
-        return {"ok": False, "error": "Falta peso"}
-    if columna not in allowed_cols:
-        return {"ok": False, "error": f"Columna inválida para EMS {scope}: {columna}"}
-
-    cached = get_tariff(scope, peso, columna, xlsx)
-    if cached is not None:
-        return {**cached, "cached": True}
-
-    # En Windows, ejecutar el runtime Python directamente (los wrappers .sh no funcionan)
-    is_windows = os.name == 'nt'
-    if is_windows:  # Windows
-        # Convertir ruta del wrapper a ruta del runtime
-        # skillX/tools/calcular_hojaX_json.sh -> skillX/runtime/calcular_hojaX_runtime.py
-        runtime_path = wrapper.replace("\\tools\\", "\\runtime\\").replace("/tools/", "/runtime/")
-        runtime_path = runtime_path.replace("_json.sh", "_runtime.py")
-        cmd = ["python", runtime_path, "--peso", peso, "--columna", columna, "--json"]
-    else:
-        cmd = ["bash", wrapper, "--peso", peso, "--columna", columna]
-    if xlsx:
-        cmd.extend(["--xlsx", xlsx])
-
-    attempts = max(DEFAULT_RETRIES, 1)
-    last = {"ok": False, "error": "Error desconocido"}
-
-    for _ in range(attempts):
-        try:
-            proc = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=DEFAULT_TIMEOUT_SECONDS,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            last = {"ok": False, "error": f"Timeout al ejecutar skill de tarifas ({DEFAULT_TIMEOUT_SECONDS}s)"}
-            continue
-        except Exception as exc:
-            last = {"ok": False, "error": f"Error ejecutando skill de tarifas: {exc}"}
-            continue
-
-        output = proc.stdout or proc.stderr or ""
-        # En Windows: convertir formato clave=valor a JSON
-        if is_windows and output:
-            parsed = _parse_keyvalue_output(output, proc.returncode)
-        else:
-            parsed = _parse_wrapper_output(output, proc.returncode)
-        if parsed.get("ok"):
-            parsed["scope"] = scope
-            parsed["skill_id"] = cfg["skill_id"]
-            set_tariff(scope, peso, columna, parsed, xlsx)
-            return parsed
-        last = parsed
-
-    if isinstance(last, dict):
-        last["scope"] = scope
-    return last
+    return {"ok": True, "tarifa": tarifa, "api_response": data}
 
 
 def ejecutar_tarifa(peso: str, columna: str, scope: str, xlsx: str | None = None) -> dict:
     scope = (scope or "").strip().lower()
     ok, err = skill_ready(scope)
     if not ok:
-        return {"ok": False, "error": err}
+        return {"ok": False, "error": err, "scope": scope, "engine": "postar_api"}
 
     cfg = SKILL_CONFIG[scope]
     allowed_cols = cfg["columns"]
     peso = (peso or "").strip().lower()
-    columna = (columna or "").strip().upper()
+    columna = (columna or "").strip()
+    columna_upper = columna.upper()
+    token_code = _decode_postar_destination(columna)
 
     if not peso:
-        return {"ok": False, "error": "Falta peso"}
-    if columna not in allowed_cols:
-        return {"ok": False, "error": f"Columna inválida para EMS {scope}: {columna}"}
+        return {"ok": False, "error": "Falta peso", "scope": scope, "engine": "postar_api"}
+    if token_code:
+        if not _postar_scope_allows_code(scope, token_code):
+            return {
+                "ok": False,
+                "error": f"Destino inválido para {scope}: {token_code}",
+                "scope": scope,
+                "engine": "postar_api",
+            }
+    elif columna_upper not in allowed_cols:
+        return {"ok": False, "error": f"Columna inválida para {scope}: {columna_upper}", "scope": scope, "engine": "postar_api"}
 
-    cached = get_tariff(scope, peso, columna, xlsx)
+    cache_col_key = _encode_postar_destination(token_code) if token_code else columna_upper
+    cached = get_tariff(scope, peso, cache_col_key, xlsx)
     if cached is not None:
         return {**cached, "cached": True}
 
-    # Si llega xlsx custom, forzamos motor legado para respetar compatibilidad.
-    force_legacy = bool((xlsx or "").strip())
-    prefer_sqlite = (CACHE_ENGINE == "sqlite") and not force_legacy
+    peso_kg = _parse_peso_to_kg(peso)
+    if peso_kg is None or peso_kg <= 0:
+        return {
+            "ok": False,
+            "error": "Formato de peso inválido. Usa por ejemplo 500g o 2.5kg.",
+            "scope": scope,
+            "engine": "postar_api",
+        }
 
-    if prefer_sqlite:
-        sqlite_result = tarifas_sqlite.calculate_tariff(
-            scope=scope,
-            peso=peso,
-            columna=columna,
-            skill_config=SKILL_CONFIG,
-            auto_seed=True,
-        )
-        if sqlite_result.get("ok"):
-            sqlite_result["scope"] = scope
-            sqlite_result["skill_id"] = cfg["skill_id"]
-            sqlite_result["engine"] = "sqlite"
-            set_tariff(scope, peso, columna, sqlite_result, xlsx)
-            return sqlite_result
+    destino_info = _resolve_postar_destination(scope, columna if token_code else columna_upper)
+    if not destino_info:
+        return {
+            "ok": False,
+            "error": f"No hay un destino API mapeado para {scope} y selector '{columna}'.",
+            "scope": scope,
+            "engine": "postar_api",
+        }
+    destino_code, destino_label = destino_info
+    categoria = POSTAR_SCOPE_TO_CATEGORY[scope]
 
-        if not TARIFF_SQLITE_FALLBACK_LEGACY:
-            sqlite_result["scope"] = scope
-            sqlite_result["engine"] = "sqlite"
-            return sqlite_result
+    payload = {
+        "categoria": categoria,
+        "destino": destino_code,
+        "peso": peso_kg,
+        "certificado": POSTAR_DEFAULT_CERTIFICADO,
+        "espreso": POSTAR_DEFAULT_ESPRESO,
+        "recibo": POSTAR_DEFAULT_RECIBO,
+    }
 
-    legacy_result = _ejecutar_tarifa_legacy(peso=peso, columna=columna, scope=scope, xlsx=xlsx)
-    if legacy_result.get("ok"):
-        legacy_result["engine"] = "legacy"
-    else:
-        legacy_result["engine"] = "legacy"
-    return legacy_result
+    result = _request_postar_tariff(payload)
+    if not result.get("ok"):
+        result["scope"] = scope
+        result["skill_id"] = cfg["skill_id"]
+        result["engine"] = "postar_api"
+        return result
+
+    tarifa = float(result["tarifa"])
+    price = int(tarifa) if tarifa.is_integer() else round(tarifa, 2)
+    output = {
+        "ok": True,
+        "scope": scope,
+        "skill_id": cfg["skill_id"],
+        "engine": "postar_api",
+        "categoria": categoria,
+        "destino": destino_code,
+        "destino_label": destino_label,
+        "peso_kg": round(peso_kg, 6),
+        "peso_g": round(peso_kg * 1000.0, 2),
+        "tarifa": price,
+        "precio": price,
+        "servicio": f"{categoria} · {destino_label}",
+        "api_payload": payload,
+        "api_response": result.get("api_response"),
+    }
+    if xlsx:
+        output["warning"] = "El parámetro xlsx se ignora cuando se usa POSTAR API."
+    set_tariff(scope, peso, cache_col_key, output, xlsx)
+    return output
 
 
 def format_tarifa_response(resultado: dict) -> str:
@@ -1202,26 +1452,16 @@ def format_tarifa_response(resultado: dict) -> str:
         return f"No pude calcular la tarifa en este momento. Detalle: {err}"
 
     precio = resultado.get("precio")
-    servicio = resultado.get("servicio") or "No especificado"
-    rango = resultado.get("rango") or {}
-    min_g = rango.get("min_g")
-    max_g = rango.get("max_g")
-    peso_g = resultado.get("peso_g")
+    categoria = resultado.get("categoria") or "N/A"
+    destino = resultado.get("destino_label") or resultado.get("destino") or "N/A"
+    peso_kg = resultado.get("peso_kg")
     scope_key = (resultado.get("scope") or "").strip().lower()
     scope = SKILL_CONFIG.get(scope_key, {}).get("label") or scope_key.capitalize()
-
-    nota = ""
-    try:
-        if peso_g is not None and min_g is not None and float(peso_g) < float(min_g):
-            nota = "\nNota: se aplicó tarifa del siguiente rango disponible."
-    except Exception:
-        nota = ""
 
     return (
         f"{scope}\n"
         f"Precio final: {precio} Bs\n"
-        f"Servicio: {servicio}\n"
-        f"Rango aplicado: {min_g}-{max_g} g\n"
-        f"Peso consultado: {peso_g} g"
-        f"{nota}"
+        f"Categoría: {categoria}\n"
+        f"Destino: {destino}\n"
+        f"Peso consultado: {peso_kg} kg"
     )

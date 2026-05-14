@@ -982,6 +982,7 @@ def _tarifa_quick_replies(
     scope: str | None = None,
     family: str | None = None,
     lang: str = "es",
+    destination_group: str | None = None,
 ) -> list[dict]:
     if not missing:
         return []
@@ -1035,7 +1036,6 @@ def _tarifa_quick_replies(
             {"label": t["eca"], "value": "eca nacional"},
             {"label": t["pliegos_oficiales"], "value": "pliegos oficiales nacional"},
             {"label": t["sacas_m"], "value": "sacas m nacional"},
-            {"label": t["ems_contratos"], "value": "ems contratos nacional"},
             {"label": t["super_express"], "value": "super express nacional"},
         ]
     if "tipo_internacional" in missing:
@@ -1046,8 +1046,6 @@ def _tarifa_quick_replies(
             {"label": t["eca"], "value": "eca internacional"},
             {"label": t["pliegos_oficiales"], "value": "pliegos oficiales internacional"},
             {"label": t["sacas_m"], "value": "sacas m internacional"},
-            {"label": t["super_express_documentos"], "value": "super express documentos internacional"},
-            {"label": t["super_express_paquetes"], "value": "super express paquetes internacional"},
         ]
     if "alcance_ems" in missing:
         return [
@@ -1065,132 +1063,14 @@ def _tarifa_quick_replies(
             {"label": "800g", "value": "800g"},
             {"label": "1kg", "value": "1kg"},
         ]
-    # Primera fase robusta: sugerencias de destino para EMS Nacional (skill1).
-    if "destino" in missing and scope == "nacional" and (family in {None, "ems"}):
-        return [
-            {"label": "Cobija", "value": "cobija"},
-            {"label": "Trinidad", "value": "trinidad"},
-            {"label": "Riberalta", "value": "riberalta"},
-            {"label": "Ciudades intermedias", "value": "ciudades intermedias"},
-            {"label": "Cobertura 1", "value": "cobertura 1"},
-            {"label": "Cobertura 2", "value": "cobertura 2"},
-            {"label": "Cobertura 3", "value": "cobertura 3"},
-            {"label": "Cobertura 4", "value": "cobertura 4"},
-        ]
-    # Segunda fase robusta: sugerencias de destino para EMS Internacional (skill2).
-    if "destino" in missing and scope == "internacional" and (family in {None, "ems"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y Caribe", "value": "america central y caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa", "value": "europa"},
-            {"label": "África / Asia / Oceanía", "value": "africa asia oceania"},
-        ]
-    # Tercera fase robusta: sugerencias para Mi Encomienda Prioritario Nacional (skill3).
-    if "destino" in missing and scope == "encomienda_nacional" and (family in {None, "encomienda"}):
-        return [
-            {"label": "Ciudades Capitales", "value": "ciudades capitales"},
-            {"label": "Destinos Especiales (Trinidad-Cobija)", "value": "destinos especiales"},
-            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
-            {"label": "Prov. En Otro Depto.", "value": "prov en otro depto"},
-        ]
-    # Cuarta fase robusta: sugerencias para Encomiendas Postales Internacional (skill4).
-    if "destino" in missing and scope == "encomienda_internacional" and (family in {None, "encomienda"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y Caribe", "value": "america central y caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África / Asia / Oceanía", "value": "africa asia oceania"},
-        ]
-    if "destino" in missing and scope == "ems_hoja5_nacional" and (family in {None, "ems_hoja5"}):
-        return [
-            {"label": "Local", "value": "local"},
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Depto.", "value": "depto"},
-            {"label": "Prov.", "value": "prov"},
-            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
-            {"label": "Riberalta - Guayaramerín", "value": "riberalta guayaramerin"},
-        ]
-    if "destino" in missing and scope == "ems_hoja6_internacional" and (family in {None, "ems_hoja6"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "eca_nacional" and (family in {None, "eca"}):
-        return [
-            {"label": "Local", "value": "local"},
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
-            {"label": "Prov. Depto. Prov.", "value": "prov depto prov"},
-            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
-            {"label": "Riberalta - Guayaramerín", "value": "riberalta guayaramerin"},
-        ]
-    if "destino" in missing and scope == "eca_internacional" and (family in {None, "eca"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "pliegos_nacional" and (family in {None, "pliegos"}):
-        return [
-            {"label": "Local", "value": "local"},
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
-            {"label": "Prov. Depto. Prov.", "value": "prov depto prov"},
-        ]
-    if "destino" in missing and scope == "pliegos_internacional" and (family in {None, "pliegos"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "sacas_m_nacional" and (family in {None, "sacas_m"}):
-        return [
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Provincial", "value": "provincial"},
-        ]
-    if "destino" in missing and scope == "sacas_m_internacional" and (family in {None, "sacas_m"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "ems_contratos_nacional" and (family in {None, "ems_contratos"}):
-        return [
-            {"label": "EMS Nacional", "value": "ems nacional"},
-            {"label": "Ciudades Intermedias", "value": "ciudades intermedias"},
-            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
-        ]
-    if "destino" in missing and scope == "super_express_documentos_internacional" and (family in {None, "super_express_documentos"}):
-        return [
-            {"label": "Sudamérica (Tarifa 1)", "value": "sud america"},
-            {"label": "Centroamérica/Florida (Tarifa 2)", "value": "centro america florida"},
-            {"label": "Resto de EEUU (Tarifa 3)", "value": "resto de eeuu"},
-            {"label": "Caribe (Tarifa 4)", "value": "caribe"},
-            {"label": "Europa (Tarifa 5)", "value": "europa"},
-            {"label": "Medio Oriente (Tarifa 6)", "value": "medio oriente"},
-            {"label": "África y Asia (Tarifa 7)", "value": "africa y asia"},
-        ]
-    if "destino" in missing and scope == "super_express_paquetes_internacional" and (family in {None, "super_express_paquetes"}):
-        return [
-            {"label": "Sudamérica (Tarifa 1)", "value": "sud america"},
-            {"label": "Centroamérica/Florida (Tarifa 2)", "value": "centro america florida"},
-            {"label": "Resto de EEUU (Tarifa 3)", "value": "resto de eeuu"},
-            {"label": "Caribe (Tarifa 4)", "value": "caribe"},
-            {"label": "Europa (Tarifa 5)", "value": "europa"},
-            {"label": "Medio Oriente (Tarifa 6)", "value": "medio oriente"},
-            {"label": "África y Asia (Tarifa 7)", "value": "africa y asia"},
-        ]
+    if "destino" in missing and scope:
+        if tarifas_skill.postar_scope_requires_destination_group(scope) and not destination_group:
+            grouped = tarifas_skill.postar_destination_group_quick_replies(scope, lang=lang)
+            if grouped:
+                return grouped
+        options = tarifas_skill.postar_destination_quick_replies(scope, destination_group=destination_group)
+        if options:
+            return options
     return []
 
 
@@ -1217,6 +1097,10 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
         prefer_scope=pendiente.get("scope"),
         prefer_family=pendiente.get("family"),
     )
+    group_choice = tarifas_skill.resolve_postar_destination_group(
+        pregunta,
+        req.scope or fragment.scope or pendiente.get("scope"),
+    )
     level_choice = _extract_geo_level_choice(pregunta)
     scope_msg = req.scope or fragment.scope
     col_msg = req.columna or fragment.columna
@@ -1228,7 +1112,7 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
         col_msg = None
 
     should_resume_pending = bool(pendiente) and bool(
-        req.is_tarifa or scope_msg or req.peso or col_msg or req.family or fragment.family or level_choice
+        req.is_tarifa or scope_msg or req.peso or col_msg or req.family or fragment.family or level_choice or group_choice
     )
     if not req.is_tarifa and not should_resume_pending:
         return None
@@ -1236,10 +1120,12 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
     pending_scope = pendiente.get("scope")
     pending_family = pendiente.get("family")
     pending_level = pendiente.get("level")
+    pending_destination_group = pendiente.get("destination_group")
     family = req.family or fragment.family or pending_family
     scope = scope_msg or pending_scope
     peso = req.peso or fragment.peso or pendiente.get("peso")
     columna = col_msg or pendiente.get("columna")
+    destination_group = group_choice or pending_destination_group
 
     # Si el usuario está eligiendo servicio (y solo servicio), forzamos siguiente paso:
     # pedir destino en vez de inferir columna por palabras como "nacional".
@@ -1299,10 +1185,23 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
     # Si la columna quedó incompatible con el alcance actual, pedimos nuevo destino/servicio.
     if columna and scope and not tarifas_skill.columna_valida_para_scope(columna, scope):
         columna = tarifas_skill.resolve_columna(pregunta, scope=scope)
+    if not scope or not tarifas_skill.postar_scope_requires_destination_group(scope):
+        destination_group = None
+    elif group_choice:
+        # Cuando el usuario elige continente/zona primero, forzamos siguiente paso a elegir país.
+        columna = None
+    if columna:
+        destination_group = None
 
     missing = _missing_tarifa_fields(scope, peso, columna, family=family, level=level)
     if missing:
-        quick_replies = _tarifa_quick_replies(missing, scope=scope, family=family, lang=lang)
+        quick_replies = _tarifa_quick_replies(
+            missing,
+            scope=scope,
+            family=family,
+            lang=lang,
+            destination_group=destination_group,
+        )
         session.set_pendiente_tarifa(
             sid,
             {
@@ -1311,6 +1210,7 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
                 "level": level,
                 "peso": peso,
                 "columna": columna,
+                "destination_group": destination_group,
             },
         )
         msg = tarifas_skill.missing_message(missing)
@@ -1333,6 +1233,7 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
                 "level": level,
                 "peso": peso,
                 "columna": columna,
+                "destination_group": destination_group,
             },
             "quick_replies": quick_replies,
         }
@@ -1367,6 +1268,7 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
                 "level": level,
                 "peso": peso,
                 "columna": None,
+                "destination_group": destination_group,
             },
         )
         session.agregar_turno(sid, pregunta, msg)
@@ -3611,6 +3513,7 @@ async def iniciar_tarifa(request: Request):
             "level": None,
             "peso": None,
             "columna": None,
+            "destination_group": None,
         },
     )
     missing = ["alcance"]
