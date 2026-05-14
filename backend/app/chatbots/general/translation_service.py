@@ -23,7 +23,6 @@ LANG_NAMES = {
     "es": "español",
     "en": "English",
     "fr": "français",
-    "pt": "português",
     "zh": "中文",
     "ru": "русский",
 }

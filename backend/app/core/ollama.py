@@ -26,7 +26,9 @@ OLLAMA_TIMEOUT        = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
 OLLAMA_RETRIES        = int(os.environ.get("OLLAMA_RETRIES", "2"))
 OLLAMA_RETRY_BACKOFF  = float(os.environ.get("OLLAMA_RETRY_BACKOFF", "0.5"))
 OLLAMA_MAX_TOKENS     = os.environ.get("OLLAMA_MAX_TOKENS")
-OLLAMA_PROMPT_MAX_TOKENS = int(os.environ.get("OLLAMA_PROMPT_MAX_TOKENS", "3600"))
+OLLAMA_PROMPT_MAX_TOKENS = int(os.environ.get("OLLAMA_PROMPT_MAX_TOKENS", "1800"))
+# Timeout máximo para respuesta del LLM (segundos). Si se supera, se devuelve fallback.
+LLM_RESPONSE_TIMEOUT  = int(os.environ.get("LLM_RESPONSE_TIMEOUT", "50"))
 
 _SESSION = requests.Session()
 _ACTIVE_LOCK = threading.Lock()
@@ -114,11 +116,11 @@ def _default_options() -> dict:
     """
     seed = os.environ.get("OLLAMA_SEED")
     options = {
-        "num_predict": _env_int("OLLAMA_NUM_PREDICT", 200),
-        "temperature": _env_float("OLLAMA_TEMPERATURE", 0.0),
-        "num_ctx": _env_int("OLLAMA_NUM_CTX", 4096),
+        "num_predict": _env_int("OLLAMA_NUM_PREDICT", 400),
+        "temperature": _env_float("OLLAMA_TEMPERATURE", 0.2),
+        "num_ctx": _env_int("OLLAMA_NUM_CTX", 2048),
         "repeat_penalty": _env_float("OLLAMA_REPEAT_PENALTY", 1.1),
-        "top_p": _env_float("OLLAMA_TOP_P", 0.7),
+        "top_p": _env_float("OLLAMA_TOP_P", 0.9),
         "top_k": _env_int("OLLAMA_TOP_K", 40),
     }
     if seed is not None and seed != "":
@@ -243,7 +245,21 @@ def stream_ollama(
                 with request_session.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT, stream=True) as resp:
                     if request_id:
                         _set_active_response(request_id, resp)
-                    resp.raise_for_status()
+                    try:
+                        resp.raise_for_status()
+                    except requests.exceptions.HTTPError as e:
+                        # Capturar el mensaje de error detallado de Ollama
+                        error_detail = resp.text
+                        try:
+                            error_json = resp.json()
+                            error_detail = error_json.get("error", str(error_json))
+                        except Exception:
+                            pass
+                        # Log the error to server console
+                        print(f"\n🚨 Ollama Error: {error_detail}\n")
+                        raise requests.exceptions.HTTPError(
+                            f"Ollama HTTP {resp.status_code}: {error_detail}"
+                        ) from e
                     for raw_line in resp.iter_lines(chunk_size=1, decode_unicode=True):
                         if cancel_event is not None and cancel_event.is_set():
                             raise OllamaCancelled("Generación cancelada por el usuario.")
@@ -283,14 +299,17 @@ def limpiar_respuesta(texto: str) -> str:
     Limpia la respuesta del modelo eliminando:
     - Bloques <think>...</think> (modelos de razonamiento)
     - Formato markdown (**bold**, * listas)
-    - Convierte * items → bullet •
+    - Convierte * items y - items → bullet •
     """
     # Eliminar bloques de razonamiento interno
     texto = re.sub(r"<think>.*?</think>", "", texto, flags=re.DOTALL)
-    # Eliminar markdown
+    # Eliminar negrita markdown
     texto = texto.replace("**", "")
-    texto = texto.replace("* ",  "• ")
-    texto = texto.replace("*",   "")
+    # Convertir listas markdown a bullets
+    texto = re.sub(r"^(\s*)\* ", r"\1• ", texto, flags=re.MULTILINE)
+    texto = re.sub(r"^(\s*)- ", r"\1• ", texto, flags=re.MULTILINE)
+    # Limpiar asteriscos sueltos
+    texto = texto.replace("*", "")
     return texto.strip()
 
 

@@ -27,8 +27,8 @@ const TX = {
     lbl: 'Analizando consulta…',
     bye: 'Conversación finalizada',
     translating: 'Traduciendo conversación…',
-    welcome: '¡Hola! Soy chatbotBO, el asistente oficial de Correos de Bolivia. Puedo ayudarte con envíos, sucursales, ubicaciones y más.\n\n• Presiona el botón TARIFAS para activar las consultas de tarifas de envío. Presiónalo de nuevo para desactivarlo.\n• Presiona el botón RASTREO para rastrear un paquete. Presiónalo de nuevo para desactivarlo.\n\n¿En qué puedo ayudarte hoy?',
-    chips: [],
+    welcome: '¡Hola! Soy ChatbotBO, el asistente oficial de Correos de Bolivia.\n\nPuedo ayudarte con envíos, sucursales, ubicaciones y más.\n\n• Presiona TARIFAS para consultar precios de envío.\n• Presiona RASTREO para rastrear un paquete.\n\n¿En qué puedo ayudarte hoy?',
+    chips: ['📦 Rastrear paquete', '💰 Ver tarifas', '📍 Sucursales', '🕐 Horarios', '✉️ ¿Qué es EMS?'],
     tarifa: 'Tarifas',
     tarifaCancel: 'Cancelar tarifa',
     tracking: 'Rastreo',
@@ -54,7 +54,7 @@ const TX = {
     bye: 'Conversation ended',
     translating: 'Translating conversation…',
     welcome: 'Hello! I am chatbotBO, the virtual assistant of the Bolivian Postal Agency. I can help you with shipments, package tracking, branches and more. How can I help you?',
-    chips: [],
+    chips: ['📦 Track package', '💰 View rates', '📍 Branches', '🕐 Office hours', '✉️ What is EMS?'],
     tarifa: 'Rates',
     tarifaCancel: 'Cancel rates',
     tracking: 'Tracking',
@@ -144,6 +144,10 @@ console.log('Widget.js cargando...');
       return res.text();
     })
     .then(html => {
+      // Reemplazar rutas relativas con URL absoluta del servidor
+      html = html.replace(/src="\/logogif\.gif"/g, `src="${baseUrl}/logogif.gif"`);
+      html = html.replace(/src="\/logo_chatbot\.png"/g, `src="${baseUrl}/logo_chatbot.png"`);
+      html = html.replace(/src="\/logocorreos\.jpg"/g, `src="${baseUrl}/logocorreos.jpg"`);
       document.body.insertAdjacentHTML('beforeend', html);
       // Retrasar la inicialización para asegurar que el script se cargue completamente
       setTimeout(() => initWidget(s), 100);
@@ -156,6 +160,11 @@ console.log('Widget.js cargando...');
 // ─── INICIALIZAR ──────────────────────────────────────────────────────
 function initWidget(s) {
   console.log('initWidget llamado');
+  if (window._widgetInitialized) {
+    console.log('initWidget ya fue llamado, ignorando.');
+    return;
+  }
+  window._widgetInitialized = true;
   if (widgetPos === 'left') {
     const bubble = document.getElementById('chat-bubble');
     const win    = document.getElementById('chat-window');
@@ -182,6 +191,14 @@ function initWidget(s) {
       sendMsg(t);
     });
   }
+
+  // Conectar botones del header (sin onclick inline para evitar errores de scope)
+  const btnClose    = document.getElementById('btn-close');
+  const btnMinimize = document.getElementById('btn-minimize');
+  const btnBubble   = document.getElementById('chat-bubble');
+  if (btnClose)    btnClose.addEventListener('click', () => toggleChat());
+  if (btnMinimize) btnMinimize.addEventListener('click', () => minimize());
+  if (btnBubble)   btnBubble.addEventListener('click', () => toggleChat());
 
   // Cerrar mapa al hacer clic fuera
   const mapaModal = document.getElementById('mapa-modal');
@@ -495,36 +512,40 @@ async function setLang(l) {
   const cancelBtn = document.querySelector('.cno');
   const confirmBtn = document.querySelector('.csi');
 
-  if (tarifaBtn) {
-    tarifaBtn.textContent = tarifaMode ? t.tarifaCancel : t.tarifa;
-  }
-  if (trackingBtn) {
-    trackingBtn.textContent = trackingMode ? t.trackingCancel : t.tracking;
-  }
-  if (nearbyBtn) {
-    nearbyBtn.textContent = t.nearby;
-    console.log('Botón sucursales actualizado:', t.nearby);
-  } else {
-    console.log('Botón sucursales no encontrado');
-  }
-  if (fHint) {
-    fHint.textContent = t.enterHint;
-  }
-  if (confirmText) {
-    confirmText.innerHTML = t.confirmText;
-  }
-  if (cancelBtn) {
-    cancelBtn.textContent = t.cancelBtn;
-  }
-  if (confirmBtn) {
-    confirmBtn.textContent = t.confirmBtn;
-  }
+  if (tarifaBtn) tarifaBtn.textContent = tarifaMode ? t.tarifaCancel : t.tarifa;
+  if (trackingBtn) trackingBtn.textContent = trackingMode ? t.trackingCancel : t.tracking;
+  if (nearbyBtn) nearbyBtn.textContent = t.nearby;
+  if (fHint) fHint.textContent = t.enterHint;
+  if (confirmText) confirmText.innerHTML = t.confirmText;
+  if (cancelBtn) cancelBtn.textContent = t.cancelBtn;
+  if (confirmBtn) confirmBtn.textContent = t.confirmBtn;
 
-  // No traducir conversación existente, el backend ya responde en el idioma correcto
-  // await translateConversation();
   const cc = document.getElementById('chips-container');
   if (cc) {
     cc.innerHTML = t.chips.map(c => `<button class="chip" onclick="suggest(this)">${c}</button>`).join('');
+  }
+
+  // Mostrar banner animado y traducir conversación
+  const banner = document.getElementById('translate-banner');
+  const bubbles = Array.from(
+    document.querySelectorAll('.msg.b .bub:not(.farewell):not(.no-translate)')
+  ).filter(b => !b.closest('.qr-message'));
+
+  if (bubbles.length > 0) {
+    // Mostrar banner con animación de puntos
+    let dots = 0;
+    banner.innerHTML = `<span id="banner-text">${t.translating}</span>`;
+    banner.classList.add('vis');
+    const dotsInterval = setInterval(() => {
+      dots = (dots + 1) % 4;
+      const el = document.getElementById('banner-text');
+      if (el) el.textContent = t.translating.replace('…', '.'.repeat(dots) || '.');
+    }, 400);
+
+    await translateConversation();
+
+    clearInterval(dotsInterval);
+    banner.classList.remove('vis');
   }
 }
 
@@ -580,10 +601,86 @@ async function translateConversation() {
 function mkAv(t) {
   const a = document.createElement('div');
   a.className = 'av';
-  a.innerHTML = t === 'u'
-    ? '<svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4-1.3 4-4s-1.3-4-4-4-4 1.3-4 4 1.3 4 4 4zm0 2c-2.7 0-8 1.35-8 4v2h16v-2c0-2.65-5.3-4-8-4z"/></svg>'
-    : '<svg viewBox="0 0 24 24"><path d="M20 2H4C2.9 2 2 2.9 2 4v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>';
+  if (t === 'u') {
+    a.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4-1.3 4-4s-1.3-4-4-4-4 1.3-4 4 1.3 4 4 4zm0 2c-2.7 0-8 1.35-8 4v2h16v-2c0-2.65-5.3-4-8-4z"/></svg>';
+  } else {
+    a.style.cssText = 'background:linear-gradient(145deg,#FFC145,#C8860E);border-radius:50%;display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;box-shadow:0 0 0 3px rgba(200,134,14,0.4),0 4px 12px rgba(122,79,0,0.5);';
+    // IDs únicos para cada avatar
+    const uid = Math.random().toString(36).slice(2,7);
+    a.innerHTML = `<svg viewBox="0 0 44 44" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="22" cy="22" r="18" fill="white"/>
+      <g id="el_${uid}">
+        <ellipse cx="14" cy="20" rx="6.5" ry="5" fill="#1A0E00"/>
+        <ellipse cx="16" cy="17.5" rx="1.8" ry="1.3" fill="white"/>
+      </g>
+      <g id="er_${uid}">
+        <ellipse cx="30" cy="20" rx="6.5" ry="5" fill="#1A0E00"/>
+        <ellipse cx="32" cy="17.5" rx="1.8" ry="1.3" fill="white"/>
+      </g>
+    </svg>`;
+    // Animar pupilas con JS
+    let dir = 1, pos = 0;
+    setInterval(() => {
+      pos += dir * 0.12;
+      if (pos > 3) dir = -1;
+      if (pos < -3) dir = 1;
+      const el = a.querySelector(`#el_${uid}`);
+      const er = a.querySelector(`#er_${uid}`);
+      if (el) el.setAttribute('transform', `translate(${pos},0)`);
+      if (er) er.setAttribute('transform', `translate(${pos},0)`);
+    }, 30);
+  }
   return a;
+}
+
+// ─── TARJETA VISUAL DE TARIFA ─────────────────────────────────────────
+function addTarifaCard(card) {
+  if (!card || !card.precio) return;
+  document.getElementById('welcomeCard')?.remove();
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = 'msg b';
+
+  const scopeLabel = {
+    'nacional': 'EMS Nacional',
+    'internacional': 'EMS Internacional',
+    'encomienda_nacional': 'Encomienda Nacional',
+    'encomienda_internacional': 'Encomienda Internacional',
+    'super_express_nacional': 'Super Express Nacional',
+    'ems_contratos_nacional': 'EMS Contratos Nacional',
+  }[card.scope] || (card.scope || 'Servicio Postal');
+
+  const cardEl = document.createElement('div');
+  cardEl.className = 'scard no-translate';
+  cardEl.innerHTML = `
+    <div class="sc-head" style="background:linear-gradient(135deg,#163A80,#2255B8)">
+      <div class="sc-ico">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M6 7c0-1.7 2.7-3 6-3s6 1.3 6 3-2.7 3-6 3-6 1.3-6 3 2.7 3 6 3 6 1.3 6 3"/></svg>
+      </div>
+      <div class="sc-htxt">
+        <strong>Tarifa calculada</strong>
+        <span>${scopeLabel}</span>
+      </div>
+    </div>
+    <div class="sc-body">
+      <div class="sc-row">
+        <svg viewBox="0 0 24 24"><path d="M12 2v20M6 7c0-1.7 2.7-3 6-3s6 1.3 6 3-2.7 3-6 3-6 1.3-6 3 2.7 3 6 3 6 1.3 6 3"/></svg>
+        <span><strong style="font-size:1.1rem;color:var(--y700)">${card.precio} Bs</strong></span>
+      </div>
+      ${card.servicio ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg><span>Servicio: ${card.servicio}</span></div>` : ''}
+      ${card.peso_g ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 1 5 5H7a5 5 0 0 1 5-5zM3 9h18l-2 13H5L3 9z"/></svg><span>Peso: ${card.peso_g} g</span></div>` : ''}
+      ${card.rango_min && card.rango_max ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" fill="none"/><path d="M8 12h8M12 8v8"/></svg><span>Rango: ${card.rango_min}–${card.rango_max} g</span></div>` : ''}
+    </div>
+    <a class="sc-cta" href="https://correos.gob.bo" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      Ver más en correos.gob.bo
+    </a>
+  `;
+
+  wrap.appendChild(mkAv('b'));
+  wrap.appendChild(cardEl);
+  chat.appendChild(wrap);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 async function rateConversation(logId, rating, likeBtn, dislikeBtn) {
@@ -609,7 +706,7 @@ function buildWelcomeCard() {
   wc.innerHTML = `
     <div class="wc-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
     <div class="wc-title"> </div>
-    <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
+    <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de Correos de Bolivia.</div>
     <div class="wc-sep"><div class="wc-sep-l"></div><div class="wc-sep-d"></div><div class="wc-sep-l"></div></div>
     <div class="chips" id="chips-container">
       ${t.chips.map(c => `<button class="chip" onclick="suggest(this)">${c}</button>`).join('')}
@@ -626,7 +723,7 @@ async function loadWelcome() {
     const data = await (await fetch(`${API_URL}/welcome?lang=${lang}`)).json();
     addMsg(data.response, 'b', false, null, false);
   } catch (e) {
-    addMsg('Bienvenido al asistente oficial de la Agencia Boliviana de Correos. ¿En qué le puedo ayudar?', 'b', false, null, false);
+    addMsg('Bienvenido al asistente oficial de Correos de Bolivia. ¿En qué puedo ayudarte?', 'b', false, null, false);
   }
 }
 
@@ -690,7 +787,7 @@ function addMsg(text, type, bye = false, loc = null, noTranslate = false, conver
     card.innerHTML = `
       <div class="sc-head">
         <div class="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
-        <div class="sc-htxt"><strong>${escapeHTML(loc.nombre) || 'Sucursal AGBC'}</strong><span>Sucursal AGBC</span></div>
+        <div class="sc-htxt"><strong>${escapeHTML(loc.nombre) || 'Sucursal'}</strong><span>Correos de Bolivia</span></div>
       </div>
       <div class="sc-body">
         <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>${escapeHTML(loc.direccion) || 'No disponible'}</span></div>
@@ -909,77 +1006,92 @@ function createStreamingBotMessage() {
   return { wrap, body, bubble };
 }
 
-async function addTrackingQR(trackingUrl, codigo) {
-  if (!trackingUrl) return;
+
+async function addTrackingCard(trackingData) {
+  if (!trackingData || !trackingData.found) return;
   const chat = document.getElementById('chat');
   const wrap = document.createElement('div');
-  wrap.className = 'msg b qr-message';
+  wrap.className = 'msg b';
 
-  const body = document.createElement('div');
-  body.className = 'bub';
-  body.classList.add('no-translate');
-  body.style.background = 'var(--white)';
-  body.style.border = '1px solid var(--border)';
-  body.style.borderRadius = '12px';
-  body.style.padding = '12px';
-  body.style.width = '100%';
-  body.style.maxWidth = '280px';
-  body.style.textAlign = 'center';
+  const ev = trackingData.ultimo_evento || {};
+  const estado = ev.nombre_evento || 'Sin descripción';
+  const fecha = (ev.created_at || '—').replace('T', ' ').substring(0, 16);
+  const servicio = ev.servicio || '—';
+  const oficina = ev.office || ev.ciudad_origen || '—';
+  const total = trackingData.total_eventos || 0;
+  const codigo = trackingData.codigo || '';
+  const trackingUrl = trackingData.tracking_url || `https://trackingbo.correos.gob.bo:8100/?codigo=${codigo}`;
+  const safeId = 'qr-' + (codigo || 'tracking').replace(/[^a-zA-Z0-9_-]/g, '');
 
-  const title = document.createElement('div');
-  title.textContent = '📱 Escanea para rastrear en tu celular';
-  title.style.fontSize = '0.75rem';
-  title.style.fontWeight = '600';
-  title.style.color = 'var(--b700)';
-  title.style.marginBottom = '10px';
-  body.appendChild(title);
+  const estadoLower = estado.toLowerCase();
+  let estadoIcon = '📦';
+  if (estadoLower.includes('transit') || estadoLower.includes('proceso')) estadoIcon = '🚚';
+  if (estadoLower.includes('entregad')) estadoIcon = '✅';
+  if (estadoLower.includes('retenid') || estadoLower.includes('aduana')) estadoIcon = '⚠️';
+  if (estadoLower.includes('devuelt')) estadoIcon = '↩️';
 
-  const qrContainer = document.createElement('div');
-  const safeCode = (codigo || 'tracking').toString().replace(/[^a-zA-Z0-9_-]/g, '');
-  qrContainer.id = 'qr-' + safeCode;
-  qrContainer.style.display = 'flex';
-  qrContainer.style.justifyContent = 'center';
-  qrContainer.style.padding = '8px';
-  qrContainer.style.background = 'white';
-  qrContainer.style.borderRadius = '8px';
-  body.appendChild(qrContainer);
-
-  const link = document.createElement('a');
-  link.href = trackingUrl;
-  link.target = '_blank';
-  link.rel = 'noopener noreferrer';
-  link.textContent = '🔗 Abrir en web de Correos';
-  link.style.display = 'inline-block';
-  link.style.marginTop = '10px';
-  link.style.fontSize = '0.72rem';
-  link.style.fontWeight = '600';
-  link.style.color = 'var(--b700)';
-  link.style.textDecoration = 'none';
-  body.appendChild(link);
-
+  const cardEl = document.createElement('div');
+  cardEl.className = 'scard no-translate';
+  cardEl.innerHTML = `
+    <div class="sc-head" style="background:linear-gradient(135deg,#163A80,#2255B8)">
+      <div class="sc-ico"><svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg></div>
+      <div class="sc-htxt"><strong>Estado del envío</strong><span style="font-family:monospace;letter-spacing:0.04em;font-size:0.7rem">${codigo}</span></div>
+    </div>
+    <div class="sc-body" style="gap:0;padding:12px 14px">
+      <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFF8E7;border-radius:10px;margin-bottom:10px;border-left:3px solid #E6A817">
+        <span style="font-size:1.3rem;line-height:1">${estadoIcon}</span>
+        <div>
+          <div style="font-size:0.62rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1px">Último estado</div>
+          <div style="font-size:0.82rem;font-weight:700;color:#1a1a1a;line-height:1.3">${estado}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div style="background:#f8f9fa;border-radius:8px;padding:7px 9px">
+          <div style="font-size:0.60rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px">📍 Origen</div>
+          <div style="font-size:0.75rem;font-weight:600;color:#1a1a1a">${oficina}</div>
+        </div>
+        <div style="background:#f8f9fa;border-radius:8px;padding:7px 9px">
+          <div style="font-size:0.60rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px">📦 Servicio</div>
+          <div style="font-size:0.75rem;font-weight:600;color:#1a1a1a">${servicio}</div>
+        </div>
+        <div style="background:#f8f9fa;border-radius:8px;padding:7px 9px">
+          <div style="font-size:0.60rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px">🕐 Fecha</div>
+          <div style="font-size:0.72rem;font-weight:600;color:#1a1a1a">${fecha}</div>
+        </div>
+        <div style="background:#f8f9fa;border-radius:8px;padding:7px 9px">
+          <div style="font-size:0.60rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px">📋 Eventos</div>
+          <div style="font-size:0.75rem;font-weight:600;color:#1a1a1a">${total} registrado${total !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      <!-- QR pequeño -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;padding:8px 10px;background:#f8f9fa;border-radius:10px">
+        <div id="qr-${codigo.replace(/[^a-zA-Z0-9]/g,'')}" style="flex-shrink:0"></div>
+        <div style="font-size:0.65rem;color:#666;line-height:1.4">📱 <strong>Escanea</strong> para ver el rastreo completo en tu celular</div>
+      </div>
+    </div>
+    <a class="sc-cta" href="${trackingUrl}" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+      Ver rastreo completo
+    </a>
+  `;
   wrap.appendChild(mkAv('b'));
-  wrap.appendChild(body);
+  wrap.appendChild(cardEl);
   chat.appendChild(wrap);
   chat.scrollTop = chat.scrollHeight;
 
-  try {
-    if (!window.QRCode) {
-      await ensureQRCodeLib();
+  // Generar QR pequeño
+  const qrEl = cardEl.querySelector('#qr-' + codigo.replace(/[^a-zA-Z0-9]/g, ''));
+  if (qrEl) {
+    try {
+      if (!window.QRCode) await ensureQRCodeLib();
+      new QRCode(qrEl, { text: trackingUrl, width: 72, height: 72, colorDark: '#163A80', colorLight: '#f8f9fa', correctLevel: QRCode.CorrectLevel.M });
+    } catch(e) {
+      qrEl.style.display = 'none';
     }
-    new QRCode(qrContainer, {
-      text: trackingUrl,
-      width: 128,
-      height: 128,
-      colorDark: '#0B1F4E',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
-  } catch (e) {
-    console.error('Error generando QR:', e);
-    qrContainer.innerHTML = '<div style="padding:20px;color:#999;font-size:0.7rem">Ver en: ' + trackingUrl + '</div>';
   }
   chat.scrollTop = chat.scrollHeight;
 }
+
 
 async function sendMsg(msg) {
   if (busy || translating || !msg.trim()) return;
@@ -1031,10 +1143,19 @@ async function sendMsg(msg) {
             removeTyping();
             streamMsg = createStreamingBotMessage();
             streamMsg._fullText = '';
+            // Inicializar con cursor parpadeante
+            streamMsg.bubble.innerHTML = '<span class="typing-cursor">|</span>';
           }
+          
+          // Acumular el texto completo
           streamMsg._fullText += data.content || '';
-          streamMsg.bubble.textContent = streamMsg._fullText;
-          streamMsg.bubble.dataset.original = streamMsg._fullText;
+          
+          // Mostrar el texto con efecto de escritura y cursor parpadeante
+          const textToShow = streamMsg._fullText;
+          streamMsg.bubble.innerHTML = textToShow + '<span class="typing-cursor">|</span>';
+          streamMsg.bubble.dataset.original = textToShow;
+          
+          // Auto-scroll suave
           const chat = document.getElementById('chat');
           chat.scrollTop = chat.scrollHeight;
           continue;
@@ -1054,11 +1175,33 @@ async function sendMsg(msg) {
             streamMsg = null;
             addBranchesList(data.branches, data.message || '');
           } else if (streamMsg) {
-            const finalText = data.response || streamMsg.bubble.textContent || 'Sin respuesta disponible';
-            streamMsg.bubble.textContent = finalText;
+            const finalText = data.response || streamMsg._fullText || 'Sin respuesta disponible';
+            // Remover cursor y mostrar texto final
+            streamMsg.bubble.innerHTML = finalText;
             streamMsg.bubble.dataset.original = finalText;
             if (!bye && data.no_translate !== true) {
               autoTranslateBubble(streamMsg.bubble, finalText);
+            }
+            // Agregar botones 👍👎 al finalizar el streaming
+            const logId = data.conversation_log_id || null;
+            if (!bye && logId) {
+              const acts = document.createElement('div');
+              acts.className = 'msg-actions';
+              const likeBtn = document.createElement('button');
+              likeBtn.className = 'btn-rate';
+              likeBtn.type = 'button';
+              likeBtn.title = 'Me gustó esta respuesta';
+              likeBtn.textContent = '👍';
+              const dislikeBtn = document.createElement('button');
+              dislikeBtn.className = 'btn-rate';
+              dislikeBtn.type = 'button';
+              dislikeBtn.title = 'No me gustó esta respuesta';
+              dislikeBtn.textContent = '👎';
+              likeBtn.onclick = () => rateConversation(logId, 'like', likeBtn, dislikeBtn);
+              dislikeBtn.onclick = () => rateConversation(logId, 'dislike', likeBtn, dislikeBtn);
+              acts.appendChild(likeBtn);
+              acts.appendChild(dislikeBtn);
+              streamMsg.body.appendChild(acts);
             }
           } else {
             addMsg(
@@ -1075,11 +1218,15 @@ async function sendMsg(msg) {
             tarifaMode = false;
             setTarifaModeUI();
           }
-          const trackingUrl = data?.tracking?.tracking_url || data?.tracking_url || data?.tracking?.url || null;
-          const trackingCode = data?.tracking?.codigo || data?.tracking_code || data?.codigo || data?.tracking?.code || null;
-          if (trackingUrl) {
-            await addTrackingQR(trackingUrl, trackingCode);
+          // Mostrar tarjeta visual de tarifa si el backend la devuelve
+          if (data?.tarifa_card && data.tarifa_card.precio) {
+            addTarifaCard(data.tarifa_card);
           }
+          const trackingCode = data?.tracking?.codigo || data?.tracking_code || data?.codigo || data?.tracking?.code || null;
+          if (data?.tracking?.found) {
+            addTrackingCard(data.tracking);
+          }
+          // QR eliminado — el botón de la tarjeta lleva directo al link
           addQuickReplies((Array.isArray(data.quick_replies) && data.quick_replies.length > 0) ? data.quick_replies : quickRepliesFromTarifa(data));
           if (bye) {
             inp.disabled = true;
@@ -1126,8 +1273,34 @@ function stopResp() {
 }
 
 // ─── LIMPIAR CONVERSACIÓN ─────────────────────────────────────────────
-function clearConv() { document.getElementById('confirm-bar').classList.add('open'); }
-function closeConf() { document.getElementById('confirm-bar').classList.remove('open'); }
+function clearConv() {
+  const bar = document.getElementById('confirm-bar');
+  const win = document.getElementById('chat-window');
+  if (!bar || !win) return;
+
+  // Posicionar el confirm-bar exactamente en la parte inferior del widget
+  const rect = win.getBoundingClientRect();
+  bar.style.position = 'fixed';
+  bar.style.left = rect.left + 'px';
+  bar.style.width = rect.width + 'px';
+  bar.style.bottom = (window.innerHeight - rect.bottom) + 'px';
+  bar.style.zIndex = '10000';
+  bar.style.borderRadius = '0 0 12px 12px';
+  bar.style.boxShadow = '0 -2px 12px rgba(0,0,0,0.12)';
+
+  bar.classList.add('open');
+}
+function closeConf() {
+  const bar = document.getElementById('confirm-bar');
+  if (bar) {
+    bar.classList.remove('open');
+    bar.style.position = '';
+    bar.style.left = '';
+    bar.style.width = '';
+    bar.style.bottom = '';
+    bar.style.zIndex = '';
+  }
+}
 
 async function doClear() {
   closeConf();
@@ -1188,55 +1361,62 @@ async function findNearestBranch() {
   closeSucursalMenu();
   if (isLocating) return;
   if (!navigator.geolocation) {
-    addMsg('Tu navegador no soporta geolocalización.', 'b', false, null);
+    addMsg('❌ Tu navegador no soporta geolocalización.', 'b', false, null);
+    return;
+  }
+
+  // Geolocalización requiere HTTPS — verificar antes de intentar
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    addMsg('📍 La función de sucursal cercana requiere conexión segura (HTTPS). Escribe el nombre de tu ciudad para buscar sucursales, por ejemplo: "sucursales La Paz"', 'b', false, null);
     return;
   }
 
   isLocating = true;
-  addMsg('Solicitando acceso a tu ubicación...', 'b', false, null);
+  addMsg('📍 Solicitando acceso a tu ubicación...', 'b', false, null);
 
-  navigator.geolocation.getCurrentPosition(
-    async position => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
+  let position;
+  try {
+    position = await new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: false,
+        timeout: 15000,
+        maximumAge: 30000
+      });
+    });
+  } catch (err) {
+    isLocating = false;
+    let msg = '❌ No se pudo obtener tu ubicación.';
+    const s = ' Escribe "sucursales" para ver la lista completa.';
+    if (err.code === 1) msg = '❌ Permiso de ubicación denegado. Actívalo en la configuración del navegador.' + s;
+    if (err.code === 2) msg = '❌ Ubicación no disponible en este momento.' + s;
+    if (err.code === 3) msg = '❌ Tiempo de espera agotado. Intenta de nuevo.' + s;
+    addMsg(msg, 'b', false, null);
+    return;
+  }
 
-      try {
-        const res = await fetch(`${API_URL}/sucursal/cercana`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lat, lng, lang, sid }),
-        });
-        const data = await res.json();
-
-        if (data && data.ok && data.sucursal) {
-          addMsg(data.response || `La sucursal más cercana es: ${data.sucursal.nombre} - ${data.sucursal.direccion}`, 'b', false, null);
-          if (data.mi_ubicacion && data.sucursal && data.sucursal.lat && data.sucursal.lng) {
-            addBranchMap(data.mi_ubicacion, data.sucursal);
-          }
-          if (data.quick_replies) addQuickReplies(data.quick_replies);
-        } else {
-          addMsg('No se pudo determinar la sucursal más cercana. Asegúrate de tener habilitado el GPS.', 'b', false, null);
-        }
-      } catch (e) {
-        addMsg('Error al buscar la sucursal más cercana.', 'b', false, null);
-      } finally {
-        isLocating = false;
+  try {
+    const lat = position.coords.latitude;
+    const lng = position.coords.longitude;
+    const res = await fetch(`${API_URL}/sucursal/cercana`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng, lang, sid }),
+    });
+    const data = await res.json();
+    if (data && data.ok && data.sucursal) {
+      addMsg(data.response || `La sucursal más cercana es: ${data.sucursal.nombre}`, 'b', false, null);
+      if (data.mi_ubicacion && data.sucursal.lat && data.sucursal.lng) {
+        addBranchMap(data.mi_ubicacion, data.sucursal);
       }
-    },
-    error => {
-      let msg = 'No se pudo obtener tu ubicación.';
-      if (error && error.code === 1) msg = 'Permiso de ubicación denegado.';
-      if (error && error.code === 2) msg = 'No se pudo determinar tu ubicación.';
-      if (error && error.code === 3) msg = 'La solicitud de ubicación tardó demasiado.';
-      addMsg(msg, 'b', false, null);
-      isLocating = false;
-    },
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
+      if (data.quick_replies) addQuickReplies(data.quick_replies);
+    } else {
+      addMsg('❌ No se pudo determinar la sucursal más cercana. Escribe "sucursales" para ver la lista.', 'b', false, null);
     }
-  );
+  } catch (e) {
+    addMsg('❌ Error al buscar la sucursal más cercana.', 'b', false, null);
+  } finally {
+    isLocating = false;
+  }
 }
 
 let isLocating = false;

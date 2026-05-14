@@ -9,8 +9,7 @@ uvicorn[standard]==0.30.0
 python-dotenv==1.0.1
 python-multipart==0.0.9
 gunicorn==22.0.0
-gevent==24.10.3
-gevent-websocket==0.10.1
+# gevent eliminado — incompatible con uvicorn/ASGI, no hace nada útil aquí
 
 # ── Cache distribuida
 redis==5.0.1
@@ -22,7 +21,9 @@ requests==2.32.3
 # ── RAG / Embeddings
 sentence-transformers==3.4.1
 chromadb==0.5.23
-torch==2.5.1
+rank-bm25==0.2.2
+# torch CPU-only — ahorra ~200MB de RAM vs versión GPU completa
+torch==2.5.1+cpu
 # compatible con chromadb==0.5.23 (tokenizers<=0.20.3)
 transformers==4.45.2
 
@@ -42,7 +43,7 @@ celery==5.3.6
 qdrant-client==1.10.0
 onnxruntime==1.15.1; python_version < "3.12"
 onnxruntime==1.17.3; python_version >= "3.12"
-tritonclient[http]==2.26.0
+# tritonclient eliminado — USE_TRITON=false, nunca se usa
 
 # ── Scraper
 beautifulsoup4==4.12.3
@@ -58,7 +59,5 @@ pytesseract==0.3.13
 python-dateutil==2.9.0
 
 # traducción local sin LLM
-# deep-translator usa Google/Facebook/Microsoft gratis
-# (se instala opcionalmente, no es crítico si falla)
 deep-translator==1.11.4
 

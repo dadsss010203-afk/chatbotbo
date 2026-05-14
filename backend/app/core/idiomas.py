@@ -1,9 +1,10 @@
 """
 core/idiomas.py
-Textos en 6 idiomas (ES/EN/FR/PT/ZH/RU) + detección automática con langdetect.
+Textos en 5 idiomas (ES/EN/FR/ZH/RU) + detección automática con langdetect.
 Compartido por todos los chatbots.
 """
 
+import re
 from langdetect import detect, LangDetectException
 
 # ─────────────────────────────────────────────
@@ -12,7 +13,6 @@ from langdetect import detect, LangDetectException
 LANG_MAP = {
     "es"   : "es",
     "en"   : "en",
-    "pt"   : "pt",
     "fr"   : "fr",
     "zh-cn": "zh",
     "zh-tw": "zh",
@@ -83,22 +83,6 @@ IDIOMAS = {
         "pedir_ciudad" : "Veuillez indiquer une ville parmi : {ciudades}",
         "no_disponible": "Non disponible",
     },
-    "pt": {
-        "nombre"       : "Português",
-        "bienvenida"   : (
-            "Olá! Bem-vindo ao assistente oficial da Agência Boliviana de Correios (AGBC). "
-            "Posso ajudá-lo com envios, agências, localizações e mais. Como posso ajudá-lo hoje?"
-        ),
-        "saludo"       : "Olá! Sou o assistente de Correos Bolivia. Como posso ajudá-lo?",
-        "despedida"    : (
-            "Foi um prazer ajudá-lo. Tenha um ótimo dia. "
-            "Lembre-se de visitar correos.gob.bo. Até logo!"
-        ),
-        "sin_info"     : "Não tenho essa informação. Visite correos.gob.bo ou ligue para +591 22152423.",
-        "instruccion"  : "Responda em português, de forma clara e amigável.",
-        "pedir_ciudad" : "Por favor, especifique uma cidade entre: {ciudades}",
-        "no_disponible": "Não disponível",
-    },
     "zh": {
         "nombre"       : "中文",
         "bienvenida"   : (
@@ -144,11 +128,14 @@ def detectar_idioma(texto: str) -> str:
     texto_limpio = texto.strip()
     if len(texto_limpio) < 2:
         return IDIOMA_DEFAULT
+
     try:
         codigo = detect(texto_limpio)
-        return LANG_MAP.get(codigo, IDIOMA_DEFAULT)
+        lang = LANG_MAP.get(codigo, IDIOMA_DEFAULT)
     except LangDetectException:
         return IDIOMA_DEFAULT
+
+    return lang
 
 
 def resolver_idioma(lang_forzado, texto: str) -> str:

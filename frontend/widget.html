@@ -11,7 +11,7 @@
 <body>
 
 <button id="chat-bubble" onclick="toggleChat()" aria-label="Abrir asistente">
-  <img src="/logo_chatbot.png" alt="Chatbot Logo" class="bubble-logo">
+  <img src="/logogif.gif" alt="Chatbot Logo" class="bubble-logo" style="width: 70px; height: 70px; object-fit: cover; border-radius: 18px;">
   <div id="badge"></div>
 </button>
 
@@ -22,23 +22,29 @@
     <div class="h-inner">
       <div class="h-row1">
         <div class="h-brand">
+          <div class="h-avatar">
+            <img src="/logocorreos.jpg" alt="Correos de Bolivia">
+            <div class="h-avatar-dot"></div>
+          </div>
           <div>
             <div class="h-name">Correos de Bolivia</div>
+            <div class="h-sub">Asistente virtual</div>
           </div>
         </div>
-        <div class="h-btns">
-          <button class="hb" onclick="minimize()" title="Minimizar">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
-          </button>
-          <button class="hb" onclick="toggleChat()" title="Cerrar">
-            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-          </button>
-        </div>
-      </div>
-      <div class="h-row2">
-        <div class="langs">
-          <button class="lpill on" data-lang="es" onclick="setLang('es')">🇧🇴 ES</button>
-          <button class="lpill" data-lang="en" onclick="setLang('en')">🇺🇸 EN</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          <div class="langs" style="display:flex;flex-direction:row;gap:4px">
+            <button class="lpill on" data-lang="es" onclick="setLang('es')">🇧🇴 ES</button>
+            <button class="lpill" data-lang="en" onclick="setLang('en')">🇺🇸 EN</button>
+          </div>
+          <div style="width:1px;height:18px;background:rgba(11,31,78,0.2);flex-shrink:0"></div>
+          <div class="h-btns">
+            <button class="hb" id="btn-minimize" title="Minimizar">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg>
+            </button>
+            <button class="hb" id="btn-close" title="Cerrar">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -49,7 +55,7 @@
     <div class="welcome" id="welcomeCard">
       <div class="wc-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
       <div class="wc-title"> </div>
-      <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de la AGBC.</div>
+      <div class="wc-sub">Consulte sobre envíos, rastreo de paquetes, sucursales y servicios postales de Correos de Bolivia.</div>
       <div class="wc-sep"><div class="wc-sep-l"></div><div class="wc-sep-d"></div><div class="wc-sep-l"></div></div>
     </div>
   </div>
@@ -73,17 +79,29 @@
       <button type="submit" id="send">
         <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
-      <button type="button" id="refresh-btn" onclick="clearConv()" title="Nueva conversación" style="width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.3s;">
-        <svg viewBox="0 0 24 24" style="width:75%;height:75%;" fill="var(--ink3)">
+      <button type="button" id="refresh-btn" onclick="clearConv()" title="Nueva conversación" style="width:38px!important;height:38px!important;min-width:38px!important;max-width:38px!important;border-radius:11px;border:1px solid var(--border);background:var(--white);cursor:pointer;display:flex!important;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.3s;box-sizing:border-box!important;">
+        <svg viewBox="0 0 24 24" style="width:18px!important;height:18px!important;flex-shrink:0;" fill="var(--ink3)">
           <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
         </svg>
       </button>
     </form>
-    <div class="f-meta">
-      <span class="f-hint">Enter para enviar</span>
-      <button type="button" id="tarifa-toggle" class="tarifa-toggle" onclick="toggleTarifaMode()">Tarifas</button>
-      <button type="button" id="tracking-toggle" class="tracking-toggle" onclick="toggleTrackingMode()">Rastreo</button>
-      <button type="button" id="nearby-toggle" class="nearby-toggle" onclick="toggleSucursalMenu()">Sucursales</button>
+    <div class="f-actions">
+      <button type="button" id="tarifa-toggle" class="action-btn tarifa-toggle" onclick="toggleTarifaMode()">
+        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+        Tarifas
+      </button>
+      <button type="button" id="tracking-toggle" class="action-btn tracking-toggle" onclick="toggleTrackingMode()">
+        <svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg>
+        Rastreo
+      </button>
+      <button type="button" id="nearby-toggle" class="action-btn nearby-toggle" onclick="toggleSucursalMenu()">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        Sucursales
+      </button>
+    </div>
+    <div style="text-align:center;padding:4px 12px 2px;font-size:0.58rem;color:#aaa;line-height:1.4;font-family:'DM Sans',sans-serif">
+      ⓘ Respuestas generadas por IA — pueden contener imprecisiones. Verifica en <a href="https://correos.gob.bo" target="_blank" rel="noopener noreferrer" style="color:#aaa;text-decoration:underline">correos.gob.bo</a> o al <span style="white-space:nowrap">+591 22152423</span>.
+    </div>
     </div>
   </div>
 
@@ -95,7 +113,6 @@
     </div>
   </div>
 </div>
-
 <div id="mapa-modal">
   <div id="mapa-cnt">
     <div id="mapa-hdr">

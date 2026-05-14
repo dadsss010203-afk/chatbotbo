@@ -49,9 +49,40 @@ except Exception:
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+
+# Los modelos de la familia e5 (intfloat/multilingual-e5-*) requieren prefijos
+# "query: " para búsquedas y "passage: " para documentos indexados.
+# Detectamos automáticamente si el modelo activo es e5.
+def _is_e5_model(model_name: str) -> bool:
+    name = (model_name or "").lower()
+    return "e5" in name and ("intfloat" in name or "multilingual-e5" in name or name.startswith("e5-"))
+
+_USE_E5_PREFIXES = _is_e5_model(EMBEDDING_MODEL)
+
+# ── BM25 híbrido ──────────────────────────────────────────────────────────────
+# rank-bm25 es opcional — si no está instalado, se usa solo búsqueda semántica.
+try:
+    from rank_bm25 import BM25Okapi as _BM25Okapi
+    _BM25_AVAILABLE = True
+except ImportError:
+    _BM25Okapi = None  # type: ignore
+    _BM25_AVAILABLE = False
+
+# Índice BM25 en memoria para ChromaDB (se reconstruye al indexar)
+_bm25_index = None          # instancia BM25Okapi
+_bm25_corpus: list[str] = []   # textos tokenizados
+_bm25_ids: list[str] = []      # IDs correspondientes
+
+# Peso de la búsqueda semántica vs BM25 en la fusión RRF
+# 0.6 semántica + 0.4 BM25 = buen balance para tarifarios
+HYBRID_SEMANTIC_WEIGHT = float(os.environ.get("HYBRID_SEMANTIC_WEIGHT", "0.6"))
+HYBRID_BM25_WEIGHT     = float(os.environ.get("HYBRID_BM25_WEIGHT",     "0.4"))
+# Constante RRF (60 es el valor estándar de la literatura)
+RRF_K = int(os.environ.get("RRF_K", "60"))
 CHROMA_PATH     = os.environ.get("CHROMA_PATH",     "chroma_db")
 CHUNK_SIZE         = int(os.environ.get("CHUNK_SIZE",   "450"))
-CHUNK_OVERLAP      = int(os.environ.get("CHUNK_OVERLAP", "80"))
+# Usar overlap más pequeño por defecto para evitar reindexar demasiado texto redundante.
+CHUNK_OVERLAP      = int(os.environ.get("CHUNK_OVERLAP", "40"))
 BATCH_SIZE         = int(os.environ.get("BATCH_SIZE",   "500"))
 N_RESULTADOS       = int(os.environ.get("N_RESULTADOS",  "3"))
 MAX_CONTEXT_CHARS  = int(os.environ.get("MAX_CONTEXT_CHARS", "1800"))
@@ -63,6 +94,12 @@ QDRANT_COLLECTION  = os.environ.get("QDRANT_COLLECTION", "correos")
 USE_TRITON         = os.environ.get("USE_TRITON", "false").lower() in ("1", "true", "yes")
 TRITON_URL         = os.environ.get("TRITON_URL", "http://triton:8000")
 TRITON_EMBEDDING_MODEL = os.environ.get("TRITON_EMBEDDING_MODEL", "embedding_model")
+# Score mínimo de similitud para aceptar un chunk como relevante.
+# Qdrant devuelve scores entre 0 y 1 (cosine similarity). Chunks con score
+# menor a este umbral se descartan para evitar que el LLM reciba contexto
+# irrelevante y aluciné sobre él.
+# Configurable por env: RAG_MIN_SCORE (default 0.30)
+RAG_MIN_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.30"))
 
 # ─────────────────────────────────────────────
 #  ESTADO GLOBAL
@@ -185,6 +222,10 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
             return _embedder.encode(texts, show_progress_bar=False).tolist()
         _collection = client.get_or_create_collection(name=collection_name, embedding_function=embed_function)
         print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
+
+    # Cargar BM25 desde ChromaDB si ya hay chunks indexados
+    if not _use_qdrant() and _BM25_AVAILABLE:
+        _cargar_bm25_desde_chroma()
 
     return _embedder, _collection
 
@@ -313,6 +354,95 @@ def pdf_chunk_counts() -> dict:
 #  CHUNKING
 # ─────────────────────────────────────────────
 
+def _apply_passage_prefix(texts: list[str]) -> list[str]:
+    """Agrega prefijo 'passage: ' para modelos e5 al indexar documentos."""
+    if not _USE_E5_PREFIXES:
+        return texts
+    return [f"passage: {t}" for t in texts]
+
+
+def _apply_query_prefix(query: str) -> str:
+    """Agrega prefijo 'query: ' para modelos e5 al buscar."""
+    if not _USE_E5_PREFIXES:
+        return query
+    return f"query: {query}"
+
+
+# ─────────────────────────────────────────────
+#  BM25 — ÍNDICE EN MEMORIA (para ChromaDB)
+# ─────────────────────────────────────────────
+
+def _tokenizar_bm25(texto: str) -> list[str]:
+    """Tokenización simple para BM25: minúsculas + split por no-alfanuméricos."""
+    texto = (texto or "").lower()
+    tokens = re.findall(r"[a-záéíóúñü0-9]+", texto)
+    # Eliminar tokens muy cortos (artículos, preposiciones)
+    return [t for t in tokens if len(t) >= 2]
+
+
+def _reconstruir_bm25(chunks: list[str], ids: list[str]) -> None:
+    """Reconstruye el índice BM25 en memoria con los chunks dados."""
+    global _bm25_index, _bm25_corpus, _bm25_ids
+    if not _BM25_AVAILABLE or not chunks:
+        _bm25_index = None
+        _bm25_corpus = []
+        _bm25_ids = []
+        return
+    tokenized = [_tokenizar_bm25(c) for c in chunks]
+    _bm25_index = _BM25Okapi(tokenized)
+    _bm25_corpus = list(chunks)
+    _bm25_ids = list(ids)
+    print(f"  BM25 index reconstruido: {len(chunks)} docs")
+
+
+def _buscar_bm25(query: str, n: int) -> list[tuple[str, float]]:
+    """
+    Busca con BM25 y devuelve lista de (chunk_id, score_normalizado).
+    Score normalizado entre 0 y 1.
+    """
+    if not _BM25_AVAILABLE or _bm25_index is None or not _bm25_ids:
+        return []
+    tokens = _tokenizar_bm25(query)
+    if not tokens:
+        return []
+    scores = _bm25_index.get_scores(tokens)
+    max_score = max(scores) if len(scores) > 0 else 1.0
+    if max_score <= 0:
+        return []
+    # Normalizar y ordenar
+    indexed = sorted(enumerate(scores), key=lambda x: x[1], reverse=True)
+    resultados = []
+    for idx, score in indexed[:n]:
+        if idx < len(_bm25_ids):
+            resultados.append((_bm25_ids[idx], float(score) / max_score))
+    return resultados
+
+
+def _rrf_fusion(
+    semantic_results: list[tuple[str, float]],
+    bm25_results: list[tuple[str, float]],
+    k: int = 60,
+    w_semantic: float = 0.6,
+    w_bm25: float = 0.4,
+) -> list[tuple[str, float]]:
+    """
+    Reciprocal Rank Fusion (RRF) para combinar resultados semánticos y BM25.
+
+    RRF score = Σ weight_i / (k + rank_i)
+
+    Devuelve lista de (chunk_id, rrf_score) ordenada de mayor a menor.
+    """
+    scores: dict[str, float] = {}
+
+    for rank, (chunk_id, _) in enumerate(semantic_results):
+        scores[chunk_id] = scores.get(chunk_id, 0.0) + w_semantic / (k + rank + 1)
+
+    for rank, (chunk_id, _) in enumerate(bm25_results):
+        scores[chunk_id] = scores.get(chunk_id, 0.0) + w_bm25 / (k + rank + 1)
+
+    return sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+
 def _normalizar_texto(texto: str) -> str:
     texto = (texto or "").replace("\r\n", "\n").replace("\r", "\n")
     texto = re.sub(r"[ \t]+", " ", texto)
@@ -361,7 +491,10 @@ def _dividir_bloque_largo(texto: str, size: int, overlap: int) -> list[str]:
         corte = max(
             ventana.rfind("\n"),
             ventana.rfind(". "),
+            ventana.rfind("? "),
+            ventana.rfind("! "),
             ventana.rfind("; "),
+            ventana.rfind(": "),
             ventana.rfind(", "),
             ventana.rfind(" "),
         )
@@ -461,7 +594,7 @@ def documento_a_chunks(
         (chunks, chunk_ids, metadatas)
     """
     size = chunk_size or CHUNK_SIZE
-    overlap = min(CHUNK_OVERLAP, max(size // 3, 40))
+    overlap = min(CHUNK_OVERLAP, max(size // 4, 24))
     metadata_base = _normalizar_metadata(metadata_base, prefijo)
 
     chunks = []
@@ -627,7 +760,7 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
 
     # Calcular embeddings
     print(f"  {len(chunks)} chunks — calculando embeddings...")
-    embeddings  = emb.encode(chunks, show_progress_bar=False, batch_size=64)
+    embeddings  = emb.encode(_apply_passage_prefix(chunks), show_progress_bar=False, batch_size=64)
     total_lotes = (len(chunks) + BATCH_SIZE - 1) // BATCH_SIZE
 
     # Insertar en lotes
@@ -665,6 +798,8 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
         print(f" {len(chunks)} chunks indexados en Qdrant")
     else:
         print(f" {len(chunks)} chunks indexados en ChromaDB")
+        # Reconstruir índice BM25 en memoria para búsqueda híbrida
+        _reconstruir_bm25(chunks, chunk_ids)
     return True
 
 
@@ -738,7 +873,7 @@ def reemplazar_por_source_type(
         return {"ok": True, "removed": removed, "added": 0}
 
     print(f"  Subset '{source_type}': insertando {len(dedup_chunks)} chunks...")
-    embeddings = emb.encode(dedup_chunks, show_progress_bar=False, batch_size=64)
+    embeddings = emb.encode(_apply_passage_prefix(dedup_chunks), show_progress_bar=False, batch_size=64)
     total_lotes = (len(dedup_chunks) + BATCH_SIZE - 1) // BATCH_SIZE
     for i in tqdm(range(0, len(dedup_chunks), BATCH_SIZE), total=total_lotes, desc=f"Indexando {source_type}"):
         batch_chunks = dedup_chunks[i : i + BATCH_SIZE]
@@ -771,6 +906,27 @@ def reemplazar_por_source_type(
             col.add(**payload)
 
     return {"ok": True, "removed": removed, "added": len(dedup_chunks)}
+
+
+def _cargar_bm25_desde_chroma() -> None:
+    """
+    Carga todos los chunks de ChromaDB al índice BM25 en memoria.
+    Se llama al arrancar si el store es ChromaDB y ya hay chunks indexados.
+    """
+    if _use_qdrant() or not _BM25_AVAILABLE:
+        return
+    try:
+        col = get_collection()
+        total = col.count()
+        if total == 0:
+            return
+        resultado = col.get(include=["documents", "ids"])
+        docs = resultado.get("documents") or []
+        ids = resultado.get("ids") or []
+        if docs and ids:
+            _reconstruir_bm25(docs, ids)
+    except Exception as e:
+        print(f"   BM25: no se pudo cargar desde ChromaDB: {e}")
 
 
 # ─────────────────────────────────────────────
@@ -825,6 +981,7 @@ def buscar(
     pregunta: str,
     n_resultados: int = None,
     preferred_source_types: list[str] | None = None,
+    skill_id: str | None = None,
 ) -> dict:
     col = get_collection()
     emb = get_embedder()
@@ -841,7 +998,7 @@ def buscar(
     if cached_vector is not None:
         vector = cached_vector
     else:
-        vector = emb.encode([pregunta]).tolist()
+        vector = emb.encode([_apply_query_prefix(pregunta)]).tolist()
         set_embedding(pregunta, vector)
 
     if _use_qdrant():
@@ -854,15 +1011,34 @@ def buscar(
                 "limit": qdrant_limit,
                 "with_payload": True,
             }
+            filters = []
             if source_type:
-                kwargs["query_filter"] = qmodels.Filter(
-                    must=[
-                        qmodels.FieldCondition(
-                            key="source_type",
-                            match=qmodels.MatchValue(value=source_type),
-                        )
-                    ]
+                filters.append(
+                    qmodels.FieldCondition(
+                        key="source_type",
+                        match=qmodels.MatchValue(value=source_type),
+                    )
                 )
+            # Si hay skill_id, priorizar chunks de ese skill
+            if skill_id:
+                filters.append(
+                    qmodels.FieldCondition(
+                        key="skill_id",
+                        match=qmodels.MatchValue(value=skill_id),
+                    )
+                )
+            if filters:
+                kwargs["query_filter"] = qmodels.Filter(must=filters)
+            return _client.search(**kwargs)
+
+        def _qdrant_search_global():
+            """Búsqueda global sin filtro de skill_id para completar cobertura."""
+            kwargs = {
+                "collection_name": _collection_name,
+                "query_vector": vector[0],
+                "limit": qdrant_limit,
+                "with_payload": True,
+            }
             return _client.search(**kwargs)
 
         search_results = []
@@ -882,7 +1058,7 @@ def buscar(
                     continue
 
         # 2) Completar con búsqueda global para no perder cobertura
-        for hit in _qdrant_search_by_type(None):
+        for hit in _qdrant_search_global():
             hit_id = str(getattr(hit, "id", ""))
             if hit_id and hit_id in seen_ids:
                 continue
@@ -907,9 +1083,65 @@ def buscar(
             include=["documents", "metadatas", "distances"],
         )
 
-        documents = (results.get("documents") or [[]])[0]
-        metadatas = (results.get("metadatas") or [[]])[0]
-        distances = (results.get("distances") or [[]])[0]
+        raw_documents = (results.get("documents") or [[]])[0]
+        raw_metadatas = (results.get("metadatas") or [[]])[0]
+        raw_distances = (results.get("distances") or [[]])[0]
+        raw_ids       = (results.get("ids") or [[]])[0]
+
+        # ── Hybrid Search con BM25 para ChromaDB ──────────────────────────
+        if _BM25_AVAILABLE and _bm25_index is not None:
+            # Resultados semánticos como lista (id, score_normalizado)
+            max_dist = max(raw_distances) if raw_distances else 1.0
+            if max_dist <= 0:
+                max_dist = 1.0
+            semantic_ranked = [
+                (raw_ids[i], 1.0 - (raw_distances[i] / max_dist))
+                for i in range(len(raw_ids))
+            ]
+
+            # Resultados BM25
+            bm25_ranked = _buscar_bm25(pregunta, n_query * 2)
+
+            # Fusión RRF
+            fused = _rrf_fusion(
+                semantic_ranked, bm25_ranked,
+                k=RRF_K,
+                w_semantic=HYBRID_SEMANTIC_WEIGHT,
+                w_bm25=HYBRID_BM25_WEIGHT,
+            )
+
+            # Reconstruir listas en orden RRF
+            # Mapear id → (doc, meta, dist) de los resultados semánticos
+            id_to_data: dict = {}
+            for i, doc_id in enumerate(raw_ids):
+                id_to_data[doc_id] = (
+                    raw_documents[i] if i < len(raw_documents) else "",
+                    raw_metadatas[i] if i < len(raw_metadatas) else {},
+                    raw_distances[i] if i < len(raw_distances) else 1.0,
+                )
+            # Para IDs que vienen solo de BM25 (no en semántica), buscar en corpus
+            bm25_id_set = {bid for bid, _ in bm25_ranked}
+            for bid in bm25_id_set:
+                if bid not in id_to_data and bid in _bm25_ids:
+                    corpus_idx = _bm25_ids.index(bid)
+                    if corpus_idx < len(_bm25_corpus):
+                        id_to_data[bid] = (_bm25_corpus[corpus_idx], {}, 0.5)
+
+            documents = []
+            metadatas = []
+            distances = []
+            for doc_id, rrf_score in fused[:n_query]:
+                if doc_id in id_to_data:
+                    doc, meta, dist = id_to_data[doc_id]
+                    documents.append(doc)
+                    metadatas.append(meta)
+                    # Convertir RRF score a distancia equivalente (menor = mejor)
+                    distances.append(1.0 - rrf_score)
+        else:
+            # Sin BM25 — usar solo resultados semánticos
+            documents = raw_documents
+            metadatas = raw_metadatas
+            distances = raw_distances
 
     candidatos = []
     vistos = set()
@@ -934,6 +1166,11 @@ def buscar(
         else:
             # En Chroma, distance menor significa mejor similitud.
             score = distance - (_prioridad_fuente(source_type) * 0.08) - source_bonus + length_penalty
+
+        # Descartar chunks con similitud demasiado baja para evitar que el LLM
+        # reciba contexto irrelevante y aluciné sobre él.
+        if _use_qdrant() and distance < RAG_MIN_SCORE:
+            continue
 
         candidatos.append(
             {
@@ -975,6 +1212,71 @@ def buscar(
                     break
     else:
         seleccionados = candidatos[:n]
+
+    # ── Parent Document Retrieval ─────────────────────────────────────────
+    # Para cada chunk seleccionado, intentamos recuperar también los chunks
+    # adyacentes (anterior y siguiente) del mismo documento fuente.
+    # Esto da al LLM más contexto sin cambiar la arquitectura de indexado.
+    if _use_qdrant() and seleccionados:
+        chunks_extra = []
+        vistos_extra = set(
+            hashlib.sha1(item["texto"][:300].lower().encode()).hexdigest()[:16]
+            for item in seleccionados
+        )
+        for item in seleccionados[:2]:  # Solo para los 2 mejores chunks
+            meta = item.get("metadata") or {}
+            source_id = meta.get("source_id") or meta.get("source_name") or ""
+            chunk_index = meta.get("chunk_index")
+            if not source_id or chunk_index is None:
+                continue
+            try:
+                chunk_index = int(chunk_index)
+            except (TypeError, ValueError):
+                continue
+            # Buscar chunks adyacentes del mismo documento
+            for adj_idx in [chunk_index - 1, chunk_index + 1]:
+                if adj_idx < 0:
+                    continue
+                try:
+                    adj_results = _client.scroll(
+                        collection_name=_collection_name,
+                        scroll_filter=qmodels.Filter(
+                            must=[
+                                qmodels.FieldCondition(
+                                    key="source_id",
+                                    match=qmodels.MatchValue(value=source_id),
+                                ),
+                                qmodels.FieldCondition(
+                                    key="chunk_index",
+                                    match=qmodels.MatchValue(value=adj_idx),
+                                ),
+                            ]
+                        ),
+                        limit=1,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+                    points = adj_results[0] if adj_results else []
+                    for point in points:
+                        payload = point.payload or {}
+                        texto_adj = _normalizar_texto(payload.get("text", ""))
+                        if not texto_adj:
+                            continue
+                        firma = hashlib.sha1(texto_adj[:300].lower().encode()).hexdigest()[:16]
+                        if firma in vistos_extra:
+                            continue
+                        vistos_extra.add(firma)
+                        chunks_extra.append({
+                            "texto": texto_adj,
+                            "metadata": payload,
+                            "score": item["score"] * 0.85,  # Peso ligeramente menor
+                        })
+                except Exception:
+                    continue
+        # Insertar chunks adyacentes después del chunk que los originó
+        if chunks_extra:
+            seleccionados = seleccionados + chunks_extra
+    # ─────────────────────────────────────────────────────────────────────
 
     contexto_partes = []
     for item in seleccionados:
