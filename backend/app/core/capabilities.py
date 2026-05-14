@@ -217,12 +217,46 @@ PDF_STORAGE_FIELDS = [
     "archivo_guardado",
     "content_hash",
     "clean_mode",
+    "skill_id",
 ]
 
 OUT_OF_SCOPE_SAMPLES = (
-    "Puedo ayudarte solo con temas de Correos de Bolivia: rastreo de envíos, servicios, "
-    "cómo enviar correctamente, reclamos, alertas de seguridad, filatelia, oficinas, contacto e historia institucional."
+    "Esa pregunta está fuera de mi área. Soy el asistente de Correos de Bolivia y solo puedo ayudarte con: "
+    "rastreo de envíos, tarifas, servicios postales, reclamos, sucursales, horarios y filatelia. "
+    "¿Tienes alguna consulta sobre envíos o servicios de Correos Bolivia?"
 )
+
+# Respuestas de redirección por tema cercano
+_OUT_OF_SCOPE_REDIRECTS = {
+    # Geografía/país
+    ("bolivia", "pais", "sudamerica", "america"): (
+        "Soy el asistente de Correos de Bolivia. En Bolivia puedes enviar paquetes y cartas "
+        "a cualquier parte del mundo a través de nuestros servicios. ¿Te ayudo con un envío?"
+    ),
+    # Gobierno/instituciones
+    ("gobierno", "estado", "ministerio", "decreto"): (
+        "Solo puedo ayudarte con temas de Correos de Bolivia. "
+        "¿Necesitas información sobre envíos, tarifas o sucursales?"
+    ),
+    # Clima/geografía
+    ("clima", "tiempo", "temperatura", "lluvia"): (
+        "No tengo información sobre el clima. Soy el asistente de Correos de Bolivia. "
+        "¿Puedo ayudarte con un envío o rastreo de paquete?"
+    ),
+    # Fútbol/deportes
+    ("futbol", "partido", "deporte", "equipo"): (
+        "Solo manejo temas postales. ¿Tienes algún paquete que rastrear o enviar?"
+    ),
+}
+
+
+def out_of_scope_response(pregunta: str = "") -> str:
+    """Devuelve respuesta de redirección amigable según el tema de la pregunta."""
+    texto = pregunta.lower().strip() if pregunta else ""
+    for palabras_clave, respuesta in _OUT_OF_SCOPE_REDIRECTS.items():
+        if any(p in texto for p in palabras_clave):
+            return respuesta
+    return OUT_OF_SCOPE_SAMPLES
 
 
 def _load_catalog(path: str, fallback: list[dict]) -> list[dict]:
@@ -441,6 +475,7 @@ def _pdf_storage_record(item: dict) -> dict:
         "archivo_guardado": _to_bool(raw.get("archivo_guardado"), False),
         "content_hash": content_hash or (str(raw.get("content_hash") or "").strip()),
         "clean_mode": clean_mode,
+        "skill_id": str(raw.get("skill_id") or "").strip(),
     }
 
 
@@ -937,16 +972,18 @@ def detectar_codigo_seguimiento(pregunta: str) -> str | None:
     if not texto:
         return None
     
-    # Patrones comunes de códigos de seguimiento (de más específico a más general)
+    # Patrones de códigos de seguimiento (de más específico a más general)
     patrones = [
-        # Formato boliviano específico: cualquier combinación que termine en BO
-        r'[A-Z]\d+[A-Z]?\d*BO',               # Ej: C0007A02018BO, R123456789BO
-        # Formato internacional XX123456789XX
-        r'[A-Z]{2}\d{9}[A-Z]{2}',              # Ej: ES123456789CN
-        # Solo números (12-14 dígitos)
-        r'\d{12,14}',                          # Ej: 123456789012
-        # Letra + números (8-13 dígitos)
-        r'[A-Z]\d{8,13}',                      # Ej: C123456789
+        # Formato boliviano real: letra + dígitos + letra(s) + dígitos + BO
+        # Ejemplos válidos: C0028A03441BO, C0007A02018BO, R123456789BO
+        # Debe tener al menos un dígito antes del BO
+        r'[A-Z]\d+[A-Z]\d+BO',                # C0028A03441BO (más común)
+        r'[A-Z]\d{6,}BO',                      # R123456789BO
+        r'\d{4,}[A-Z]\d+BO',                   # 0028A03441BO (sin letra inicial)
+        # Formato internacional XX123456789XX (2 letras + 9 dígitos + 2 letras)
+        r'[A-Z]{2}\d{9}[A-Z]{2}',              # ES123456789CN
+        # Solo números (12-14 dígitos) — códigos numéricos puros
+        r'\b\d{12,14}\b',
     ]
     
     for patron in patrones:
@@ -979,16 +1016,29 @@ def detectar_consulta_especial(pregunta: str) -> str | None:
         print(f"[CONSULTA_ESPECIAL] Detectado tracking con código: {codigo}")
         return "tracking"
 
+    # Bloquear consultas de introspección técnica interna:
+    # "skills internas", "skills cargadas", "skills en memoria", etc.
+    # Estas revelan arquitectura interna y no aportan valor al usuario final.
+    _INTROSPECTION_PATTERNS = (
+        "skills internas", "skills cargadas", "skills en memoria",
+        "skills del sistema", "skills del bot", "todas las skills",
+        "lista de skills", "cuantas skills", "cuántas skills",
+        "skills de sistema", "dame los skills", "dame las skills",
+        "cuales son las skills", "cuáles son las skills",
+        "rag", "chroma", "embeddings", "chunks", "base vectorial",
+        "estado del sistema", "status del sistema", "estado bot", "estado del bot",
+        "sucursales cargadas", "resumen de sucursales", "estado de sucursales",
+    )
+    if any(_contains_whole_phrase(texto, token) for token in _INTROSPECTION_PATTERNS):
+        return "capacidades_usuario"
+
+    # "skills" o "habilidades" sin contexto de introspección → también redirigir
     if any(_contains_whole_phrase(texto, token) for token in ("skill", "skills", "habilidad", "habilidades")):
-        return "skills"
-    if any(_contains_whole_phrase(texto, token) for token in ("rag", "chroma", "embeddings", "chunks", "base vectorial")):
-        return "rag_local"
-    if any(_contains_whole_phrase(texto, token) for token in ("estado del sistema", "status del sistema", "estado bot", "estado del bot")):
-        return "system_status"
-    if any(_contains_whole_phrase(texto, token) for token in ("sucursales cargadas", "resumen de sucursales", "estado de sucursales")):
-        return "branches_summary"
+        return "capacidades_usuario"
+
     if any(_contains_whole_phrase(texto, token) for token in ("que puedes hacer", "capacidades del bot", "que sabes hacer")):
-        return "generar"
+        return "capacidades_usuario"
+
     return None
 
 
@@ -1109,6 +1159,7 @@ def guardar_pdf_subido(
     fuente_url: str = "",
     pagina_fuente: str = "",
     clean_mode: str | None = None,
+    skill_id: str = "",
 ) -> dict:
     if file_storage is None or not getattr(file_storage, "filename", ""):
         raise ValueError("Debes seleccionar un archivo PDF")
@@ -1160,6 +1211,7 @@ def guardar_pdf_subido(
         "subido_manual": True,
         "archivo_guardado": False,
         "clean_mode": clean_mode_resolved,
+        "skill_id": (skill_id or "").strip(),
     }
 
     replaced = False
@@ -1322,15 +1374,16 @@ def eliminar_pdf(nombre_archivo: str) -> dict:
     }
 
 
-def actualizar_texto_pdf(nombre_archivo: str, texto_extraido: str | None) -> dict:
+def actualizar_texto_pdf(nombre_archivo: str, texto_extraido: str | None, skill_id: str = "") -> dict:
     """
-    Actualiza manualmente el texto extraído de un PDF ya registrado.
+    Actualiza manualmente el texto extraído y/o el skill vinculado de un PDF ya registrado.
     `nombre_archivo` puede ser nombre real o `registro_id`.
     """
     pdfs = listar_pdfs()
     objetivo = None
     actualizados = []
     texto_normalizado = (texto_extraido or "").strip() or None
+    skill_id_normalizado = (skill_id or "").strip()
 
     for item in pdfs:
         if item.get("registro_id") == nombre_archivo or item.get("nombre_archivo") == nombre_archivo:
@@ -1339,6 +1392,7 @@ def actualizar_texto_pdf(nombre_archivo: str, texto_extraido: str | None) -> dic
             limpio["texto_extraido"] = texto_normalizado
             limpio["longitud_texto"] = len(texto_normalizado) if texto_normalizado else 0
             limpio["metodo_extraccion"] = "manual_edit"
+            limpio["skill_id"] = skill_id_normalizado
             actualizados.append(limpio)
             continue
         actualizados.append(_clean_pdf_entry(item))
@@ -1372,12 +1426,22 @@ def actualizar_texto_pdf(nombre_archivo: str, texto_extraido: str | None) -> dic
 
 
 def execute_special_query(tipo: str, runtime_capabilities: dict, pregunta: str = "") -> dict:
+    if tipo == "capacidades_usuario":
+        respuesta = (
+            "Soy ChatbotBO, el asistente virtual de Correos de Bolivia. Puedo ayudarte con:\n"
+            "• Rastreo de envíos — consulta el estado de tu paquete con tu código de seguimiento.\n"
+            "• Tarifas — cotiza el costo de envíos nacionales e internacionales.\n"
+            "• Sucursales y horarios — encuentra oficinas, direcciones y horarios de atención.\n"
+            "• Servicios postales — EMS, Encomienda, Correo Prioritario, ChasquiExpressBO y más.\n"
+            "• Reclamos y quejas — orienta sobre cómo reportar incidencias o paquetes perdidos.\n"
+            "• Filatelia — información sobre sellos de colección bolivianos.\n"
+            "• Historia institucional — antecedentes y evolución de Correos de Bolivia.\n\n"
+            "¿En qué puedo ayudarte hoy?"
+        )
+        return {"kind": "capacidades_usuario", "payload": {}, "response": respuesta}
     if tipo == "skills":
-        return {
-            "kind": "skills",
-            "payload": runtime_capabilities["skills"],
-            "response": _render_skills(runtime_capabilities["skills"]),
-        }
+        # Redirigir al mismo handler de usuario (no exponer arquitectura interna)
+        return execute_special_query("capacidades_usuario", runtime_capabilities, pregunta)
     if tipo == "generar":
         return {
             "kind": "summary",

@@ -331,7 +331,7 @@ def get_hora_bolivia() -> dict:
 
     if ahora.weekday() < 5:           # Lunes a Viernes
         abierto = 8.5 <= hora_float < 18.5
-        horario = "lunes a viernes de 8:30 a 18:30"
+        horario = "lunes a viernes de 8:30 a 16:30"
     elif ahora.weekday() == 5:        # Sábado
         abierto = 9.0 <= hora_float < 13.0
         horario = "sábados de 9:00 a 13:00"

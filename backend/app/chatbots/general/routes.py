@@ -37,6 +37,8 @@ from chatbots.general.chat_helpers import (
     extraer_citas_evidencia,
     respuesta_chat_vacio,
     validar_evidencia_en_contexto,
+    rerank_rag_results,
+    log_sin_info,
 )
 from chatbots.general.translation_service import translate_texts
 from chatbots.general.config import (
@@ -74,6 +76,183 @@ GENERAL_SYSTEM_PROMPT = (
 _reindex_timer = None
 _reindex_lock = threading.Lock()
 _reindex_mode = None
+
+# ─────────────────────────────────────────────
+#  ENRIQUECIMIENTO DE CONTEXTO
+# ─────────────────────────────────────────────
+_PALABRAS_CONTEXTO_CORREOS = {
+    # Institución — solo términos específicos, NO "bolivia" solo
+    'correos', 'agbc', 'postal',
+    # Servicios
+    'envio', 'envío', 'paquete', 'encomienda', 'ems',
+    'tarifa', 'precio', 'costo', 'cuesta',
+    # Operaciones
+    'rastreo', 'rastrear', 'tracking', 'seguimiento',
+    'guia', 'guía', 'codigo', 'código',
+    # Lugares
+    'sucursal', 'oficina', 'regional', 'agencia',
+    # Tiempo
+    'horario', 'abierto', 'cerrado', 'atienden',
+    # Envío
+    'despacho', 'entrega', 'enviar', 'mandar',
+    'destinatario', 'remitente',
+    # Inglés
+    'mail', 'parcel', 'package', 'shipping', 'delivery',
+    'branch', 'schedule',
+}
+
+
+_PATRON_CONSULTA_TECNICA_RED = re.compile(
+    r'\b(?:ip|dns|servidor|host|puerto|firewall|subred|gateway|mac\s+address)\b'
+    r'|\bscan\s+(?:de\s+)?(?:red|puertos?|vulnerabilidades?)\b',
+    re.IGNORECASE,
+)
+
+def _mensaje_fuera_dominio(pregunta: str, lang: str) -> str:
+    """
+    Devuelve el mensaje apropiado según el tipo de consulta fuera de dominio.
+    Consultas técnicas de red → mensaje directo sin sugerir contacto.
+    Resto → mensaje estándar de redirección.
+    """
+    if _PATRON_CONSULTA_TECNICA_RED.search(pregunta or ""):
+        msgs = {
+            "es": "No puedo proporcionar esa información.",
+            "en": "I cannot provide that information.",
+            "fr": "Je ne peux pas fournir cette information.",
+            "zh": "我无法提供该信息。",
+            "ru": "Я не могу предоставить эту информацию.",
+        }
+        return msgs.get(lang, msgs["es"])
+    msgs = {
+        "es": "Solo puedo ayudarte con temas de Correos Bolivia.",
+        "en": "I can only help you with Correos Bolivia topics.",
+        "fr": "Je peux uniquement vous aider avec les sujets de Correos Bolivia.",
+        "zh": "我只能帮助您解答玻利维亚邮政相关问题。",
+        "ru": "Я могу помочь только по вопросам Correos Bolivia.",
+    }
+    return msgs.get(lang, msgs["es"])
+
+
+def _respuesta_en_portugues(texto: str) -> bool:
+    """
+    Detecta si el LLM generó una respuesta en portugués a pesar de la instrucción de idioma.
+    Usa marcadores léxicos inequívocos del portugués que no existen en español.
+    """
+    if not texto or len(texto) < 20:
+        return False
+    t = texto.lower()
+    # Palabras exclusivas del portugués (no existen en español)
+    marcadores_pt = [
+        "você", "voce", "não ", "nao ", "também", "tambem", "então", "entao",
+        "está ", "estão", "são ", "isso ", "esse ", "essa ", "aqui ", "aquele",
+        "posso ", "pode ", "podem ", "temos ", "nosso ", "nossa ",
+        "obrigado", "obrigada", "por favor ", "ajudá", "ajuda-",
+        "envio ", "envios ", "rastreamento", "agência", "agencia ",
+        "correios", "serviço", "serviços", "informação", "informações",
+        "visite ", "ligue ", "até logo", "até mais",
+    ]
+    hits = sum(1 for m in marcadores_pt if m in t)
+    # Si hay 2 o más marcadores, es muy probable que sea portugués
+    return hits >= 2
+
+
+def _enriquecer_pregunta(pregunta: str) -> str:
+    """
+    Si la pregunta no contiene palabras que indiquen contexto postal,
+    agrega un marcador de contexto para que el LLM y el resolver de skills
+    respondan en el dominio correcto.
+    La pregunta original se preserva intacta para logs e historial.
+
+    IMPORTANTE: No enriquecer si la pregunta es claramente fuera de dominio
+    (situaciones personales, cotidianas, etc.) — eso causaría alucinaciones.
+    """
+    # Si ya es out-of-domain, no forzar contexto postal
+    if intents.es_pregunta_fuera_dominio(pregunta):
+        return pregunta
+    palabras = set(re.sub(r"[^\w\s]", " ", pregunta.lower()).split())
+    if not palabras.intersection(_PALABRAS_CONTEXTO_CORREOS):
+        # Agregar "correos" explícitamente para que resolve_skills_for_query
+        # detecte contexto postal y no rechace la pregunta como out_of_scope
+        return f"{pregunta} correos bolivia"
+    return pregunta
+
+
+def _respuesta_sireco(pregunta: str, lang: str) -> str | None:
+    texto = (pregunta or "").lower()
+    if "sireco" not in texto:
+        return None
+
+    triggers = (
+        "que es sireco",
+        "qué es sireco",
+        "que es sireco en",
+        "qué es sireco en",
+        "explica sireco",
+        "dime que es sireco",
+        "definicion de sireco",
+        "sireco es",
+    )
+    if not any(t in texto for t in triggers):
+        return None
+
+    if lang == "es":
+        return (
+            "SIRECO es el Sistema de Gestión de Consultas de Correos de Bolivia. "
+            "Es la herramienta oficial para canalizar sugerencias, incidencias y dudas de los usuarios. "
+            "Su objetivo es resolver problemas planteados y fortalecer la calidad del servicio institucional."
+        )
+    if lang == "en":
+        return (
+            "SIRECO is Correos de Bolivia's Query Management System. "
+            "It is the official tool for channeling suggestions, incidents, and customer questions. "
+            "Its goal is to resolve reported issues and strengthen the quality of institutional service."
+        )
+    return None
+
+
+def _respuesta_servicios_correos(pregunta: str, lang: str) -> str | None:
+    texto = (pregunta or "").lower()
+    if "servicios" not in texto:
+        return None
+    triggers = (
+        "todos los servicios",
+        "lista de servicios",
+        "servicios de correos",
+        "servicios postales",
+        "que servicios ofrece",
+        "qué servicios ofrece",
+        "servicios que ofrece",
+    )
+    if not any(t in texto for t in triggers):
+        return None
+
+    if lang == "es":
+        return (
+            "Estos son los servicios principales de Correos de Bolivia:\n"
+            "1. Express Mail Service (EMS): envío urgente nacional e internacional con seguimiento en tiempo real.\n"
+            "2. Servicio Encomienda Postal (SEP): envío de paquetes con cobertura internacional y rastreo.\n"
+            "3. Correo Prioritario: servicio para cartas, impresos y pequeños paquetes con entrega más rápida.\n"
+            "4. Envíos de Correspondencia Agrupada (ECA): servicio para envíos masivos de documentos y correspondencia empresarial.\n"
+            "5. Mi Encomienda: paquetería nacional económica con tracking y retiro en oficinas.\n"
+            "6. Filatelia: venta de sellos postales de colección y servicios filatélicos.\n"
+            "7. Casillas Postales: servicio de recepción segura de correspondencia y paquetes en oficinas de Correos.\n"
+            "8. ChasquiExpressBO: servicio de delivery a domicilio para empresas, tiendas y envíos comerciales.\n"
+            "También se disponen de aplicativos digitales relacionados como TrackingBO, SIRECO, POSTAR, UNIENVIO, GESPA, GESDO, SIREN, ULTRAPOST y GESCON."
+        )
+    if lang == "en":
+        return (
+            "These are the main services of Correos de Bolivia:\n"
+            "1. Express Mail Service (EMS): urgent national and international shipping with real-time tracking.\n"
+            "2. Postal Parcel Service (SEP): package shipping with international coverage and tracking.\n"
+            "3. Priority Mail: service for letters, printed matter, and small packages with faster delivery.\n"
+            "4. Grouped Correspondence Shipments (ECA): service for bulk mailings and business correspondence.\n"
+            "5. Mi Encomienda: economical national parcel shipping with tracking and office pickup.\n"
+            "6. Philately: sale of postage stamps and philatelic services.\n"
+            "7. Post Office Boxes: secure receipt of mail and packages at Correos offices.\n"
+            "8. ChasquiExpressBO: home delivery service for businesses, shops, and commercial shipments.\n"
+            "Related digital applications include TrackingBO, SIRECO, POSTAR, UNIENVIO, GESPA, GESDO, SIREN, ULTRAPOST, and GESCON."
+        )
+    return None
 
 
 def _safe_json_object(text: str) -> dict | None:
@@ -276,21 +455,33 @@ def _consultar_tracking_api(codigo: str) -> dict:
             timeout=TRACKING_API_TIMEOUT,
             verify=TRACKING_API_VERIFY_SSL,
         )
+        # 404 significa que el código no existe en el sistema
+        if response.status_code == 404:
+            return {"existe_paquete": False, "resultado": [], "_not_found": True}
         response.raise_for_status()
         payload = response.json()
         if not isinstance(payload, dict):
             raise ValueError("La API de rastreo no devolvió un JSON válido")
         return payload
+    except requests.exceptions.Timeout:
+        raise ValueError("El servicio de rastreo tardó demasiado. Intenta nuevamente en unos minutos.")
+    except requests.exceptions.ConnectionError:
+        raise ValueError("No se pudo conectar al servicio de rastreo. Intenta nuevamente en unos minutos.")
     except requests.RequestException as exc:
-        raise ValueError(f"No se pudo consultar la API de rastreo: {exc}") from exc
+        # Solo mostrar error técnico si no es un error de negocio conocido
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status == 404:
+            return {"existe_paquete": False, "resultado": [], "_not_found": True}
+        raise ValueError("El servicio de rastreo no está disponible en este momento. Intenta más tarde o llama al +591 22152423.") from exc
     except ValueError:
         raise
     except Exception as exc:
-        raise ValueError(f"No se pudo interpretar la respuesta de rastreo: {exc}") from exc
+        raise ValueError("No se pudo interpretar la respuesta del servicio de rastreo.") from exc
 
 
 def _format_tracking_response(codigo: str, payload: dict) -> tuple[str, dict]:
     existe_paquete = bool(payload.get("existe_paquete"))
+    not_found = bool(payload.get("_not_found"))
     resultados = payload.get("resultado") if isinstance(payload.get("resultado"), list) else []
     paquete = resultados[0] if resultados else {}
     eventos = paquete.get("eventos") if isinstance(paquete.get("eventos"), list) else []
@@ -298,8 +489,20 @@ def _format_tracking_response(codigo: str, payload: dict) -> tuple[str, dict]:
     ultimo_evento = eventos[-1] if eventos else {}
 
     if not existe_paquete or not eventos:
+        if not_found:
+            msg = (
+                f"El código {codigo} no fue encontrado en el sistema.\n"
+                f"Verifica que el código esté escrito correctamente.\n"
+                f"Si el envío es reciente, puede que aún no esté registrado — intenta nuevamente en unas horas.\n"
+                f"Para más ayuda llama al +591 22152423 o visita correos.gob.bo."
+            )
+        else:
+            msg = (
+                f"No se encontraron eventos para el código {codigo}.\n"
+                f"Verifica que el código esté bien escrito o intenta nuevamente en unos minutos."
+            )
         return (
-            f"No encontré eventos para el código {codigo}. Verifica si está bien escrito o intenta nuevamente en unos minutos.",
+            msg,
             {
                 "ok": False,
                 "pending": False,
@@ -1332,9 +1535,24 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
         precio=str(resultado_tarifa.get("precio") or ""),
     )
     session.agregar_turno(sid, pregunta, respuesta_tarifa)
+
+    # Construir tarjeta visual estructurada para el frontend
+    rango = resultado_tarifa.get("rango") or {}
+    tarifa_card = {
+        "tipo": "tarifa",
+        "precio": str(resultado_tarifa.get("precio") or ""),
+        "servicio": resultado_tarifa.get("servicio") or "",
+        "scope": resultado_tarifa.get("scope") or scope or "",
+        "peso_g": str(resultado_tarifa.get("peso_g") or ""),
+        "rango_min": str(rango.get("min_g") or ""),
+        "rango_max": str(rango.get("max_g") or ""),
+        "columna": (columna or "").upper(),
+    }
+
     return {
         "response": respuesta_tarifa,
         "tarifa": resultado_tarifa,
+        "tarifa_card": tarifa_card,
         "skill_resolution": {
             "in_scope": True,
             "primary_skill": primary_skill,
@@ -1412,6 +1630,7 @@ def _reindexar_pdfs_incremental() -> bool:
                         "source_page": p.get("pagina_fuente", ""),
                         "extraction_method": p.get("metodo_extraccion", ""),
                         "pdf_key": key,
+                        "skill_id": (p.get("skill_id") or "").strip(),
                     },
                 )
                 chunks += pdf_chunks
@@ -1606,9 +1825,13 @@ def reindexar() -> bool:
                 if texto:
                     nombre_pdf = p.get("nombre_archivo") or f"PDF {idx + 1}"
                     key = _pdf_source_key(p, idx)
+                    skill = (p.get("skill_id") or "").strip()
+                    # PDFs de historia entran completos en un solo chunk
+                    pdf_chunk_size = max(rag.CHUNK_SIZE, 3000) if skill == "historia_correos_bolivia" else None
                     pdf_chunks, pdf_ids, pdf_meta = rag.documento_a_chunks(
                         texto,
                         prefijo=f"pdf_{key}",
+                        chunk_size=pdf_chunk_size,
                         metadata_base={
                             "source_type": "pdf",
                             "source_name": nombre_pdf,
@@ -1617,6 +1840,7 @@ def reindexar() -> bool:
                             "source_page": p.get("pagina_fuente", ""),
                             "extraction_method": p.get("metodo_extraccion", ""),
                             "pdf_key": key,
+                            "skill_id": skill,
                         },
                     )
                     chunks += pdf_chunks; ids += pdf_ids; metadatas += pdf_meta
@@ -1645,6 +1869,7 @@ def reindexar() -> bool:
                 hist_chunks, hist_ids, hist_meta = rag.documento_a_chunks(
                     contenido,
                     prefijo=f"hist_{idx}",
+                    chunk_size=max(rag.CHUNK_SIZE, 3000),
                     metadata_base={
                         "source_type": "history",
                         "source_name": titulo,
@@ -1770,6 +1995,11 @@ async def chat(request: Request):
         f"DEBUG: Mensaje: '{pregunta}', "
         f"Idioma manual: {lang_manual or 'none'}, idioma usado: {lang}"
     )
+
+    # Enriquecer la pregunta con contexto postal si no lo tiene implícito.
+    # pregunta_llm se usa solo para el LLM.
+    # pregunta (original) se usa para logs, historial y detección de intenciones.
+    pregunta_llm = _enriquecer_pregunta(pregunta) if not _modo_general_only() else pregunta
 
     # ── Consulta de rastreo 100% determinista (API externa)
     if tracking_mode:
@@ -1914,6 +2144,7 @@ async def chat(request: Request):
     # si el usuario responde con un pedido corto, reorganizamos la pregunta para
     # no perder el tema anterior. La función `es_pedido_corto` revisa comandos
     # como "dame" o mensajes muy breves.
+    pregunta_original = pregunta  # guardar antes del posible rewrite
     if intents.es_pedido_corto(pregunta):
         hist = session.get_historial(sid)
         # buscar el último mensaje del propio usuario en el historial
@@ -1928,10 +2159,15 @@ async def chat(request: Request):
             pregunta = nueva  # añade contexto
 
     t    = idiomas.IDIOMAS[lang]
-    skill_resolution = capabilities.resolve_skills_for_query(pregunta)
+    # Usar pregunta_llm (enriquecida) para detectar skills e in_scope
+    # así "que servicios ofrece" → "que servicios ofrece [contexto: Correos Bolivia]"
+    # y el resolver detecta correctamente el dominio postal
+    skill_resolution = capabilities.resolve_skills_for_query(pregunta_llm)
 
     print(f"[CHAT] Procesando pregunta: {pregunta[:50]}")
-    consulta_especial = capabilities.detectar_consulta_especial(pregunta)
+    # Verificar consulta especial tanto en la pregunta reescrita como en la original
+    # para evitar que el follow-up rewrite oculte intenciones de introspección
+    consulta_especial = capabilities.detectar_consulta_especial(pregunta) or capabilities.detectar_consulta_especial(pregunta_original)
     print(f"[CHAT] Consulta especial detectada: {consulta_especial}")
     if consulta_especial is not None:
         estado = _estado_capacidades()
@@ -1951,7 +2187,29 @@ async def chat(request: Request):
             started_at=started_at,
         )
 
-    # ── 1. Saludo → sin Ollama
+    # ── 0. Prompt injection → bloquear antes de cualquier procesamiento
+    if intents.es_prompt_injection(pregunta):
+        logger.warning("PROMPT_INJECTION detectado | pregunta='%s'", pregunta[:100])
+        return _finalizar_chat_response(
+            sid=sid,
+            request_id=request_id,
+            pregunta=pregunta,
+            payload={"response": t["sin_info"], "lang": lang},
+            started_at=started_at,
+        )
+
+    # ── 0b. Pregunta fuera de dominio → bloquear antes del LLM
+    if intents.es_pregunta_fuera_dominio(pregunta):
+        logger.warning("FUERA_DOMINIO | pregunta='%s'", pregunta[:100])
+        fuera_msg = _mensaje_fuera_dominio(pregunta, lang)
+        return _finalizar_chat_response(
+            sid=sid,
+            request_id=request_id,
+            pregunta=pregunta,
+            payload={"response": fuera_msg, "lang": lang},
+            started_at=started_at,
+        )
+
     if intents.es_saludo(pregunta):
         return _finalizar_chat_response(
             sid=sid,
@@ -1974,6 +2232,28 @@ async def chat(request: Request):
             ),
             "lang": lang,
             },
+            started_at=started_at,
+        )
+
+    respuesta_servicios = _respuesta_servicios_correos(pregunta, lang)
+    if respuesta_servicios is not None:
+        session.agregar_turno(sid, pregunta, respuesta_servicios)
+        return _finalizar_chat_response(
+            sid=sid,
+            request_id=request_id,
+            pregunta=pregunta,
+            payload={"response": respuesta_servicios, "lang": lang},
+            started_at=started_at,
+        )
+
+    respuesta_sireco = _respuesta_sireco(pregunta, lang)
+    if respuesta_sireco is not None:
+        session.agregar_turno(sid, pregunta, respuesta_sireco)
+        return _finalizar_chat_response(
+            sid=sid,
+            request_id=request_id,
+            pregunta=pregunta,
+            payload={"response": respuesta_sireco, "lang": lang},
             started_at=started_at,
         )
 
@@ -2083,7 +2363,7 @@ async def chat(request: Request):
             return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload=resp_json, started_at=started_at)
 
     if not skill_resolution["in_scope"]:
-        respuesta = capabilities.out_of_scope_response()
+        respuesta = capabilities.out_of_scope_response(pregunta)
         session.agregar_turno(sid, pregunta, respuesta)
         return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
             "response": respuesta,
@@ -2136,6 +2416,7 @@ async def chat(request: Request):
                 preferred_source_types=capabilities.preferred_sources_for_skill(
                     primary_skill
                 ),
+                skill_id=primary_skill_id if primary_skill_id else None,
             )
         )
         contexto = rag_result.get("context", "")
@@ -2154,6 +2435,9 @@ async def chat(request: Request):
     
     if not contexto.strip() or not valid_sources:
         respuesta = t["sin_info"]
+        # Registrar para mejorar el RAG
+        log_sin_info(pregunta, lang, primary_skill_id)
+        _registrar_sin_respuesta(pregunta, lang, primary_skill_id)
         session.agregar_turno(sid, pregunta, respuesta)
         respuesta = _truncate_response_safely(respuesta)
         return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
@@ -2182,7 +2466,7 @@ async def chat(request: Request):
     mensajes = [
         {"role": "system", "content": sistema},
         *session.historial_reciente(sid),
-        {"role": "user",   "content": pregunta},
+        {"role": "user",   "content": pregunta_llm},
     ]
     mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
     prompt_tokens = sum(_estimate_message_tokens(m) for m in mensajes)
@@ -2198,10 +2482,42 @@ async def chat(request: Request):
 
     try:
         print(f" [{lang}] {pregunta[:60]}")
-        respuesta = await _llamar_ollama_cancelable(request, request_id, mensajes)
+        respuesta = await asyncio.wait_for(
+            _llamar_ollama_cancelable(request, request_id, mensajes),
+            timeout=float(ollama.LLM_RESPONSE_TIMEOUT),
+        )
         respuesta = ollama.limpiar_respuesta(respuesta)
         respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
         respuesta = _normalize_response_text(respuesta)
+
+        # Anti-portugués: si el LLM responde en portugués a pesar de la instrucción,
+        # reemplazar con sin_info para forzar una respuesta en el idioma correcto.
+        if _respuesta_en_portugues(respuesta):
+            logger.warning("RESPUESTA_PORTUGUES detectada | pregunta='%s'", pregunta[:100])
+            respuesta = t["sin_info"]
+
+        # Anti-alucinación: detectar frases genéricas de modelo
+        from core.intents import detectar_alucinacion, respuesta_fuera_de_dominio, datos_inventados
+        if detectar_alucinacion(respuesta):
+            logger.warning("ALUCINACION detectada | pregunta='%s'", pregunta[:100])
+            respuesta = t["sin_info"]
+
+        # Anti-confusión: verificar que la respuesta tenga relación semántica
+        # con la pregunta original. Usa la función centralizada en intents.py.
+        if respuesta and respuesta != t["sin_info"]:
+            if respuesta_fuera_de_dominio(pregunta, respuesta):
+                logger.warning("CONFUSION detectada | pregunta='%s' | respuesta_inicio='%s'",
+                               pregunta[:80], respuesta[:80])
+                respuesta = t["sin_info"]
+
+        # Anti-inventado: verificar que los datos concretos (números, precios,
+        # fechas) de la respuesta existan en el contexto RAG y no sean inventados.
+        if respuesta and respuesta != t["sin_info"]:
+            if datos_inventados(respuesta, contexto):
+                logger.warning("DATOS_INVENTADOS detectados | pregunta='%s' | respuesta_inicio='%s'",
+                               pregunta[:80], respuesta[:80])
+                respuesta = t["sin_info"]
+
         observability.log_event(
             "llm.response",
             lang=lang,
@@ -2223,8 +2539,8 @@ async def chat(request: Request):
         # presentación. Detectamos esa situación y devolvemos el texto de
         # "sin_info" en lugar de repetir el saludo.
         presentacion_corta = (
-            "Soy ChatbotBO, el asistente virtual de la Agencia Boliviana de "
-            "Correos. ¿En qué puedo ayudarte?"
+            "Soy ChatbotBO, el asistente virtual de  Correos de Bolivia. "
+            " ¿En qué puedo ayudarte?"
         )
         if respuesta.startswith("Eres ChatbotBO") or respuesta.strip().startswith(presentacion_corta):
             respuesta = t["sin_info"]
@@ -2234,6 +2550,11 @@ async def chat(request: Request):
             and bool(valid_sources)
             and len(respuesta) >= 40
         )
+
+        # Registrar preguntas donde el LLM terminó devolviendo sin_info
+        # (alucinación detectada, confusión, evidencia inválida, etc.)
+        if respuesta == t["sin_info"]:
+            _registrar_sin_respuesta(pregunta, lang, primary_skill_id)
         respuesta = _truncate_response_safely(respuesta)
 
         if should_cache:
@@ -2257,6 +2578,11 @@ async def chat(request: Request):
 
         session.agregar_turno(sid, pregunta, respuesta)
         print(f" [{lang}] {len(respuesta)} chars")
+
+        # Quick replies dinámicos según el contenido de la respuesta
+        from core.intents import quick_replies_para_respuesta
+        qr_dinamicos = quick_replies_para_respuesta(respuesta, lang)
+
         return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
             "response": respuesta,
             "lang": lang,
@@ -2267,8 +2593,18 @@ async def chat(request: Request):
             },
             "sources": rag_result.get("sources", []),
             "primary_source_type": rag_result.get("primary_source_type"),
+            "quick_replies": qr_dinamicos,
         }, started_at=started_at)
 
+    except asyncio.TimeoutError:
+        fallback = "Lo siento, el sistema está tardando más de lo normal. Por favor llámanos al +591 22152423 o visita correos.gob.bo"
+        session.agregar_turno(sid, pregunta, fallback)
+        logger.warning("LLM_TIMEOUT | pregunta='%s' | timeout=%ss", pregunta[:100], ollama.LLM_RESPONSE_TIMEOUT)
+        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
+            "response": fallback,
+            "lang": lang,
+            "timeout": True,
+        }, started_at=started_at)
     except ollama.OllamaCancelled:
         raise HTTPException(status_code=499, detail="Consulta cancelada por el usuario.")
     except requests.exceptions.Timeout:
@@ -2311,6 +2647,7 @@ async def chat_stream(request: Request):
 
     async def stream_generator():
         pregunta_actual = pregunta
+        pregunta_actual_llm = _enriquecer_pregunta(pregunta_actual) if not _modo_general_only() else pregunta_actual
         yield _stream_line({"type": "start", "sid": sid, "request_id": request_id, "lang": lang})
 
         if tracking_mode:
@@ -2442,15 +2779,22 @@ async def chat_stream(request: Request):
                     last_user = entry.get("content")
                     break
             if last_user:
+                pregunta_actual_original = pregunta_actual
                 nueva = f"{last_user} {pregunta_actual}"
                 print(f" Follow‑up detectado, reescribiendo pregunta: '{pregunta_actual}' → '{nueva}'")
                 pregunta_actual = nueva
+            else:
+                pregunta_actual_original = pregunta_actual
+        else:
+            pregunta_actual_original = pregunta_actual
 
         t = idiomas.IDIOMAS[lang]
-        skill_resolution = capabilities.resolve_skills_for_query(pregunta_actual)
+        # Usar pregunta_actual_llm (enriquecida) para detectar skills e in_scope
+        skill_resolution = capabilities.resolve_skills_for_query(pregunta_actual_llm)
 
         print(f"[CHAT] Procesando pregunta: {pregunta_actual[:50]}")
-        consulta_especial = capabilities.detectar_consulta_especial(pregunta_actual)
+        # Verificar consulta especial en la pregunta reescrita y en la original
+        consulta_especial = capabilities.detectar_consulta_especial(pregunta_actual) or capabilities.detectar_consulta_especial(pregunta_actual_original)
         print(f"[CHAT] Consulta especial detectada: {consulta_especial}")
         if consulta_especial is not None:
             estado = _estado_capacidades()
@@ -2465,6 +2809,21 @@ async def chat_stream(request: Request):
                     "tool_result": resultado,
                 }
             ):
+                yield line
+            return
+
+        # ── 0. Prompt injection → bloquear
+        if intents.es_prompt_injection(pregunta_actual):
+            logger.warning("PROMPT_INJECTION stream | pregunta='%s'", pregunta_actual[:100])
+            async for line in instant_end({"response": t["sin_info"], "lang": lang}):
+                yield line
+            return
+
+        # ── 0b. Pregunta fuera de dominio → bloquear
+        if intents.es_pregunta_fuera_dominio(pregunta_actual):
+            logger.warning("FUERA_DOMINIO stream | pregunta='%s'", pregunta_actual[:100])
+            fuera_msg = _mensaje_fuera_dominio(pregunta_actual, lang)
+            async for line in instant_end({"response": fuera_msg, "lang": lang}):
                 yield line
             return
 
@@ -2575,7 +2934,7 @@ async def chat_stream(request: Request):
                 return
 
         if not skill_resolution["in_scope"]:
-            respuesta = capabilities.out_of_scope_response()
+            respuesta = capabilities.out_of_scope_response(pregunta_actual)
             session.agregar_turno(sid, pregunta_actual, respuesta)
             async for line in instant_end(
                 {
@@ -2629,6 +2988,7 @@ async def chat_stream(request: Request):
                 lambda: rag.buscar(
                     pregunta_actual,
                     preferred_source_types=capabilities.preferred_sources_for_skill(primary_skill),
+                    skill_id=primary_skill_id if primary_skill_id else None,
                 ),
             )
             contexto = rag_result.get("context", "")
@@ -2679,7 +3039,7 @@ async def chat_stream(request: Request):
         mensajes = [
             {"role": "system", "content": sistema},
             *session.historial_reciente(sid),
-            {"role": "user", "content": pregunta_actual},
+            {"role": "user", "content": pregunta_actual_llm},
         ]
         mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
         prompt_tokens = sum(_estimate_message_tokens(m) for m in mensajes)
@@ -2708,6 +3068,12 @@ async def chat_stream(request: Request):
             respuesta = ollama.limpiar_respuesta("".join(partes))
             respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
             respuesta = _normalize_response_text(respuesta)
+
+            # Anti-portugués: misma guardia que en /chat
+            if _respuesta_en_portugues(respuesta):
+                logger.warning("RESPUESTA_PORTUGUES streaming | pregunta='%s'", pregunta_actual[:100])
+                respuesta = t["sin_info"]
+
             observability.log_event(
                 "llm.response",
                 lang=lang,
@@ -2722,6 +3088,23 @@ async def chat_stream(request: Request):
                 if not validar_evidencia_en_contexto(citas, contexto):
                     respuesta = t["sin_info"]
 
+            # Anti-alucinación y anti-confusión: misma lógica centralizada que en /chat
+            from core.intents import detectar_alucinacion, respuesta_fuera_de_dominio, datos_inventados
+            if detectar_alucinacion(respuesta):
+                logger.warning("ALUCINACION streaming | pregunta='%s'", pregunta_actual[:100])
+                respuesta = t["sin_info"]
+
+            if respuesta and respuesta != t["sin_info"]:
+                if respuesta_fuera_de_dominio(pregunta_actual, respuesta):
+                    logger.warning("CONFUSION streaming | pregunta='%s'", pregunta_actual[:80])
+                    respuesta = t["sin_info"]
+
+            # Anti-inventado: misma lógica que en /chat
+            if respuesta and respuesta != t["sin_info"]:
+                if datos_inventados(respuesta, contexto):
+                    logger.warning("DATOS_INVENTADOS streaming | pregunta='%s'", pregunta_actual[:80])
+                    respuesta = t["sin_info"]
+
             presentacion_corta = (
                 "Soy ChatbotBO, el asistente virtual de la Agencia Boliviana de "
                 "Correos. ¿En qué puedo ayudarte?"
@@ -2730,6 +3113,10 @@ async def chat_stream(request: Request):
                 respuesta = t["sin_info"]
 
             should_cache = bool(respuesta and respuesta != t["sin_info"]) and bool(valid_sources) and len(respuesta) >= 40
+
+            # Registrar preguntas donde el LLM terminó devolviendo sin_info
+            if respuesta == t["sin_info"]:
+                _registrar_sin_respuesta(pregunta_actual, lang, primary_skill_id)
 
             if should_cache:
                 cache.set_response(
@@ -2768,6 +3155,15 @@ async def chat_stream(request: Request):
                 yield line
             return
         except ollama.OllamaCancelled:
+            return
+        except requests.exceptions.HTTPError as e:
+            error_detail = str(e)
+            print(f"🚨 Ollama HTTP Error en streaming: {error_detail}")
+            yield _stream_line({"type": "error", "content": "Lo siento, el servicio de IA no está disponible temporalmente. Por favor, intenta más tarde."})
+            return
+        except Exception as e:
+            print(f"🚨 Error inesperado en streaming: {str(e)}")
+            yield _stream_line({"type": "error", "content": "Ocurrió un error inesperado. Por favor, intenta nuevamente."})
             return
 
     return StreamingResponse(
@@ -2986,6 +3382,49 @@ def cache_response_delete(cache_id: str):
     if not cache.delete_response_cache(cache_id):
         raise HTTPException(status_code=404, detail="Cache response no encontrada")
     return {"ok": True, "cache_id": cache_id}
+
+
+# ─────────────────────────────────────────────
+#  PREGUNTAS SIN RESPUESTA
+# ─────────────────────────────────────────────
+
+# Almacén en memoria de preguntas sin respuesta
+_sin_respuesta_log: list[dict] = []
+_sin_respuesta_lock = __import__("threading").Lock()
+_SIN_RESPUESTA_MAX = int(os.environ.get("SIN_RESPUESTA_MAX", "500"))
+
+
+def _registrar_sin_respuesta(pregunta: str, lang: str, skill_id: str) -> None:
+    """Registra una pregunta sin respuesta en memoria y en log."""
+    import time as _time
+    from chatbots.general.chat_helpers import log_sin_info
+    log_sin_info(pregunta, lang, skill_id)
+    with _sin_respuesta_lock:
+        _sin_respuesta_log.append({
+            "pregunta": (pregunta or "").strip()[:300],
+            "lang": lang or "?",
+            "skill_id": skill_id or "?",
+            "ts": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+        })
+        # Limitar tamaño
+        if len(_sin_respuesta_log) > _SIN_RESPUESTA_MAX:
+            _sin_respuesta_log.pop(0)
+
+
+@router.get("/sin-respuesta")
+def listar_sin_respuesta(limit: int = 200):
+    """Lista las preguntas donde el bot no encontró información."""
+    with _sin_respuesta_lock:
+        items = list(reversed(_sin_respuesta_log))[:limit]
+    return {"items": items, "total": len(_sin_respuesta_log)}
+
+
+@router.delete("/sin-respuesta")
+def limpiar_sin_respuesta():
+    """Limpia el log de preguntas sin respuesta."""
+    with _sin_respuesta_lock:
+        _sin_respuesta_log.clear()
+    return {"ok": True}
 
 
 @router.post("/cache/responses/clear")
@@ -3255,6 +3694,7 @@ async def subir_pdf(
     fuente_url: str = Form(""),
     pagina_fuente: str = Form(""),
     clean_mode: str = Form(""),
+    skill_id: str = Form(""),
 ):
     try:
         resultado = capabilities.guardar_pdf_subido(
@@ -3262,6 +3702,7 @@ async def subir_pdf(
             fuente_url=fuente_url,
             pagina_fuente=pagina_fuente,
             clean_mode=clean_mode,
+            skill_id=skill_id,
         )
         resultado["reindex_started"] = _programar_reindex_debounced("pdf_upload", mode="pdf_only")
         return JSONResponse(content=resultado, status_code=201 if resultado.get("created") else 200)
@@ -3287,10 +3728,11 @@ def eliminar_pdf(nombre_archivo: str = Path(..., description="Nombre del archivo
 async def editar_pdf_texto(request: Request, nombre_archivo: str = Path(..., description="Nombre del archivo PDF a editar")):
     data = await request.json()
     texto_extraido = data.get("texto_extraido", "")
+    skill_id = str(data.get("skill_id") or "").strip()
     if texto_extraido is not None and not isinstance(texto_extraido, str):
         raise HTTPException(status_code=400, detail="texto_extraido debe ser string")
     try:
-        resultado = capabilities.actualizar_texto_pdf(nombre_archivo, texto_extraido)
+        resultado = capabilities.actualizar_texto_pdf(nombre_archivo, texto_extraido, skill_id=skill_id)
         resultado["reindex_started"] = _programar_reindex_debounced("pdf_manual_edit", mode="pdf_only")
         return resultado
     except FileNotFoundError as e:

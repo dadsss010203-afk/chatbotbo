@@ -23,9 +23,21 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from core import ollama, updater, observability
 from chatbots.general import routes as general_routes
+
+# ─────────────────────────────────────────────
+#  LIFESPAN
+# ─────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global _rate_limit_lock
+    import threading
+    _rate_limit_lock = threading.Lock()
+    inicializar()
+    yield
 
 # ─────────────────────────────────────────────
 #  RATE LIMITING
@@ -72,15 +84,8 @@ def check_rate_limit(ip: str, limit: int, window: int = 60) -> tuple[bool, int, 
 # ─────────────────────────────────────────────
 #  APP FASTAPI
 # ─────────────────────────────────────────────
-app = FastAPI(title="ChatbotBO", description="Agencia Boliviana de Correos")
+app = FastAPI(title="ChatbotBO", description="Agencia Boliviana de Correos", lifespan=lifespan)
 _APP_INITIALIZED = False
-
-@app.on_event("startup")
-def startup_event():
-    global _rate_limit_lock
-    import threading
-    _rate_limit_lock = threading.Lock()
-    inicializar()
 
 
 @app.middleware("http")
@@ -201,6 +206,15 @@ async def favicon():
     raise HTTPException(status_code=404, detail="Favicon not found")
 
 
+@app.get("/logocorreos.jpg")
+async def logo_correos():
+    """Sirve el logo oficial de Correos de Bolivia."""
+    path = os.path.join(FRONTEND_DIR, "logocorreos.jpg")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/jpeg")
+    raise HTTPException(status_code=404, detail="Logo not found")
+
+
 @app.get("/logo_chatbot.png")
 async def logo_chatbot():
     """Sirve el logo del chatbot."""
@@ -208,6 +222,24 @@ async def logo_chatbot():
     if os.path.exists(logo_path):
         return FileResponse(logo_path, media_type="image/png")
     raise HTTPException(status_code=404, detail="Logo not found")
+
+
+@app.get("/logogif.gif")
+async def logo_gif():
+    """Sirve el gif animado del chatbot."""
+    gif_path = os.path.join(FRONTEND_DIR, "logogif.gif")
+    if os.path.exists(gif_path):
+        return FileResponse(gif_path, media_type="image/gif")
+    raise HTTPException(status_code=404, detail="GIF not found")
+
+
+@app.get("/pruebaapi.html")
+async def pruebaapi():
+    """Sirve la página de prueba del widget."""
+    path = os.path.join(FRONTEND_DIR, "pruebaapi.html")
+    if os.path.exists(path):
+        return FileResponse(path, media_type="text/html")
+    raise HTTPException(status_code=404, detail="Not found")
 
 
 # ─────────────────────────────────────────────
@@ -295,10 +327,14 @@ if __name__ == "__main__":
     print(f"   Presiona Ctrl+C para detener\n")
 
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=PORT,
-        reload=False,
-        log_level="info",
-    )
+    try:
+        uvicorn.run(
+            "main:app",
+            host="0.0.0.0",
+            port=PORT,
+            reload=False,
+            log_level="info",
+        )
+    except KeyboardInterrupt:
+        print("\n🛑 Servidor detenido manualmente.")
+        sys.exit(0)

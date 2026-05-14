@@ -6,7 +6,7 @@
     "modo": "rag+llm",
     "categoria": "atencion",
     "prioridad": 5,
-    "trigger": "rastreo, seguimiento, track, tracking, guia, codigo de envio, estado de envio, paquete",
+    "trigger": "rastreo, seguimiento, track, tracking, guia, codigo de envio, estado de envio, paquete, donde esta mi paquete, donde esta mi envio",
     "activa": true
   },
   {
@@ -76,7 +76,7 @@
     "modo": "rag+llm",
     "categoria": "documental",
     "prioridad": 3,
-    "trigger": "historia, historia institucional, origen, evolucion, antecedentes, correos bolivia",
+    "trigger": "historia, historia correos, historia institucional, origen, origen correos, evolucion correos, antecedentes correos, cuando se fundo, fundacion, fundacion correos, ecobol, agbc historia, correos bolivia historia, decreto supremo 3495, 1825, union postal universal, upu, que es upu, que es ecobol, que es agbc, cuando nacio correos",
     "activa": true
   },
   {

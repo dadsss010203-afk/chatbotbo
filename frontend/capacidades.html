@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -3827,8 +3827,7 @@
         <a href="/" style="color:#666;text-decoration:none;font-weight:700;transition:all 0.2s" onmouseover="this.style.color='#3BA7FF'" onmouseout="this.style.color='#666'">← VOLVER AL ASISTENTE</a>
       </div>
       <div style="margin-top:24px;padding-top:20px;border-top:1px solid #EEE;text-align:center">
-        <p style="margin:0 0 8px;color:#999;font-size:.7rem;text-transform:uppercase;letter-spacing:0.05em">Demo Credentials</p>
-        <p style="margin:0;color:#1A1A1A;font-size:.75rem"><strong>admin</strong> / admin123 &nbsp;|&nbsp; <strong>editor</strong> / editor123</p>
+        <p style="margin:0;color:#bbb;font-size:.68rem">Acceso restringido al personal autorizado.</p>
       </div>
     </div>
     <style>
@@ -3861,6 +3860,7 @@
           <a class="menu-btn" data-view="conversations" href="/gestion/capacidades/conversaciones"><span class="menu-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg></span><span class="menu-btn__label">Chats</span></a>
           <a class="menu-btn" data-view="tariff-conversations" href="/gestion/capacidades/conversaciones-tarifas"><span class="menu-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v10H7l-3 3z"/><path d="M9 9h6M9 12h4"/></svg></span><span class="menu-btn__label">Chats tarifas</span></a>
           <a class="menu-btn admin-only" data-view="users" href="/gestion/capacidades/usuarios" style="display:none"><span class="menu-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span><span class="menu-btn__label">Usuarios</span></a>
+          <a class="menu-btn" data-view="sin-respuesta" href="/gestion/capacidades/sin-respuesta"><span class="menu-btn__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg></span><span class="menu-btn__label">Sin respuesta</span></a>
         </nav>
       </div>
     </aside>
@@ -4229,6 +4229,36 @@
           <div class="table-footer"><span id="users-count">0 usuarios</span></div>
         </div>
       </section>
+
+      <section class="section view-section" id="view-sin-respuesta">
+        <div class="section-head">
+          <div>
+            <h3>Preguntas sin respuesta</h3>
+            <p>Preguntas donde el bot no encontró información en el RAG. Úsalas para mejorar el contenido.</p>
+          </div>
+          <div class="section-head-actions">
+            <button class="btn btn-secondary" type="button" onclick="loadSinRespuesta()">Actualizar</button>
+            <button class="btn btn-secondary" type="button" onclick="clearSinRespuesta()">Limpiar log</button>
+          </div>
+        </div>
+        <div class="section-summary" id="sin-respuesta-summary"></div>
+        <div class="table-wrap">
+          <table id="sin-respuesta-table">
+            <thead>
+              <tr>
+                <th>Pregunta</th>
+                <th>Idioma</th>
+                <th>Skill</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody id="sin-respuesta-body">
+              <tr><td colspan="4" style="text-align:center;color:var(--muted)">Cargando...</td></tr>
+            </tbody>
+          </table>
+          <div class="table-footer"><span id="sin-respuesta-count">0 preguntas</span></div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -4291,6 +4321,13 @@
             <div class="field">
               <label for="pdf-file">Archivo PDF</label>
               <input id="pdf-file" name="file" type="file" accept="application/pdf" required>
+            </div>
+            <div class="field">
+              <label for="pdf-skill-id">Vincular a Skill (opcional)</label>
+              <select id="pdf-skill-id" name="skill_id">
+                <option value="">— Sin vincular (general) —</option>
+              </select>
+              <small style="color:#888;font-size:0.82em;">El bot buscará primero en este PDF cuando el skill esté activo.</small>
             </div>
             <div class="field">
               <label for="pdf-pagina-fuente">Página fuente</label>
@@ -4627,7 +4664,8 @@ const els = {
     tariffs: document.getElementById("view-tariffs"),
     conversations: document.getElementById("view-conversations"),
     "tariff-conversations": document.getElementById("view-tariff-conversations"),
-    users: document.getElementById("view-users")
+    users: document.getElementById("view-users"),
+    "sin-respuesta": document.getElementById("view-sin-respuesta")
   }
 };
 
@@ -4789,6 +4827,11 @@ const viewConfig = {
     title: "Usuarios",
     description: "Gestión de usuarios y roles del panel.",
     showSkillButton: false
+  },
+  "sin-respuesta": {
+    title: "Preguntas sin respuesta",
+    description: "Preguntas donde el bot no encontró información. Úsalas para mejorar el contenido.",
+    showSkillButton: false
   }
 };
 
@@ -4856,6 +4899,7 @@ function getCurrentView() {
   if (last === "conversaciones") return "conversations";
   if (last === "conversaciones-tarifas") return "tariff-conversations";
   if (last === "usuarios") return "users";
+  if (last === "sin-respuesta") return "sin-respuesta";
   return viewConfig[last] ? last : "overview";
 }
 
@@ -4908,6 +4952,8 @@ function applyView() {
     renderScraping();
   } else if (currentView === "resources") {
     renderResources();
+  } else if (currentView === "sin-respuesta") {
+    loadSinRespuesta();
   }
 }
 
@@ -5659,6 +5705,35 @@ function resetPdfForm() {
     meta: "Sin procesar",
     text: 'Pulsa "Procesar" para extraer una vista previa del contenido antes de guardar.'
   });
+  // Cargar skills en el selector al abrir el formulario
+  _cargarSkillsEnSelector();
+}
+
+async function _cargarSkillsEnSelector() {
+  const select = document.getElementById("pdf-skill-id");
+  if (!select) return;
+  try {
+    // Usar skills ya cargados en state si están disponibles
+    let skills = Array.isArray(state.capabilities?.skills) ? state.capabilities.skills : [];
+    if (!skills.length) {
+      // Fallback: cargar desde API
+      const res = await fetch("/api/skills");
+      const data = await res.json();
+      skills = Array.isArray(data) ? data : (data.skills || []);
+    }
+    // Limpiar opciones excepto la primera (sin vincular)
+    while (select.options.length > 1) select.remove(1);
+    skills
+      .filter(s => s.activa !== false)
+      .forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s.id;
+        opt.textContent = s.nombre || s.id;
+        select.appendChild(opt);
+      });
+  } catch (e) {
+    console.warn("No se pudieron cargar skills para el selector:", e);
+  }
 }
 
 function setPdfMessage(target, text, kind = "info") {
@@ -5984,6 +6059,51 @@ function cancelUserForm() {
   document.getElementById("user-form-container").style.display = "none";
 }
 
+// ─────────────────────────────────────────────
+//  PREGUNTAS SIN RESPUESTA
+// ─────────────────────────────────────────────
+
+async function loadSinRespuesta() {
+  const tbody = document.getElementById("sin-respuesta-body");
+  const count = document.getElementById("sin-respuesta-count");
+  const summary = document.getElementById("sin-respuesta-summary");
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Cargando...</td></tr>';
+  try {
+    const data = await fetchJson("/api/sin-respuesta?limit=200");
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (summary) {
+      summary.innerHTML = `<div class="summary-pill">${items.length} preguntas sin respuesta registradas</div>`;
+    }
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">No hay preguntas sin respuesta registradas.</td></tr>';
+      if (count) count.textContent = "0 preguntas";
+      return;
+    }
+    tbody.innerHTML = items.map(item => `
+      <tr>
+        <td style="max-width:400px;word-break:break-word">${escapeHtml(item.pregunta || "—")}</td>
+        <td>${escapeHtml(item.lang || "—")}</td>
+        <td>${escapeHtml(item.skill_id || "—")}</td>
+        <td style="white-space:nowrap">${escapeHtml(item.ts || "—")}</td>
+      </tr>
+    `).join("");
+    if (count) count.textContent = `${items.length} preguntas`;
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4" style="color:#b44231">Error cargando datos: ${escapeHtml(e.message || String(e))}</td></tr>`;
+  }
+}
+
+async function clearSinRespuesta() {
+  if (!confirm("¿Limpiar el log de preguntas sin respuesta?")) return;
+  try {
+    await fetchJson("/api/sin-respuesta", { method: "DELETE" });
+    await loadSinRespuesta();
+  } catch (e) {
+    alert("Error al limpiar: " + (e.message || String(e)));
+  }
+}
+
 async function loadAll() {
   const requests = await Promise.allSettled([
     fetchJson("/api/capabilities"),
@@ -6119,6 +6239,14 @@ function editPdfInfo(id) {
   const nombre = item.nombre_archivo || item.nombre || "sin_nombre.pdf";
   const fuente = item.pagina_fuente || item.fuente || item.fuente_url || "—";
   const texto = item.texto_extraido || "";
+  const skillIdActual = item.skill_id || "";
+
+  // Construir opciones de skills desde state.capabilities.skills
+  const skills = Array.isArray(state.capabilities?.skills) ? state.capabilities.skills : [];
+  const skillOptions = skills
+    .filter(s => s.activa !== false)
+    .map(s => `<option value="${escapeHtml(s.id)}" ${s.id === skillIdActual ? 'selected' : ''}>${escapeHtml(s.nombre || s.id)}</option>`)
+    .join('');
 
   openModal("detail", {
     title: "Editar información PDF",
@@ -6138,6 +6266,14 @@ function editPdfInfo(id) {
           <div class="detail-line"><span>Chunks (DB)</span><strong>${escapeHtml(String(item.chunks_indexados || 0))}</strong></div>
           <div class="detail-line"><span>Disponible</span><strong>${item.texto_disponible ? "Sí" : "No"}</strong></div>
         </div>
+      </div>
+      <div class="field" style="margin:1rem 0 0.5rem">
+        <label for="pdf-edit-skill-id" style="font-weight:600">Vincular a Skill</label>
+        <select id="pdf-edit-skill-id" style="width:100%;padding:0.4rem 0.6rem;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text)">
+          <option value="">— Sin vincular (general) —</option>
+          ${skillOptions}
+        </select>
+        <small style="color:#888;font-size:0.82em">El bot buscará primero en este PDF cuando el skill esté activo.</small>
       </div>
       <div class="detail-text-wrap">
         <div class="detail-text-head">
@@ -6170,10 +6306,12 @@ async function savePdfInfo(id) {
   }
 
   try {
+    const skillIdEl = document.getElementById("pdf-edit-skill-id");
+    const skillId = (skillIdEl?.value || "").trim();
     await fetchJson(`/api/pdfs/${encodeURIComponent(String(id))}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ texto_extraido: textoExtraido })
+      body: JSON.stringify({ texto_extraido: textoExtraido, skill_id: skillId })
     });
 
     if (message) {
@@ -6280,28 +6418,51 @@ async function rebuildRag() {
   }
 }
 
-function deleteResponseCache() {
-  demoNotice("La limpieza de elementos temporales no ejecuta cambios reales en esta demo.");
+function deleteResponseCache(cacheId) {
+  if (!cacheId) { demoNotice("No se pudo identificar el elemento a eliminar."); return; }
+  if (!window.confirm("¿Eliminar esta respuesta del cache?")) return;
+  fetchJson(`/api/cache/responses/${cacheId}`, { method: "DELETE" })
+    .then(() => { showToast("Entrada eliminada del cache."); loadAll(); })
+    .catch(err => demoNotice(`Error al eliminar: ${err?.message || "Verifica que Redis esté activo."}`));
 }
 
 function clearResponseCache() {
-  demoNotice("La limpieza general fue reemplazada por una vista previa informativa.");
+  if (!window.confirm("¿Limpiar TODO el cache de respuestas? Esto no se puede deshacer.")) return;
+  fetchJson("/api/cache/responses/clear", { method: "POST" })
+    .then(r => { showToast(`Cache limpiado: ${r?.deleted ?? 0} entradas eliminadas.`); loadAll(); })
+    .catch(err => demoNotice(`Error al limpiar cache: ${err?.message || "Verifica que Redis esté activo."}`));
 }
 
 function deleteConversation() {
-  demoNotice("Las tablas de actividad son estáticas en esta maqueta.");
+  const logId = event?.target?.closest("tr")?.dataset?.logId;
+  if (!logId) { demoNotice("No se pudo identificar la conversación."); return; }
+  if (!window.confirm("¿Eliminar esta conversación?")) return;
+  fetchJson(`/api/conversations/${logId}`, { method: "DELETE" })
+    .then(() => { showToast("Conversación eliminada."); loadAll(); })
+    .catch(() => demoNotice("Error al eliminar conversación."));
 }
 
 function clearConversations() {
-  demoNotice("La limpieza de actividad está deshabilitada en la versión visual.");
+  if (!window.confirm("¿Eliminar TODAS las conversaciones? Esto no se puede deshacer.")) return;
+  fetchJson("/api/conversations/clear", { method: "POST" })
+    .then(r => { showToast(`${r?.deleted ?? 0} conversaciones eliminadas.`); loadAll(); })
+    .catch(() => demoNotice("Error al limpiar conversaciones."));
 }
 
 function deleteTariffConversation() {
-  demoNotice("Los flujos mostrados son solo demostrativos.");
+  const logId = event?.target?.closest("tr")?.dataset?.logId;
+  if (!logId) { demoNotice("No se pudo identificar el flujo."); return; }
+  if (!window.confirm("¿Eliminar este flujo de tarifa?")) return;
+  fetchJson(`/api/conversations/tarifas/${logId}`, { method: "DELETE" })
+    .then(() => { showToast("Flujo eliminado."); loadAll(); })
+    .catch(() => demoNotice("Error al eliminar flujo."));
 }
 
 function clearTariffConversations() {
-  demoNotice("Esta sección mantiene datos simulados para conservar el diseño.");
+  if (!window.confirm("¿Eliminar TODOS los flujos de tarifas? Esto no se puede deshacer.")) return;
+  fetchJson("/api/conversations/tarifas/clear", { method: "POST" })
+    .then(r => { showToast(`${r?.deleted ?? 0} flujos eliminados.`); loadAll(); })
+    .catch(() => demoNotice("Error al limpiar flujos de tarifas."));
 }
 
 function reloadTariffCatalog() {
@@ -6757,6 +6918,7 @@ els.pdfForm.addEventListener("submit", async (event) => {
   formData.append("file", file);
   formData.append("pagina_fuente", (els.pdfPageInput?.value || "").trim());
   formData.append("clean_mode", els.pdfCleanModeInput?.value || "aggressive");
+  formData.append("skill_id", (document.getElementById("pdf-skill-id")?.value || "").trim());
 
   if (els.pdfSaveBtn) {
     els.pdfSaveBtn.disabled = true;
@@ -6830,6 +6992,48 @@ if (document.readyState === "loading") {
 } else {
   checkAuth();
 }
+  // ─── TOAST NOTIFICATIONS ─────────────────────────────────────────────
+  window.showToast = function showToast(message, type = 'ok') {
+    const existing = document.getElementById('chatbotbo-toast');
+    if (existing) existing.remove();
+
+    const colors = {
+      ok:      { bg: 'rgba(69,211,157,0.12)', border: 'rgba(69,211,157,0.35)', text: '#45d39d' },
+      err:     { bg: 'rgba(255,107,107,0.12)', border: 'rgba(255,107,107,0.35)', text: '#ff6b6b' },
+      info:    { bg: 'rgba(59,167,255,0.12)',  border: 'rgba(59,167,255,0.35)',  text: '#3ba7ff' },
+      warn:    { bg: 'rgba(255,159,106,0.12)', border: 'rgba(255,159,106,0.35)', text: '#ff9f6a' },
+    };
+    const c = colors[type] || colors.ok;
+
+    const toast = document.createElement('div');
+    toast.id = 'chatbotbo-toast';
+    toast.textContent = message;
+    toast.style.cssText = [
+      'position:fixed',
+      'bottom:28px',
+      'right:28px',
+      'z-index:9999',
+      `background:${c.bg}`,
+      `border:1px solid ${c.border}`,
+      `color:${c.text}`,
+      'padding:12px 18px',
+      'border-radius:10px',
+      'font-size:0.88rem',
+      'font-weight:600',
+      'font-family:DM Sans,sans-serif',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.28)',
+      'max-width:360px',
+      'word-break:break-word',
+      'animation:toastIn 0.22s ease',
+      'backdrop-filter:blur(8px)',
+    ].join(';');
+
+    const style = document.createElement('style');
+    style.textContent = '@keyframes toastIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}';
+    document.head.appendChild(style);
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 320); }, 3200);
+  }
   </script>
 </body>
 </html>

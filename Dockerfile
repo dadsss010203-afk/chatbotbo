@@ -22,6 +22,7 @@ RUN apt-get update --fix-missing && \
 # Instalar dependencias Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch==2.5.1+cpu --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements.txt
 
 # Copiar proyecto
