@@ -153,6 +153,11 @@ console.log('Widget.js cargando...');
 // ─── INICIALIZAR ──────────────────────────────────────────────────────
 function initWidget(s) {
   console.log('initWidget llamado');
+  if (window._widgetInitialized) {
+    console.log('initWidget ya fue llamado, ignorando.');
+    return;
+  }
+  window._widgetInitialized = true;
   if (widgetPos === 'left') {
     const bubble = document.getElementById('chat-bubble');
     const win    = document.getElementById('chat-window');

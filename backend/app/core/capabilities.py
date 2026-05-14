@@ -623,10 +623,6 @@ def build_skill_manifest(skills: list[dict] | None = None) -> str:
     return "\n".join(lineas)
 
 
-def out_of_scope_response() -> str:
-    return OUT_OF_SCOPE_SAMPLES
-
-
 def preferred_sources_for_skill(skill: dict | None) -> list[str]:
     if not skill:
         return ["pdf", "history", "json_data", "web_main", "section", "branch"]
