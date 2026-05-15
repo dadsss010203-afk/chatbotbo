@@ -195,10 +195,8 @@ function initWidget(s) {
   // Conectar botones del header (sin onclick inline para evitar errores de scope)
   const btnClose    = document.getElementById('btn-close');
   const btnMinimize = document.getElementById('btn-minimize');
-  const btnBubble   = document.getElementById('chat-bubble');
   if (btnClose)    btnClose.addEventListener('click', () => toggleChat());
   if (btnMinimize) btnMinimize.addEventListener('click', () => minimize());
-  if (btnBubble)   btnBubble.addEventListener('click', () => toggleChat());
 
   // Cerrar mapa al hacer clic fuera
   const mapaModal = document.getElementById('mapa-modal');
@@ -1169,11 +1167,17 @@ async function sendMsg(msg) {
           removeTyping();
 
           const bye = data.despedida === true;
+          const hasTarifaCard = Boolean(data?.tarifa_card && data.tarifa_card.precio);
+          const hasTrackingCard = Boolean(data?.tracking?.found);
+          const hasStructuredCard = hasTarifaCard || hasTrackingCard;
           const isBranchesList = data?.response_type === 'branches_list' && Array.isArray(data?.branches);
           if (isBranchesList) {
             if (streamMsg) streamMsg.wrap.remove();
             streamMsg = null;
             addBranchesList(data.branches, data.message || '');
+          } else if (hasStructuredCard) {
+            if (streamMsg) streamMsg.wrap.remove();
+            streamMsg = null;
           } else if (streamMsg) {
             const finalText = data.response || streamMsg._fullText || 'Sin respuesta disponible';
             // Remover cursor y mostrar texto final

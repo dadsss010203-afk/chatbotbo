@@ -11,7 +11,8 @@
     "subido_manual": true,
     "archivo_guardado": false,
     "content_hash": "885a925b521e780e",
-    "clean_mode": "aggressive"
+    "clean_mode": "aggressive",
+    "skill_id": ""
   },
   {
     "url": "",
@@ -25,7 +26,8 @@
     "subido_manual": true,
     "archivo_guardado": false,
     "content_hash": "d0c355eec477b068",
-    "clean_mode": "aggressive"
+    "clean_mode": "aggressive",
+    "skill_id": ""
   },
   {
     "url": "",
@@ -39,7 +41,8 @@
     "subido_manual": true,
     "archivo_guardado": false,
     "content_hash": "6a58253410f172f4",
-    "clean_mode": "aggressive"
+    "clean_mode": "aggressive",
+    "skill_id": ""
   },
   {
     "url": "",
@@ -53,7 +56,8 @@
     "subido_manual": true,
     "archivo_guardado": false,
     "content_hash": "d876b1fc064b999d",
-    "clean_mode": "aggressive"
+    "clean_mode": "aggressive",
+    "skill_id": ""
   },
   {
     "url": "",
@@ -67,6 +71,7 @@
     "subido_manual": true,
     "archivo_guardado": false,
     "content_hash": "e125c361d0bde244",
-    "clean_mode": "aggressive"
+    "clean_mode": "aggressive",
+    "skill_id": ""
   }
 ]
