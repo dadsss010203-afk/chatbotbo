@@ -1218,9 +1218,24 @@ async function sendMsg(msg) {
             );
           }
 
-          if (data?.tarifa?.requires_mode) {
+          const tarifaDone = Boolean(
+            data?.tarifa && (
+              data.tarifa.requires_mode ||
+              data.tarifa.ok === true ||
+              data.tarifa.pending === false
+            )
+          );
+          if (tarifaDone && tarifaMode) {
             tarifaMode = false;
             setTarifaModeUI();
+          }
+          const trackingDone = Boolean(
+            data?.tracking &&
+            data.tracking.pending === false
+          );
+          if (trackingDone && trackingMode) {
+            trackingMode = false;
+            setTrackingModeUI();
           }
           // Mostrar tarjeta visual de tarifa si el backend la devuelve
           if (data?.tarifa_card && data.tarifa_card.precio) {
