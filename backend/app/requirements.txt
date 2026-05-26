@@ -26,6 +26,7 @@ rank-bm25==0.2.2
 torch==2.5.1+cpu
 # compatible con chromadb==0.5.23 (tokenizers<=0.20.3)
 transformers==4.45.2
+# cross-encoder para reranking (incluido en sentence-transformers, no requiere instalación extra)
 
 # ── Detección de idioma
 langdetect==1.0.9

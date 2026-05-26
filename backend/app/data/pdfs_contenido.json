@@ -4,15 +4,15 @@
     "archivo_local": "",
     "nombre_archivo": "Servicios_de_la_Agencia_Boliviana_de_Correos__AGBC_.pdf",
     "tamano_bytes": 63584,
-    "texto_extraido": "--- Página 1 ---\nServicios de Correos de Bolivia (antes AGBC - Agencia Boliviana de Correos)\nNota: Desde 2026 la institución se llama Correos de Bolivia. Antes era conocida como AGBC.\nExpress Mail Service (EMS)\nServicio de envío urgente nacional e internacional con tiempos rápidos y cobertura amplia.\n● Entrega nacional: 24 a 48 horas\n● Entrega internacional: 5 a 8 días\n● Peso: hasta 20 kg\n● Seguimiento en tiempo real (ULTRAPOST)\nServicio Encomienda Postal (SEP)\nServicio de envío de paquetes con cobertura internacional y sistema de rastreo.\n● Entrega internacional: 8 a 14 días\n● Cobertura: 192 países\n● Peso: hasta 20 kg\n● Seguimiento (SIREN)\nCorreo Prioritario\nServicio para cartas, impresos y pequeños paquetes con mayor rapidez.\n● Entrega nacional: 24 a 48 horas\n● Entrega internacional: 7 a 14 días\n● Peso: hasta 2 kg\nCorrespondencia Agrupada\nServicio para envíos masivos de documentos y correspondencia empresarial.\n● Mínimo 40 envíos\n● Entrega nacional: 24 a 72 horas\n● Cobertura en capitales\nMi Encomienda\nServicio económico de paquetería nacional con entrega en oficinas.\n● Entrega: 24 a 48 horas\n● Peso: hasta 20 kg\n● Incluye tracking\nFilatelia\nVenta de sellos postales de colección y organización de exposiciones.\n\n--- Página 2 ---\n● Catálogos especializados\n● Emisión de sellos\n● Exposiciones filatélicas\nCasillas Postales\nServicio de recepción segura de correspondencia en oficinas.\n● Modalidades: trimestral, semestral, anual\n● Alta seguridad y confidencialidad\n● Atención personalizada\nChasquiExpressBO\nServicio de entrega a domicilio de paquetes y encomiendas.\nInformación de Contacto\nTeléfono: (591-2) 2152423\nEmail: agbc@correos.gob.bo\nWeb: https://correos.gob.bo/",
-    "longitud_texto": 1572,
+    "texto_extraido": "Servicios de Correos de Bolivia (antes AGBC - Agencia Boliviana de Correos)\nNota: Desde 2026 la institución se llama Correos de Bolivia. Antes era conocida como AGBC.\n\nExpress Mail Service (EMS)\nServicio de envío urgente nacional e internacional con tiempos rápidos y cobertura amplia.\n- Entrega nacional: 24 a 48 horas\n- Entrega internacional: 5 a 8 días\n- Peso: hasta 20 kg\n- Seguimiento en tiempo real (ULTRAPOST)\n\nServicio Encomienda Postal (SEP)\nServicio de envío de paquetes con cobertura internacional y sistema de rastreo.\n- Entrega internacional: 8 a 14 días\n- Cobertura: 192 países\n- Peso: hasta 20 kg\n- Seguimiento (SIREN)\n\nCorreo Prioritario\nServicio para cartas, impresos y pequeños paquetes con mayor rapidez.\n- Entrega nacional: 24 a 48 horas\n- Entrega internacional: 7 a 14 días\n- Peso: hasta 2 kg\n\nCorrespondencia Agrupada (ECA)\nServicio para envíos masivos de documentos y correspondencia empresarial.\n- Mínimo 40 envíos\n- Entrega nacional: 24 a 72 horas\n- Cobertura en capitales\n\nMi Encomienda\nServicio económico de paquetería nacional con entrega en oficinas.\n- Entrega: 24 a 48 horas\n- Peso: hasta 20 kg\n- Incluye tracking\n\nFilatelia\nVenta de sellos postales de colección y organización de exposiciones.\n- Catálogos especializados\n- Emisión de sellos\n- Exposiciones filatélicas\n\nCasillas Postales\nServicio de recepción segura de correspondencia en oficinas.\n- Modalidades: trimestral, semestral, anual\n- Alta seguridad y confidencialidad\n- Atención personalizada\n\nChasquiExpressBO\nServicio de entrega a domicilio de paquetes y encomiendas.\n\nInformación de Contacto\nTeléfono: (591-2) 2152423\nEmail: agbc@correos.gob.bo\nWeb: https://correos.gob.bo/",
+    "longitud_texto": 1480,
     "metodo_extraccion": "pdfplumber_text",
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "885a925b521e780e",
+    "content_hash": "0233f816f0801ed5",
     "clean_mode": "aggressive",
-    "skill_id": ""
+    "skill_id": "servicios_correos"
   },
   {
     "url": "",
@@ -27,7 +27,7 @@
     "archivo_guardado": false,
     "content_hash": "d0c355eec477b068",
     "clean_mode": "aggressive",
-    "skill_id": ""
+    "skill_id": "historia_correos_bolivia"
   },
   {
     "url": "",
@@ -42,7 +42,7 @@
     "archivo_guardado": false,
     "content_hash": "6a58253410f172f4",
     "clean_mode": "aggressive",
-    "skill_id": ""
+    "skill_id": "reclamos_quejas"
   },
   {
     "url": "",
@@ -57,7 +57,7 @@
     "archivo_guardado": false,
     "content_hash": "d876b1fc064b999d",
     "clean_mode": "aggressive",
-    "skill_id": ""
+    "skill_id": "alertas_seguridad"
   },
   {
     "url": "",
@@ -73,5 +73,20 @@
     "content_hash": "e125c361d0bde244",
     "clean_mode": "aggressive",
     "skill_id": ""
+  },
+  {
+    "url": "",
+    "archivo_local": "",
+    "nombre_archivo": "UPU_Final_Texto_Limpio.pdf",
+    "tamano_bytes": 46972,
+    "texto_extraido": "Información sobre Mercancías Peligrosas y Prohibidas en el Correo Internacional Este documento contiene la información completa del folleto de la Unión Postal Universal (UPU) sobre la seguridad en los envíos internacionales, organizada de forma clara y sin tablas. 1. El Compromiso de Seguridad Su Correo se compromete a brindar un servicio de calidad y a distribuir sus paquetes con la mayor rapidez posible. Sin embargo, para lograrlo, necesita su ayuda. Al enviar un paquete al extranjero, es vital recordar que ciertos objetos, materiales y sustancias están estrictamente prohibidos en el flujo de correo internacional. Lema principal: Cuanto más seguro soy, más rápido voy. 2. Clasificación de Mercancías Peligrosas Las normas del transporte aéreo internacional prohíben incluir los siguientes productos debido al riesgo que representan para la seguridad: Clase 1: Explosivos Incluye fuegos artificiales, petardos, municiones, pólvora y bengalas. Clase 2: Gases comprimidos Incluye tanques de propano, tanques de buceo, aerosoles, gas butano y extintores de incendios. Clase 3: Líquidos inflamables Incluye encendedores, líquidos para encendedores, pinturas al óleo, barnices para madera, perfumes, lociones para después de afeitado, esmaltes, lacas y gel de uñas. Clase 4: Sustancias inflamables Incluye cerillas (fósforos) y carbones. Clase 5: Sustancias comburentes Incluye productos químicos para piscinas, peróxido de hidrógeno y blanqueadores.\n\nClase 6: Sustancias tóxicas e infecciosas Incluye plaguicidas, productos químicos agrícolas, compuestos de mercurio, bacterias y virus. Clase 7: Materiales radiactivos Incluye desechos radiactivos, fuentes radiactivas y detectores de humo. Clase 8: Corrosivos Incluye baterías de electrolito líquido, mercurio y ácido clorhídrico. Clase 9: Mercancías peligrosas varias Incluye objetos magnetizados, hielo seco y baterías de litio. 3. Comparativa de Artículos Comunes Artículos de uso doméstico Inaceptables: Aerosoles, pinturas inflamables y adhesivos. Aceptables: Chocolates, golosinas, camisas y vestidos. Artículos deportivos Inaceptables: Municiones o gases comprimidos. Aceptables: Raquetas, pelotas y zapatos. Artículos de camping Inaceptables: Gas comprimido, combustible de cocina o cerillas. Aceptables: Carpas y sacos de dormir. Artículos de buceo Inaceptables: Tanques con gases comprimidos. Aceptables: Trajes de buceo, máscaras, aletas y esnórquel. Medicamentos Inaceptables: Aquellos que contienen alcohol o están embalados en hielo seco.\n\nAceptables: Ibuprofeno y antiácidos comunes. Cosméticos Inaceptables: Perfumes inflamables, artículos de manicura o quitaesmalte. Aceptables: Jabones y brillo labial. Piezas de automóvil Inaceptables: Aditivos de combustible inflamables, aerosoles o gas comprimido. Aceptables: Espejos y fundas de asiento. Dispositivos médicos Inaceptables: Aparatos para medir la presión arterial o termómetros que contengan mercurio. Aceptables: Estetoscopios. 4. Baterías de Litio Si desea enviar dispositivos electrónicos con baterías de litio, debe seguir estas reglas: Lo que SÍ se acepta: Las baterías deben estar instaladas dentro del equipo electrónico (como celulares, laptops o cámaras). El equipo debe ser pequeño y cumplir con los límites de potencia. No deben enviarse más de cuatro pilas o dos baterías por equipo. Se requiere un embalaje exterior sólido. Lo que NO se acepta: Baterías sueltas o separadas del equipo. Baterías defectuosas o dañadas.\n\nEquipos grandes como bicicletas eléctricas, sillas de ruedas eléctricas o generadores. 5. Otros Objetos Prohibidos También está prohibido el envío de los siguientes artículos: Objetos falsificados o pirateados (violan derechos de autor). Monedas, billetes de banco o valores al portador (salvo envíos con valor declarado en casos específicos). Animales vivos y plantas (con excepciones muy limitadas). Estupefacientes y sustancias psicotrópicas. 6. Guía para un Embalaje Correcto Para asegurar que su paquete no sea devuelto y llegue seguro: 1. Cajas resistentes: Use cajas que soporten el peso y no tengan partes cortantes. 2. Protección interna: Use materiales de amortiguación como papel arrugado o burbujas para que el contenido no se mueva. 3. Cerrado seguro: Use cinta adhesiva resistente. No use grapas ni cuerdas. 4. Etiquetas claras: Escriba claramente la dirección del remitente y del destinatario. Indique si el contenido es “FRÁGIL” o “PERECEDERO” si es necesario. 7. Advertencias Finales Usted es el responsable legal del contenido de sus paquetes. Los envíos que contengan objetos prohibidos serán tratados según la ley nacional, podrían ser confiscados o destruidos, y usted podría perder el derecho a cualquier indemnización. Más información: Visite www.upu.int/mas-seguro o contacte a su oficina de Correo local.",
+    "longitud_texto": 4789,
+    "metodo_extraccion": "manual_edit",
+    "pagina_fuente": "",
+    "subido_manual": true,
+    "archivo_guardado": false,
+    "content_hash": "7332f886ce2113bc",
+    "clean_mode": "aggressive",
+    "skill_id": "normas_upu"
   }
 ]

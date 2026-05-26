@@ -1,0 +1,19 @@
+{
+  "nombre": "Correos de Bolivia",
+  "nombre_anterior": "AGBC - Agencia Boliviana de Correos",
+  "telefono": "+591 22152423",
+  "telefono_corto": "22152423",
+  "email": "agbc@correos.gob.bo",
+  "web": "correos.gob.bo",
+  "web_url": "https://correos.gob.bo",
+  "tracking_url": "https://trackingbo.correos.gob.bo:8100",
+  "tracking_api_url": "https://trackingbo.correos.gob.bo:8100/api/public/tracking/eventos",
+  "horario_semana": "Lunes a viernes 8:30 a 16:30",
+  "horario_sabado": "Sábados 9:00 a 13:00",
+  "horario_domingo": "Domingos cerrado",
+  "horario_apertura_semana": "8:30",
+  "horario_cierre_semana": "16:30",
+  "horario_apertura_sabado": "9:00",
+  "horario_cierre_sabado": "13:00",
+  "_skill_id": "oficinas_contacto"
+}

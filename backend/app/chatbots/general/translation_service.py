@@ -22,9 +22,6 @@ except ImportError:
 LANG_NAMES = {
     "es": "español",
     "en": "English",
-    "fr": "français",
-    "zh": "中文",
-    "ru": "русский",
 }
 
 

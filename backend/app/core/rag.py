@@ -7,6 +7,7 @@ Compartido por todos los chatbots.
 import os
 import re
 import hashlib
+import logging
 import uuid
 from collections import defaultdict
 from tqdm import tqdm
@@ -14,6 +15,8 @@ from sentence_transformers import SentenceTransformer
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qmodels
 from core.cache import get_embedding, set_embedding, get_rag_search, set_rag_search
+
+logger = logging.getLogger("chatbotbo.rag")
 
 os.environ.setdefault("ANONYMIZED_TELEMETRY", "FALSE")
 
@@ -95,9 +98,10 @@ USE_TRITON         = os.environ.get("USE_TRITON", "false").lower() in ("1", "tru
 TRITON_URL         = os.environ.get("TRITON_URL", "http://triton:8000")
 TRITON_EMBEDDING_MODEL = os.environ.get("TRITON_EMBEDDING_MODEL", "embedding_model")
 # Score mínimo de similitud para aceptar un chunk como relevante.
-# Qdrant devuelve scores entre 0 y 1 (cosine similarity). Chunks con score
-# menor a este umbral se descartan para evitar que el LLM reciba contexto
-# irrelevante y aluciné sobre él.
+# Qdrant devuelve scores entre 0 y 1 (cosine similarity). Para ChromaDB
+# normalizamos la distancia a una similitud en el rango 0..1.
+# Chunks con score menor a este umbral se descartan para evitar que el LLM
+# reciba contexto irrelevante y aluciné sobre él.
 # Configurable por env: RAG_MIN_SCORE (default 0.30)
 RAG_MIN_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.30"))
 
@@ -149,7 +153,7 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
     modelo = embedding_model or EMBEDDING_MODEL
     path   = chroma_path     or CHROMA_PATH
 
-    print(f"  Cargando modelo de embeddings: {modelo}")
+    logger.info("Cargando modelo de embeddings", extra={"model": modelo})
     # si hay token de HF en el entorno, pásalo para evitar límites de descarga
     hf_token = os.environ.get("HF_TOKEN")
     kwargs = {}
@@ -160,7 +164,7 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
     kwargs["model_kwargs"] = {"ignore_mismatched_sizes": True}
 
     _embedder = SentenceTransformer(modelo, **kwargs)
-    print(" Modelo de embeddings cargado (con ignore_mismatched_sizes)")
+    logger.info("Modelo de embeddings cargado", extra={"ignore_mismatched_sizes": True})
 
     if _use_qdrant():
         try:
@@ -188,40 +192,44 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
                         distance=qmodels.Distance.COSINE
                     )
                 )
-                print(f" Qdrant collection '{collection_name}' creada con vector_size={_embedder.encode([''], show_progress_bar=False).shape[1]}")
+                logger.info("Qdrant collection creada", extra={"collection": collection_name, "vector_size": _embedder.encode([""], show_progress_bar=False).shape[1]})
             _collection = collection_name
             _collection_name = collection_name
             _client = client
             count = client.count(collection_name=collection_name).count
-            print(f" Qdrant listo en '{QDRANT_URL}' ({count} chunks en '{collection_name}')")
+            logger.info("Qdrant listo", extra={"url": QDRANT_URL, "count": count, "collection": collection_name})
         except Exception as e:
-            print(f" ⚠️  Qdrant no disponible ({e}), usando ChromaDB local")
+            logger.warning("Qdrant no disponible, usando ChromaDB local", extra={"error": str(e)})
             RAG_VECTOR_STORE = "chroma"
             import chromadb
             from chromadb.config import Settings
+            from chromadb import EmbeddingFunction, Documents, Embeddings
             client      = chromadb.PersistentClient(
                 path=path,
                 settings=Settings(anonymized_telemetry=False),
             )
             _client = client
             _collection_name = collection_name
-            def embed_function(texts):
-                return _embedder.encode(texts, show_progress_bar=False).tolist()
-            _collection = client.get_or_create_collection(name=collection_name, embedding_function=embed_function)
-            print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
+            class _EmbedFn(EmbeddingFunction):
+                def __call__(self, input: Documents) -> Embeddings:
+                    return _embedder.encode(input, show_progress_bar=False).tolist()
+            _collection = client.get_or_create_collection(name=collection_name, embedding_function=_EmbedFn())
+            logger.info("ChromaDB listo", extra={"path": path, "count": _collection.count(), "collection": collection_name})
     else:
         import chromadb
         from chromadb.config import Settings
+        from chromadb import EmbeddingFunction, Documents, Embeddings
         client      = chromadb.PersistentClient(
             path=path,
             settings=Settings(anonymized_telemetry=False),
         )
         _client = client
         _collection_name = collection_name
-        def embed_function(texts):
-            return _embedder.encode(texts, show_progress_bar=False).tolist()
-        _collection = client.get_or_create_collection(name=collection_name, embedding_function=embed_function)
-        print(f" ChromaDB listo en '{path}' ({_collection.count()} chunks en '{collection_name}')")
+        class _EmbedFn(EmbeddingFunction):
+            def __call__(self, input: Documents) -> Embeddings:
+                return _embedder.encode(input, show_progress_bar=False).tolist()
+        _collection = client.get_or_create_collection(name=collection_name, embedding_function=_EmbedFn())
+        logger.info("ChromaDB listo", extra={"path": path, "count": _collection.count(), "collection": collection_name})
 
     # Cargar BM25 desde ChromaDB si ya hay chunks indexados
     if not _use_qdrant() and _BM25_AVAILABLE:
@@ -392,7 +400,7 @@ def _reconstruir_bm25(chunks: list[str], ids: list[str]) -> None:
     _bm25_index = _BM25Okapi(tokenized)
     _bm25_corpus = list(chunks)
     _bm25_ids = list(ids)
-    print(f"  BM25 index reconstruido: {len(chunks)} docs")
+    logger.info("BM25 index reconstruido", extra={"docs": len(chunks)})
 
 
 def _buscar_bm25(query: str, n: int) -> list[tuple[str, float]]:
@@ -647,7 +655,7 @@ def archivo_a_chunks(filepath: str, prefijo: str = "txt") -> tuple[list, list]:
         (chunks, chunk_ids) o ([], []) si el archivo no existe.
     """
     if not os.path.exists(filepath):
-        print(f"   Archivo no encontrado: {filepath}")
+        logger.warning("Archivo no encontrado", extra={"filepath": filepath})
         return [], []
 
     with open(filepath, "r", encoding="utf-8") as f:
@@ -658,7 +666,7 @@ def archivo_a_chunks(filepath: str, prefijo: str = "txt") -> tuple[list, list]:
         prefijo=prefijo,
         metadata_base={"source_type": "file", "source_path": filepath},
     )
-    print(f"   → {len(chunks)} chunks de '{filepath}'")
+    logger.info("Archivo procesado a chunks", extra={"filepath": filepath, "chunks": len(chunks)})
     return chunks, ids
 
 
@@ -671,7 +679,7 @@ def archivo_a_documentos(
     Lee un archivo y devuelve chunks con metadatos listos para indexación.
     """
     if not os.path.exists(filepath):
-        print(f"   Archivo no encontrado: {filepath}")
+        logger.warning("Archivo no encontrado", extra={"filepath": filepath})
         return [], [], []
 
     with open(filepath, "r", encoding="utf-8") as f:
@@ -682,7 +690,7 @@ def archivo_a_documentos(
         metadatos.update(metadata_base)
 
     chunks, ids, docs_meta = documento_a_chunks(texto, prefijo=prefijo, metadata_base=metadatos)
-    print(f"   → {len(chunks)} chunks de '{filepath}'")
+    logger.info("Archivo procesado a documentos", extra={"filepath": filepath, "chunks": len(chunks)})
     return chunks, ids, docs_meta
 
 
@@ -706,7 +714,7 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
     emb = get_embedder()
 
     if not chunks:
-        print("   Sin chunks para indexar")
+        logger.info("Sin chunks para indexar")
         return False
 
     # deduplicar por huella de contenido para evitar sobreindexar texto repetido
@@ -731,14 +739,14 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
             dedup_meta.append(meta)
 
     if len(dedup_chunks) != len(chunks):
-        print(f"   🔁 Dedupe de indexación: {len(chunks)} → {len(dedup_chunks)} chunks únicos")
+        logger.info("Dedupe de indexacion", extra={"original": len(chunks), "unicos": len(dedup_chunks)})
 
     chunks = dedup_chunks
     chunk_ids = dedup_ids
     metadatas = dedup_meta
 
     if not chunks:
-        print("   Sin chunks útiles después de deduplicar")
+        logger.info("Sin chunks utiles despues de deduplicar")
         return False
 
     # Limpiar BD anterior
@@ -746,20 +754,20 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
         if _use_qdrant():
             try:
                 reset_collection()
-                print("   🗑️  Colección Qdrant reiniciada")
+                logger.info("Coleccion Qdrant reiniciada")
             except Exception as e:
-                print(f"      Error al reiniciar Qdrant: {e}")
+                logger.error("Error al reiniciar Qdrant", extra={"error": str(e)})
         else:
             try:
                 todos = col.get()
                 if todos and todos.get("ids"):
                     col.delete(ids=todos["ids"])
-                    print(f"   🗑️  {len(todos['ids'])} chunks anteriores eliminados")
+                    logger.info("Chunks anteriores eliminados", extra={"count": len(todos['ids'])})
             except Exception as e:
-                print(f"      Error al limpiar: {e}")
+                logger.error("Error al limpiar", extra={"error": str(e)})
 
     # Calcular embeddings
-    print(f"  {len(chunks)} chunks — calculando embeddings...")
+    logger.info("Calculando embeddings", extra={"chunks": len(chunks)})
     embeddings  = emb.encode(_apply_passage_prefix(chunks), show_progress_bar=False, batch_size=64)
     total_lotes = (len(chunks) + BATCH_SIZE - 1) // BATCH_SIZE
 
@@ -795,9 +803,9 @@ def indexar(chunks: list, chunk_ids: list, metadatas: list | None = None, limpia
             col.add(**payload)
 
     if _use_qdrant():
-        print(f" {len(chunks)} chunks indexados en Qdrant")
+        logger.info("Chunks indexados en Qdrant", extra={"count": len(chunks)})
     else:
-        print(f" {len(chunks)} chunks indexados en ChromaDB")
+        logger.info("Chunks indexados en ChromaDB", extra={"count": len(chunks)})
         # Reconstruir índice BM25 en memoria para búsqueda híbrida
         _reconstruir_bm25(chunks, chunk_ids)
     return True
@@ -843,7 +851,7 @@ def reemplazar_por_source_type(
                 col.delete(ids=ids_a_borrar)
                 removed = len(ids_a_borrar)
     except Exception as exc:
-        print(f"   Error eliminando subset '{source_type}': {exc}")
+        logger.error("Error eliminando subset", extra={"source_type": source_type, "error": str(exc)})
 
     # 2) insertar subset nuevo
     if not chunks:
@@ -935,6 +943,7 @@ def _cargar_bm25_desde_chroma() -> None:
 
 def _prioridad_fuente(source_type: str) -> int:
     prioridades = {
+        "knowledge_base": 7,
         "pdf": 6,
         "history": 5,
         "branch": 5,
@@ -977,6 +986,53 @@ def _source_preference_bonus(source_type: str, preferred_source_types: list[str]
     return max(0.22 - (idx * 0.06), 0.04)
 
 
+# ─────────────────────────────────────────────
+#  RERANKER (cross-encoder ligero, CPU-friendly)
+#  Modelo: cross-encoder/ms-marco-MiniLM-L-6-v2
+#  Tamaño: ~22MB | Latencia CPU: ~30-80ms
+#  Mejora: reordena chunks por relevancia real
+#  antes de enviarlos al LLM → mejor calidad
+# ─────────────────────────────────────────────
+_reranker = None
+_reranker_intentado = False  # evita reintentar si ya falló
+RERANKER_MODEL = os.environ.get("RERANKER_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+RERANKER_ENABLED = os.environ.get("RERANKER_ENABLED", "true").lower() in ("1", "true", "yes")
+
+
+def _get_reranker():
+    global _reranker, _reranker_intentado
+    if _reranker is not None:
+        return _reranker
+    if _reranker_intentado or not RERANKER_ENABLED:
+        return None
+    _reranker_intentado = True
+    try:
+        from sentence_transformers import CrossEncoder
+        _reranker = CrossEncoder(RERANKER_MODEL, max_length=512)
+        logger.info("Reranker cargado", extra={"model": RERANKER_MODEL})
+    except Exception as e:
+        logger.warning("Reranker no disponible — se usará orden por score vectorial", extra={"error": str(e)})
+        _reranker = None
+    return _reranker
+
+
+def _rerank_chunks(pregunta: str, candidatos: list[dict], top_n: int) -> list[dict]:
+    """Reordena chunks por relevancia real usando cross-encoder."""
+    reranker = _get_reranker()
+    if not reranker or len(candidatos) <= 1:
+        return candidatos[:top_n]
+    try:
+        pares = [(pregunta, item["texto"]) for item in candidatos]
+        scores = reranker.predict(pares)
+        for i, item in enumerate(candidatos):
+            item["_rerank_score"] = float(scores[i])
+        candidatos.sort(key=lambda x: x.get("_rerank_score", 0), reverse=True)
+        logger.debug("Reranking aplicado", extra={"chunks": len(candidatos), "top_n": top_n})
+    except Exception as e:
+        logger.warning("Error en reranking — usando orden original", extra={"error": str(e)})
+    return candidatos[:top_n]
+
+
 def buscar(
     pregunta: str,
     n_resultados: int = None,
@@ -1009,7 +1065,7 @@ def buscar(
                 "collection_name": _collection_name,
                 "query_vector": vector[0],
                 "limit": qdrant_limit,
-                "with_payload": True,
+"with_payload": True,
             }
             filters = []
             if source_type:
@@ -1019,14 +1075,20 @@ def buscar(
                         match=qmodels.MatchValue(value=source_type),
                     )
                 )
-            # Si hay skill_id, priorizar chunks de ese skill
+            # Si hay skill_id, usarlo como boost (should) en vez de filtro duro (must)
+            # para no excluir fuentes no-PDF como json_data, branch, etc.
+            # que no tienen skill_id asignado en sus metadatos.
             if skill_id:
-                filters.append(
-                    qmodels.FieldCondition(
-                        key="skill_id",
-                        match=qmodels.MatchValue(value=skill_id),
-                    )
+                kwargs["query_filter"] = qmodels.Filter(
+                    must=filters,
+                    should=[
+                        qmodels.FieldCondition(
+                            key="skill_id",
+                            match=qmodels.MatchValue(value=skill_id),
+                        )
+                    ],
                 )
+                return _client.search(**kwargs)
             if filters:
                 kwargs["query_filter"] = qmodels.Filter(must=filters)
             return _client.search(**kwargs)
@@ -1071,11 +1133,14 @@ def buscar(
         documents = []
         metadatas = []
         distances = []
+        similarities = []
         for hit in search_results:
             payload = hit.payload or {}
             documents.append(payload.get("text", ""))
             metadatas.append(payload)
-            distances.append(getattr(hit, "score", 0.0) or 0.0)
+            score = getattr(hit, "score", 0.0) or 0.0
+            distances.append(score)
+            similarities.append(score)
     else:
         results = col.query(
             query_embeddings=vector,
@@ -1087,13 +1152,13 @@ def buscar(
         raw_metadatas = (results.get("metadatas") or [[]])[0]
         raw_distances = (results.get("distances") or [[]])[0]
         raw_ids       = (results.get("ids") or [[]])[0]
+        max_dist = max(raw_distances) if raw_distances else 1.0
+        if max_dist <= 0:
+            max_dist = 1.0
 
         # ── Hybrid Search con BM25 para ChromaDB ──────────────────────────
         if _BM25_AVAILABLE and _bm25_index is not None:
             # Resultados semánticos como lista (id, score_normalizado)
-            max_dist = max(raw_distances) if raw_distances else 1.0
-            if max_dist <= 0:
-                max_dist = 1.0
             semantic_ranked = [
                 (raw_ids[i], 1.0 - (raw_distances[i] / max_dist))
                 for i in range(len(raw_ids))
@@ -1130,6 +1195,7 @@ def buscar(
             documents = []
             metadatas = []
             distances = []
+            similarities = []
             for doc_id, rrf_score in fused[:n_query]:
                 if doc_id in id_to_data:
                     doc, meta, dist = id_to_data[doc_id]
@@ -1137,11 +1203,16 @@ def buscar(
                     metadatas.append(meta)
                     # Convertir RRF score a distancia equivalente (menor = mejor)
                     distances.append(1.0 - rrf_score)
+                    similarities.append(max(0.0, min(1.0, float(rrf_score))))
         else:
             # Sin BM25 — usar solo resultados semánticos
             documents = raw_documents
             metadatas = raw_metadatas
             distances = raw_distances
+            similarities = [
+                max(0.0, min(1.0, 1.0 - (float(dist) / max_dist)))
+                for dist in raw_distances
+            ]
 
     candidatos = []
     vistos = set()
@@ -1157,6 +1228,7 @@ def buscar(
 
         metadata = metadatas[idx] if idx < len(metadatas) else {}
         distance = distances[idx] if idx < len(distances) else 99
+        similarity = similarities[idx] if idx < len(similarities) else None
         source_type = (metadata or {}).get("source_type")
         length_penalty = 0.3 if len(texto) > CHUNK_SIZE * 1.2 else 0
         source_bonus = _source_preference_bonus(source_type, preferred_source_types)
@@ -1169,7 +1241,7 @@ def buscar(
 
         # Descartar chunks con similitud demasiado baja para evitar que el LLM
         # reciba contexto irrelevante y aluciné sobre él.
-        if _use_qdrant() and distance < RAG_MIN_SCORE:
+        if similarity is not None and similarity < RAG_MIN_SCORE:
             continue
 
         candidatos.append(
@@ -1277,6 +1349,10 @@ def buscar(
         if chunks_extra:
             seleccionados = seleccionados + chunks_extra
     # ─────────────────────────────────────────────────────────────────────
+
+    # ── Reranking con cross-encoder ────────────────────────────────────────────
+    if len(seleccionados) > 1:
+        seleccionados = _rerank_chunks(pregunta, seleccionados, top_n=n)
 
     contexto_partes = []
     for item in seleccionados:

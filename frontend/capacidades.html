@@ -3786,6 +3786,160 @@
         display:none;
       }
     }
+
+    /* ═══════════════════════════════════════════════════
+       RESPONSIVE CONSOLIDADO — override final
+       Corrige reglas contradictorias de bloques anteriores
+    ═══════════════════════════════════════════════════ */
+
+    /* Sidebar oculto en móvil — siempre fuera de pantalla hasta sidebar-open */
+    @media (max-width: 1024px) {
+      .shell {
+        grid-template-columns: 1fr !important;
+        display: block;
+      }
+      .sidebar {
+        position: fixed !important;
+        top: 0; left: 0; bottom: 0;
+        width: min(82vw, 300px) !important;
+        height: 100vh !important;
+        transform: translateX(-110%) !important;
+        transition: transform .24s ease !important;
+        z-index: 250 !important;
+        overflow-y: auto;
+      }
+      body.sidebar-open .sidebar {
+        transform: translateX(0) !important;
+      }
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15,23,42,.4);
+        z-index: 240;
+        border: none;
+        cursor: pointer;
+      }
+      body.sidebar-open .sidebar-backdrop {
+        display: block !important;
+      }
+      body.sidebar-open {
+        overflow: hidden;
+      }
+      .top-navbar__toggle {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 38px; height: 38px;
+        border-radius: 10px;
+        border: 1px solid rgba(16,35,67,.14);
+        background: #fff;
+        cursor: pointer;
+        flex-shrink: 0;
+        padding: 8px 7px;
+      }
+      .top-navbar__toggle span {
+        display: block;
+        width: 100%; height: 2px;
+        margin: 4px 0;
+        border-radius: 99px;
+        background: currentColor;
+        transition: transform .18s ease, opacity .18s ease;
+      }
+      body.sidebar-open .top-navbar__toggle span:nth-child(1) {
+        transform: translateY(6px) rotate(45deg);
+      }
+      body.sidebar-open .top-navbar__toggle span:nth-child(2) {
+        opacity: 0;
+      }
+      body.sidebar-open .top-navbar__toggle span:nth-child(3) {
+        transform: translateY(-6px) rotate(-45deg);
+      }
+      .content {
+        padding: 14px !important;
+        width: 100%;
+        min-width: 0;
+      }
+      .top-strip, #top-strip {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      .hero {
+        grid-template-columns: 1fr !important;
+        padding: 16px !important;
+      }
+      .stats {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      .section-summary {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .top-strip, #top-strip {
+        grid-template-columns: 1fr 1fr !important;
+      }
+      .stats {
+        grid-template-columns: 1fr 1fr !important;
+      }
+      .section-summary {
+        grid-template-columns: 1fr !important;
+      }
+      .section-head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .toolbar {
+        width: 100%;
+      }
+      .toolbar .btn {
+        flex: 1;
+        min-width: 0;
+        font-size: .8rem;
+        padding: 9px 10px;
+      }
+      .top-navbar__search,
+      .top-navbar__user-info {
+        display: none !important;
+      }
+      .top-navbar__btn span {
+        display: none;
+      }
+      .top-navbar__btn {
+        padding: 8px !important;
+      }
+      table {
+        font-size: .82rem;
+      }
+      .mini-btn {
+        padding: 5px 8px;
+        font-size: .75rem;
+      }
+      .modal-card {
+        width: 96vw !important;
+        max-height: 92vh !important;
+        margin: 4vh auto !important;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .top-strip, #top-strip {
+        grid-template-columns: 1fr !important;
+      }
+      .stats {
+        grid-template-columns: 1fr !important;
+      }
+      .hero-actions {
+        flex-direction: column;
+      }
+      .hero-actions .btn {
+        width: 100%;
+      }
+      .section {
+        padding: 14px !important;
+        border-radius: 14px !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -4038,7 +4192,7 @@
           </div>
           <div class="toolbar">
             <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
-            <button class="btn btn-danger" id="btn-clear-redis-cache" type="button" onclick="clearRedisCache()">Limpiar cache Redis</button>
+            <button class="btn btn-danger" type="button" onclick="clearResponseCache()">Limpiar cache respuestas</button>
           </div>
         </div>
         <div class="section-summary" id="cache-summary"></div>
@@ -5620,8 +5774,22 @@ function renderTariffConversations() {
 }
 
 function fillSkillOptions() {
-  els.skillMode.innerHTML = ["Asistido", "Consulta", "Control"].map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
-  els.skillCategory.innerHTML = ["Operación", "Servicio", "Contenido", "Administración"].map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
+  // Usar modos y categorias desde la API (state.capabilities)
+  const modos = Array.isArray(state.capabilities?.modos_skill) ? state.capabilities.modos_skill : [];
+  const categorias = Array.isArray(state.capabilities?.categorias_skill) ? state.capabilities.categorias_skill : [];
+  
+  if (modos.length) {
+    els.skillMode.innerHTML = modos.map(m => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.nombre)}</option>`).join("");
+  } else {
+    // Fallback si no hay datos de API
+    els.skillMode.innerHTML = `<option value="rag+llm">RAG + LLM</option><option value="custom">Personalizada</option>`;
+  }
+  
+  if (categorias.length) {
+    els.skillCategory.innerHTML = categorias.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`).join("");
+  } else {
+    els.skillCategory.innerHTML = `<option value="atencion">Atencion</option><option value="documental">Documental</option><option value="analitica">Analitica</option>`;
+  }
 }
 
 function openModal(type, payload = {}) {
@@ -6184,8 +6352,12 @@ function editSkill(id) {
   openModal("skill", { edit: true, data: item });
 }
 
-function deleteSkill() {
-  demoNotice("La maqueta no elimina elementos reales. Esta acción se muestra solo con fines visuales.");
+function deleteSkill(skillId) {
+  if (!skillId) { showToast("No se pudo identificar el skill."); return; }
+  if (!window.confirm(`¿Eliminar el skill "${skillId}"? Esta acción no se puede deshacer.`)) return;
+  fetchJson(`/api/skills/${encodeURIComponent(skillId)}`, { method: "DELETE" })
+    .then(() => { showToast(`Skill "${skillId}" eliminado.`); loadAll(); })
+    .catch(err => showToast(`Error al eliminar skill: ${err?.message || "Error desconocido"}`));
 }
 
 function findPdfById(id) {
@@ -6336,8 +6508,13 @@ function retryPdf(id) {
   editPdfInfo(id);
 }
 
-function deletePdf() {
-  demoNotice("La maqueta no elimina documentos. Solo presenta el diseño del flujo.");
+function deletePdf(id, nombre) {
+  const target = nombre || id;
+  if (!target) { showToast("No se pudo identificar el documento."); return; }
+  if (!window.confirm(`¿Eliminar el documento "${target}"? Esta acción no se puede deshacer.`)) return;
+  fetchJson(`/api/pdfs/${encodeURIComponent(target)}`, { method: "DELETE" })
+    .then(() => { showToast(`Documento "${target}" eliminado.`); loadAll(); })
+    .catch(err => showToast(`Error al eliminar documento: ${err?.message || "Error desconocido"}`));
 }
 
 async function previewDataJson(name) {
@@ -6371,8 +6548,128 @@ async function previewDataJson(name) {
   }
 }
 
-function editDataJson(name) {
-  demoNotice(`La edición de "${name}" está desactivada. Solo se conserva la presentación visual.`);
+async function editDataJson(name) {
+  // Archivos que se pueden editar desde el panel
+  const EDITABLES = [
+    "contacto_institucional.json",
+    "aplicativos_detalle.json",
+    "enlaces_interes.json",
+    "estadisticas.json",
+    "historia_institucional.json",
+    "secciones_home.json",
+    "sucursales_contacto.json",
+  ];
+  if (!EDITABLES.includes(name)) {
+    demoNotice(`La edición de "${name}" no está habilitada desde el panel. Edita el archivo directamente en data/.`);
+    return;
+  }
+
+  let item;
+  try {
+    item = await fetchJson(`/api/data-jsons/${encodeURIComponent(name)}`);
+  } catch (err) {
+    openModal("detail", {
+      title: name,
+      subtitle: "No se pudo cargar el contenido.",
+      html: `<div class="detail-empty">${escapeHtml(err.message || "Error al obtener el archivo.")}</div>`
+    });
+    return;
+  }
+
+const prettyContent = item?.content_pretty || JSON.stringify(item?.content ?? {}, null, 2);
+  const editorId = `json-editor-${Date.now()}`;
+  const msgId    = `json-editor-msg-${Date.now()}`;
+  const skillId  = item?.skill_id || "";
+
+  // Construir opciones de skills
+  const skills = Array.isArray(state.capabilities?.skills) ? state.capabilities.skills : [];
+  const skillOptions = skills
+    .filter(s => s.activa !== false)
+    .map(s => `<option value="${escapeHtml(s.id)}" ${s.id === skillId ? 'selected' : ''}>${escapeHtml(s.nombre || s.id)}</option>`)
+    .join('');
+
+  openModal("detail", {
+    title: `Editar: ${name}`,
+    subtitle: "Edita el JSON y guarda. Los cambios se aplican de inmediato sin reiniciar.",
+    html: `
+      <div style="margin-bottom:10px;padding:10px 12px;background:#f8f9fa;border-radius:10px;border:1px solid #e0e0e0">
+        <label style="font-weight:600;font-size:0.82rem;display:block;margin-bottom:4px">
+          Vincular a Skill <span style="color:#999;font-weight:400;font-size:0.7rem">(opcional)</span>
+        </label>
+        <select id="json-edit-skill-id" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:0.82rem">
+          <option value="">— Sin vincular (general) —</option>
+          ${skillOptions}
+        </select>
+        <small style="color:#888;font-size:0.7rem;display:block;margin-top:3px">
+          💡 Vincular mejora la precision cuando el usuario pregunta sobre este tema
+        </small>
+      </div>
+      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-primary" type="button" onclick="saveDataJson('${escapeHtml(name)}','${editorId}','${msgId}')">
+          Guardar cambios
+        </button>
+        <button class="btn btn-secondary" type="button" onclick="formatDataJsonEditor('${editorId}','${msgId}')">
+          Formatear JSON
+        </button>
+        <span id="${msgId}" style="font-size:0.85rem;"></span>
+      </div>
+      <textarea
+        id="${editorId}"
+        spellcheck="false"
+        style="width:100%;min-height:420px;font-family:monospace;font-size:0.82rem;
+               padding:10px;border:1px solid #ccc;border-radius:6px;resize:vertical;
+               background:#1e1e2e;color:#cdd6f4;line-height:1.5;"
+      >${escapeHtml(prettyContent)}</textarea>
+    `
+  });
+}
+
+function formatDataJsonEditor(editorId, msgId) {
+  const ta  = document.getElementById(editorId);
+  const msg = document.getElementById(msgId);
+  if (!ta) return;
+  try {
+    const parsed = JSON.parse(ta.value);
+    ta.value = JSON.stringify(parsed, null, 2);
+    if (msg) { msg.style.color = "#40a02b"; msg.textContent = "JSON formateado."; }
+  } catch (e) {
+    if (msg) { msg.style.color = "#d20f39"; msg.textContent = `JSON inválido: ${e.message}`; }
+  }
+}
+
+async function saveDataJson(name, editorId, msgId) {
+  const ta  = document.getElementById(editorId);
+  const msg = document.getElementById(msgId);
+  if (!ta || !msg) return;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(ta.value);
+  } catch (e) {
+    msg.style.color = "#d20f39";
+    msg.textContent = `JSON inválido: ${e.message}`;
+    return;
+  }
+
+  msg.style.color = "#888";
+  msg.textContent = "Guardando…";
+
+  try {
+const skillSelect = document.getElementById("json-edit-skill-id");
+    const skillId    = (skillSelect?.value || "").trim();
+    const result = await fetchJson(`/api/data-jsons/${encodeURIComponent(name)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: parsed, skill_id: skillId })
+    });
+    msg.style.color = "#40a02b";
+    const extra = result?.contacto_reloaded ? " Cache de contacto recargado." : "";
+    msg.textContent = `Guardado correctamente.${extra}`;
+    await loadAll();
+  } catch (err) {
+    msg.style.color = "#d20f39";
+    msg.textContent = `Error al guardar: ${err.message || "Error desconocido"}`;
+  }
 }
 
 async function rebuildRag() {
@@ -6380,35 +6677,26 @@ async function rebuildRag() {
   const originalText = btn?.textContent || "Rebuild limpio RAG";
   if (btn) {
     btn.disabled = true;
-    btn.textContent = "Encolando rebuild...";
+    btn.textContent = "Reindexando...";
   }
 
   try {
-    const result = await fetchJson("/api/rag/rebuild", {
-      method: "POST"
-    });
-    const taskId = result?.task_id || "—";
-    const message = result?.mensaje || "Rebuild limpio del RAG encolado.";
+    const result = await fetchJson("/api/rag/rebuild", { method: "POST" });
+    const chunks = result?.chunks || 0;
     openModal("detail", {
-      title: "Rebuild RAG encolado",
-      subtitle: "El proceso corre en segundo plano.",
-      html: `
-        <div class="detail-grid">
-          <div class="detail-card">
-            <h5>Resultado</h5>
-            <div class="detail-line"><span>Estado</span><strong>OK</strong></div>
-            <div class="detail-line"><span>Task ID</span><strong>${escapeHtml(taskId)}</strong></div>
-            <div class="detail-line"><span>Mensaje</span><strong>${escapeHtml(message)}</strong></div>
-          </div>
-        </div>
-      `
+      title: "Rebuild RAG completado",
+      subtitle: "Todos los datos fueron reindexados.",
+      html: `<div class="detail-card"><h5>Resultado</h5>
+        <div class="detail-line"><span>Chunks indexados</span><strong>${chunks}</strong></div>
+        <div class="detail-line"><span>Estado</span><strong>OK</strong></div>
+      </div>`
     });
     await loadAll();
   } catch (err) {
     openModal("detail", {
       title: "Error en rebuild RAG",
-      subtitle: "No se pudo encolar el proceso.",
-      html: `<div class="detail-empty">${escapeHtml(err.message || "Error desconocido")}</div>`
+      subtitle: "No se pudo completar el proceso.",
+      html: `<div class="detail-empty">${err.message || "Error desconocido"}</div>`
     });
   } finally {
     if (btn) {
@@ -6418,89 +6706,27 @@ async function rebuildRag() {
   }
 }
 
-async function deleteResponseCache(cacheId) {
-  const id = String(cacheId || "").trim();
-  if (!id) return;
-  const confirmed = window.confirm("¿Eliminar esta respuesta cacheada?");
-  if (!confirmed) return;
-
-  try {
-    await fetchJson(`/api/cache/responses/${encodeURIComponent(id)}`, {
-      method: "DELETE"
-    });
-    await loadAll();
-  } catch (err) {
-    openModal("detail", {
-      title: "Error al limpiar cache",
-      subtitle: "No se pudo eliminar la respuesta cacheada.",
-      html: `<div class="detail-empty">${escapeHtml(err.message || "Error desconocido")}</div>`
-    });
-  }
-}
-
-async function clearRedisCache() {
-  const confirmed = window.confirm("Se eliminará todo el cache Redis de la DB configurada: respuestas, RAG, embeddings, tarifas y otras claves de cache. ¿Continuar?");
-  if (!confirmed) return;
-
-  const btn = document.getElementById("btn-clear-redis-cache");
-  const originalText = btn?.textContent || "Limpiar cache Redis";
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Limpiando...";
-  }
-
-  try {
-    const result = await fetchJson("/api/cache/clear", {
-      method: "POST"
-    });
-    await loadAll();
-
-    const namespaces = result?.namespaces_before || {};
-    openModal("detail", {
-      title: "Cache Redis limpiado",
-      subtitle: `${Number(result?.deleted || 0)} claves eliminadas.`,
-      html: `
-        <div class="detail-grid">
-          <div class="detail-card">
-            <h5>Resultado</h5>
-            <div class="detail-line"><span>Claves antes</span><strong>${escapeHtml(String(result?.keys_before ?? 0))}</strong></div>
-            <div class="detail-line"><span>Eliminadas</span><strong>${escapeHtml(String(result?.deleted ?? 0))}</strong></div>
-          </div>
-          <div class="detail-card">
-            <h5>Namespaces limpiados</h5>
-            <div class="detail-line"><span>RAG</span><strong>${escapeHtml(String(namespaces.rag ?? 0))}</strong></div>
-            <div class="detail-line"><span>Embeddings</span><strong>${escapeHtml(String(namespaces.embeddings ?? 0))}</strong></div>
-            <div class="detail-line"><span>Tarifas</span><strong>${escapeHtml(String(namespaces.tarifas ?? 0))}</strong></div>
-            <div class="detail-line"><span>Respuestas</span><strong>${escapeHtml(String(namespaces.respuestas ?? 0))}</strong></div>
-          </div>
-        </div>
-      `
-    });
-  } catch (err) {
-    openModal("detail", {
-      title: "Error al limpiar Redis",
-      subtitle: "No se pudo ejecutar la limpieza.",
-      html: `<div class="detail-empty">${escapeHtml(err.message || "Error desconocido")}</div>`
-    });
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = originalText;
-    }
-  }
+function deleteResponseCache(cacheId) {
+  if (!cacheId) { demoNotice("No se pudo identificar el elemento a eliminar."); return; }
+  if (!window.confirm("¿Eliminar esta respuesta del cache?")) return;
+  fetchJson(`/api/cache/responses/${cacheId}`, { method: "DELETE" })
+    .then(() => { showToast("Entrada eliminada del cache."); loadAll(); })
+    .catch(err => demoNotice(`Error al eliminar: ${err?.message || "Verifica que Redis esté activo."}`));
 }
 
 function clearResponseCache() {
-  return clearRedisCache();
+  if (!window.confirm("¿Limpiar TODO el cache de respuestas? Esto no se puede deshacer.")) return;
+  fetchJson("/api/cache/responses/clear", { method: "POST" })
+    .then(r => { showToast(`Cache limpiado: ${r?.deleted ?? 0} entradas eliminadas.`); loadAll(); })
+    .catch(err => demoNotice(`Error al limpiar cache: ${err?.message || "Verifica que Redis esté activo."}`));
 }
 
-function deleteConversation() {
-  const logId = event?.target?.closest("tr")?.dataset?.logId;
-  if (!logId) { demoNotice("No se pudo identificar la conversación."); return; }
-  if (!window.confirm("¿Eliminar esta conversación?")) return;
+function deleteConversation(logId) {
+  if (!logId) { demoNotice("No se pudo identificar la conversacion."); return; }
+  if (!window.confirm("Eliminar esta conversacion?")) return;
   fetchJson(`/api/conversations/${logId}`, { method: "DELETE" })
-    .then(() => { showToast("Conversación eliminada."); loadAll(); })
-    .catch(() => demoNotice("Error al eliminar conversación."));
+    .then(() => { showToast("Conversacion eliminada."); loadAll(); })
+    .catch(() => demoNotice("Error al eliminar conversacion."));
 }
 
 function clearConversations() {
@@ -6510,10 +6736,9 @@ function clearConversations() {
     .catch(() => demoNotice("Error al limpiar conversaciones."));
 }
 
-function deleteTariffConversation() {
-  const logId = event?.target?.closest("tr")?.dataset?.logId;
+function deleteTariffConversation(logId) {
   if (!logId) { demoNotice("No se pudo identificar el flujo."); return; }
-  if (!window.confirm("¿Eliminar este flujo de tarifa?")) return;
+  if (!window.confirm("Eliminar este flujo de tarifa?")) return;
   fetchJson(`/api/conversations/tarifas/${logId}`, { method: "DELETE" })
     .then(() => { showToast("Flujo eliminado."); loadAll(); })
     .catch(() => demoNotice("Error al eliminar flujo."));
@@ -6957,10 +7182,39 @@ window.addEventListener("resize", () => {
   applySidebarCollapsed(getSidebarCollapsedPreference(), false);
 });
 
-els.skillForm.addEventListener("submit", (event) => {
+els.skillForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  els.skillMsg.className = "msg show ok";
-  els.skillMsg.textContent = "Formulario guardado solo como demostración visual.";
+  const id = document.getElementById("skill-id")?.value?.trim();
+  const nombre = document.getElementById("skill-name")?.value?.trim();
+  const descripcion = document.getElementById("skill-description")?.value?.trim();
+  const modo = document.getElementById("skill-mode")?.value;
+  const categoria = document.getElementById("skill-category")?.value;
+  const prioridad = parseInt(document.getElementById("skill-priority")?.value || "3", 10);
+  const trigger = document.getElementById("skill-trigger")?.value?.trim();
+  const activa = document.getElementById("skill-active")?.value !== "false";
+
+  if (!id || !nombre || !descripcion || !modo) {
+    els.skillMsg.className = "msg show err";
+    els.skillMsg.textContent = "Completa ID, Nombre, Descripcion y Modo.";
+    return;
+  }
+
+  els.skillMsg.className = "msg show";
+  els.skillMsg.textContent = "Guardando...";
+  try {
+    const result = await fetchJson("/api/skills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, nombre, descripcion, modo, categoria, prioridad, trigger, activa })
+    });
+    els.skillMsg.className = "msg show ok";
+    els.skillMsg.textContent = result.created ? "Skill creada correctamente." : "Skill actualizada.";
+    await loadAll();
+    setTimeout(() => closeModal(), 500);
+  } catch (err) {
+    els.skillMsg.className = "msg show err";
+    els.skillMsg.textContent = "Error: " + (err.message || "sin detalle");
+  }
 });
 
 els.pdfForm.addEventListener("submit", async (event) => {
@@ -6975,11 +7229,13 @@ els.pdfForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const formData = new FormData();
+const formData = new FormData();
   formData.append("file", file);
   formData.append("pagina_fuente", (els.pdfPageInput?.value || "").trim());
   formData.append("clean_mode", els.pdfCleanModeInput?.value || "aggressive");
   formData.append("skill_id", (document.getElementById("pdf-skill-id")?.value || "").trim());
+  // Enviar el texto extraido en el frontend para que no dependa de la extraccion server-side
+  formData.append("texto_frontend", els.pdfPreviewText?.textContent || "");
 
   if (els.pdfSaveBtn) {
     els.pdfSaveBtn.disabled = true;

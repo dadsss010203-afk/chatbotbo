@@ -34,13 +34,16 @@ ENV FLASK_ENV=production \
     PYTHONUNBUFFERED=1 \
     OLLAMA_URL=http://ollama:11434/api/chat \
     LLM_MODEL=correos-bot \
-    EMBEDDING_MODEL=paraphrase-multilingual-MiniLM-L12-v2 \
+    EMBEDDING_MODEL=intfloat/multilingual-e5-small \
+    RERANKER_ENABLED=true \
+    RERANKER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 \
     CHROMA_PATH=/app/chroma_db \
-    CHUNK_SIZE=600 \
+    CHUNK_SIZE=800 \
     BATCH_SIZE=500 \
-    N_RESULTADOS=3 \
+    N_RESULTADOS=10 \
     OLLAMA_TIMEOUT=600 \
-    UVICORN_WORKERS=1
+    UVICORN_WORKERS=1 \
+    HF_HOME=/tmp/huggingface_cache
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=60s \
   CMD curl -f http://localhost:5000/api/status || exit 1

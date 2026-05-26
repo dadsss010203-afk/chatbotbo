@@ -11,7 +11,7 @@ GET  /api/status
 POST /api/actualizar
 """
 
-import sys
+import sys 
 import os
 import logging
 import threading
@@ -25,18 +25,17 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "core"))
 
 import requests
 import json
-from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, Form, Depends
+from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, Form
 from fastapi.responses import JSONResponse, StreamingResponse
 from celery.result import AsyncResult
 
-from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, tarifas_skill, tarifas_sqlite, cache, conversation_logs, conversation_logs_tarifas
+from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, tarifas_skill, tarifas_sqlite, cache, conversation_logs, conversation_logs_tarifas, contacto
 from celery_app import celery
 from tasks import rebuild_rag_task, run_update_task
 from chatbots.general.chat_helpers import (
     buscar_contexto_local_minimo,
-    extraer_citas_evidencia,
     respuesta_chat_vacio,
-    validar_evidencia_en_contexto,
+    respuesta_respaldada,
     rerank_rag_results,
     log_sin_info,
 )
@@ -47,19 +46,8 @@ from chatbots.general.config import (
 )
 
 # ─────────────────────────────────────────────
-#  ROUTER Y MIDDLEWARE ADMIN
+#  ROUTER
 # ─────────────────────────────────────────────
-
-ADMIN_TOKEN = os.environ.get("ADMIN_API_TOKEN", "")
-
-async def require_admin(request: Request):
-    if not ADMIN_TOKEN:
-        return  # Sin token configurado, deshabilitado por compatibilidad
-    auth = request.headers.get("Authorization", "")
-    if auth != f"Bearer {ADMIN_TOKEN}":
-        raise HTTPException(status_code=401, detail="No autorizado")
-
-router = APIRouter()
 router = APIRouter(prefix="/api")   # rutas en /api/*
 logger = logging.getLogger("chatbotbo.general.routes")
 
@@ -69,10 +57,12 @@ REINDEX_DEBOUNCE_SECONDS = int(os.environ.get("REINDEX_DEBOUNCE_SECONDS", "30"))
 CHAT_RESPONSE_MAX_CHARS = int(os.environ.get("CHAT_RESPONSE_MAX_CHARS", "0"))
 LLM_TARIFF_ORCHESTRATOR = os.environ.get("LLM_TARIFF_ORCHESTRATOR", "true").strip().lower() in ("1", "true", "yes")
 TARIFF_DETERMINISTIC_ONLY = os.environ.get("TARIFF_DETERMINISTIC_ONLY", "true").strip().lower() in ("1", "true", "yes")
-LOCATION_USE_LLM_ONLY = os.environ.get("LOCATION_USE_LLM_ONLY", "false").strip().lower() in ("1", "true", "yes")
+INPUT_TEXT_NORMALIZATION = os.environ.get("INPUT_TEXT_NORMALIZATION", "true").strip().lower() in ("1", "true", "yes")
+INPUT_MAX_CHARS = int(os.environ.get("INPUT_MAX_CHARS", "420"))
+LOCATION_USE_LLM_ONLY = True
 TRACKING_API_URL = os.environ.get(
     "TRACKING_API_URL",
-    "https://trackingbo.correos.gob.bo:8100/api/public/tracking/eventos",
+    contacto.tracking_api_url(),
 )
 TRACKING_API_TIMEOUT = int(os.environ.get("TRACKING_API_TIMEOUT", "20"))
 TRACKING_API_VERIFY_SSL = os.environ.get("TRACKING_API_VERIFY_SSL", "false").strip().lower() in ("1", "true", "yes")
@@ -83,6 +73,46 @@ GENERAL_SYSTEM_PROMPT = (
     "Responde solo con conocimiento general del modelo y con lo que diga el usuario en esta charla. "
     "Mantén respuestas breves, naturales y en el mismo idioma del usuario."
 )
+_COMMON_TYPOS_ES = {
+    "chabot": "chatbot",
+    "chatbo": "chatbot",
+    "repsondsa": "responda",
+    "respodna": "responda",
+    "flatra": "falta",
+    "apra": "para",
+    "admeas": "además",
+    "ademas": "además",
+    "laucine": "alucine",
+    "qe": "que",
+    "sertvicios": "servicios",
+    "sertvicio": "servicio",
+    "srevicios": "servicios",
+    "serivcios": "servicios",
+    "servicos": "servicios",
+    "serviciso": "servicios",
+    # Typos frecuentes adicionales
+    "sevicios": "servicios",
+    "sevicio": "servicio",
+    "servicois": "servicios",
+    "servciios": "servicios",
+    "hisotria": "historia",
+    "histoira": "historia",
+    "hisoria": "historia",
+    "coreros": "correos",
+    "corroes": "correos",
+    "corerros": "correos",
+    "tarifas": "tarifas",
+    "tairfas": "tarifas",
+    "ratreo": "rastreo",
+    "rastrear": "rastrear",
+    "encomiendas": "encomiendas",
+    "encomieda": "encomienda",
+    "paquete": "paquete",
+    "paquetes": "paquetes",
+    "lso": "los",
+    "dme": "dame",
+    "dmae": "dame",
+}
 
 _reindex_timer = None
 _reindex_lock = threading.Lock()
@@ -124,22 +154,17 @@ def _mensaje_fuera_dominio(pregunta: str, lang: str) -> str:
     Devuelve el mensaje apropiado según el tipo de consulta fuera de dominio.
     Consultas técnicas de red → mensaje directo sin sugerir contacto.
     Resto → mensaje estándar de redirección.
-    """
+"""
     if _PATRON_CONSULTA_TECNICA_RED.search(pregunta or ""):
         msgs = {
             "es": "No puedo proporcionar esa información.",
             "en": "I cannot provide that information.",
-            "fr": "Je ne peux pas fournir cette information.",
-            "zh": "我无法提供该信息。",
-            "ru": "Я не могу предоставить эту информацию.",
         }
         return msgs.get(lang, msgs["es"])
+    # Respuesta general para cualquier consulta fuera de dominio
     msgs = {
-        "es": "Solo puedo ayudarte con temas de Correos Bolivia.",
-        "en": "I can only help you with Correos Bolivia topics.",
-        "fr": "Je peux uniquement vous aider avec les sujets de Correos Bolivia.",
-        "zh": "我只能帮助您解答玻利维亚邮政相关问题。",
-        "ru": "Я могу помочь только по вопросам Correos Bolivia.",
+        "es": "Solo puedo ayudarte con temas de Correos Bolivia. ¿Tienes alguna consulta sobre envíos, rastreo o servicios postales?",
+        "en": "I can only help you with Correos Bolivia topics. Do you have any questions about shipping, tracking, or postal services?",
     }
     return msgs.get(lang, msgs["es"])
 
@@ -167,6 +192,10 @@ def _respuesta_en_portugues(texto: str) -> bool:
     return hits >= 2
 
 
+def _sin_info_payload(lang: str, textos: dict) -> dict:
+    return {"response": textos["sin_info"], "quick_replies": []}
+
+
 def _enriquecer_pregunta(pregunta: str) -> str:
     """
     Si la pregunta no contiene palabras que indiquen contexto postal,
@@ -188,82 +217,20 @@ def _enriquecer_pregunta(pregunta: str) -> str:
     return pregunta
 
 
-def _respuesta_sireco(pregunta: str, lang: str) -> str | None:
-    texto = (pregunta or "").lower()
-    if "sireco" not in texto:
-        return None
-
-    triggers = (
-        "que es sireco",
-        "qué es sireco",
-        "que es sireco en",
-        "qué es sireco en",
-        "explica sireco",
-        "dime que es sireco",
-        "definicion de sireco",
-        "sireco es",
-    )
-    if not any(t in texto for t in triggers):
-        return None
-
-    if lang == "es":
-        return (
-            "SIRECO es el Sistema de Gestión de Consultas de Correos de Bolivia. "
-            "Es la herramienta oficial para canalizar sugerencias, incidencias y dudas de los usuarios. "
-            "Su objetivo es resolver problemas planteados y fortalecer la calidad del servicio institucional."
-        )
-    if lang == "en":
-        return (
-            "SIRECO is Correos de Bolivia's Query Management System. "
-            "It is the official tool for channeling suggestions, incidents, and customer questions. "
-            "Its goal is to resolve reported issues and strengthen the quality of institutional service."
-        )
-    return None
+def _normalizar_texto_usuario(texto: str) -> str:
+    raw = (texto or "").replace("\r\n", " ").replace("\r", " ").replace("\n", " ").strip()
+    if not raw:
+        return ""
+    if INPUT_MAX_CHARS > 0 and len(raw) > INPUT_MAX_CHARS:
+        raw = raw[:INPUT_MAX_CHARS].strip()
+    normalizado = re.sub(r"\s+", " ", raw)
+    if not INPUT_TEXT_NORMALIZATION:
+        return normalizado
+    for typo, canonico in _COMMON_TYPOS_ES.items():
+        normalizado = re.sub(rf"\b{re.escape(typo)}\b", canonico, normalizado, flags=re.IGNORECASE)
+    return normalizado
 
 
-def _respuesta_servicios_correos(pregunta: str, lang: str) -> str | None:
-    texto = (pregunta or "").lower()
-    if "servicios" not in texto:
-        return None
-    triggers = (
-        "todos los servicios",
-        "lista de servicios",
-        "servicios de correos",
-        "servicios postales",
-        "que servicios ofrece",
-        "qué servicios ofrece",
-        "servicios que ofrece",
-    )
-    if not any(t in texto for t in triggers):
-        return None
-
-    if lang == "es":
-        return (
-            "Estos son los servicios principales de Correos de Bolivia:\n"
-            "1. Express Mail Service (EMS): envío urgente nacional e internacional con seguimiento en tiempo real.\n"
-            "2. Servicio Encomienda Postal (SEP): envío de paquetes con cobertura internacional y rastreo.\n"
-            "3. Correo Prioritario: servicio para cartas, impresos y pequeños paquetes con entrega más rápida.\n"
-            "4. Envíos de Correspondencia Agrupada (ECA): servicio para envíos masivos de documentos y correspondencia empresarial.\n"
-            "5. Mi Encomienda: paquetería nacional económica con tracking y retiro en oficinas.\n"
-            "6. Filatelia: venta de sellos postales de colección y servicios filatélicos.\n"
-            "7. Casillas Postales: servicio de recepción segura de correspondencia y paquetes en oficinas de Correos.\n"
-            "8. ChasquiExpressBO: servicio de delivery a domicilio para empresas, tiendas y envíos comerciales.\n"
-            "También se disponen de aplicativos digitales relacionados como TrackingBO, SIRECO, POSTAR, UNIENVIO, GESPA, GESDO, SIREN, ULTRAPOST y GESCON."
-        )
-    if lang == "en":
-        return (
-            "These are the main services of Correos de Bolivia:\n"
-            "1. Express Mail Service (EMS): urgent national and international shipping with real-time tracking.\n"
-            "2. Postal Parcel Service (SEP): package shipping with international coverage and tracking.\n"
-            "3. Priority Mail: service for letters, printed matter, and small packages with faster delivery.\n"
-            "4. Grouped Correspondence Shipments (ECA): service for bulk mailings and business correspondence.\n"
-            "5. Mi Encomienda: economical national parcel shipping with tracking and office pickup.\n"
-            "6. Philately: sale of postage stamps and philatelic services.\n"
-            "7. Post Office Boxes: secure receipt of mail and packages at Correos offices.\n"
-            "8. ChasquiExpressBO: home delivery service for businesses, shops, and commercial shipments.\n"
-            "Related digital applications include TrackingBO, SIRECO, POSTAR, UNIENVIO, GESPA, GESDO, SIREN, ULTRAPOST, and GESCON."
-        )
-    return None
 
 
 def _safe_json_object(text: str) -> dict | None:
@@ -483,7 +450,7 @@ def _consultar_tracking_api(codigo: str) -> dict:
         status = getattr(getattr(exc, "response", None), "status_code", None)
         if status == 404:
             return {"existe_paquete": False, "resultado": [], "_not_found": True}
-        raise ValueError("El servicio de rastreo no está disponible en este momento. Intenta más tarde o llama al +591 22152423.") from exc
+        raise ValueError(f"El servicio de rastreo no está disponible en este momento. Intenta más tarde o llama al {contacto.telefono()}.") from exc
     except ValueError:
         raise
     except Exception as exc:
@@ -505,7 +472,7 @@ def _format_tracking_response(codigo: str, payload: dict) -> tuple[str, dict]:
                 f"El código {codigo} no fue encontrado en el sistema.\n"
                 f"Verifica que el código esté escrito correctamente.\n"
                 f"Si el envío es reciente, puede que aún no esté registrado — intenta nuevamente en unas horas.\n"
-                f"Para más ayuda llama al +591 22152423 o visita correos.gob.bo."
+                f"Para más ayuda llama al {contacto.telefono()} o visita {contacto.web()}."
             )
         else:
             msg = (
@@ -543,7 +510,7 @@ def _format_tracking_response(codigo: str, payload: dict) -> tuple[str, dict]:
         lineas.append(f"• Ciudad destino: {ultimo_evento['ciudad_destino']}")
 
     # URL para rastreo web y QR
-    tracking_url = f"https://trackingbo.correos.gob.bo:8100/?codigo={codigo}"
+    tracking_url = f"{contacto.tracking_url()}/?codigo={codigo}"
     
     return (
         "\n".join(lineas),
@@ -587,8 +554,7 @@ def _filtrar_sucursales_por_scope(sucursales: list[dict], scope: str | None) -> 
     if scope == "regionales":
         return [s for s in sucursales if _es_regional(s)]
     if scope == "sucursales":
-        filtradas = [s for s in sucursales if not _es_regional(s)]
-        return filtradas or list(sucursales)
+        return [s for s in sucursales if not _es_regional(s)]
     return list(sucursales)
 
 
@@ -614,42 +580,32 @@ def _parece_consulta_ubicacion(texto: str, sucursales: list[dict]) -> bool:
     )
 
 
-def _detectar_geo_ubicacion(
-    pregunta: str,
-    sucursales_scope: list[dict],
-    *,
-    fallback_sucursales: list[dict] | None = None,
-) -> dict | None:
-    geo = intents.detectar_solo_ciudad(pregunta, sucursales_scope)
-    if geo is None:
-        geo = intents.detectar_consulta_ubicacion(pregunta, sucursales_scope)
-    if geo is not None or not fallback_sucursales:
-        return geo
-    geo = intents.detectar_solo_ciudad(pregunta, fallback_sucursales)
-    if geo is None:
-        geo = intents.detectar_consulta_ubicacion(pregunta, fallback_sucursales)
-    return geo
-
-
 def _payload_pregunta_scope_ubicacion(lang: str, *, reask: bool = False) -> dict:
     if lang == "en":
         msg = (
-            "I can help you find our offices nationwide. 📍 Are you looking for a Regional Office (main) or a specific Branch? Send the name of the department"
+            "Do you mean locations of regional offices or branches?"
             if not reask
-            else "I need that detail first: regional office or branch? Send the name of the department"
+            else "I need that detail first: regional offices or branches?"
         )
+        label_regionales = "Regional Offices"
+        label_sucursales = "Branches"
     else:
         msg = (
-            "Puedo ayudarte a encontrar nuestras oficinas en todo el país. 📍 ¿Buscas una Oficina Regional (principal) o una Sucursal específica? envía el nombre del departamento"
+            "¿Te refieres a ubicación de regionales o de sucursales?"
             if not reask
-            else "Para ubicarte bien, primero indícame: ¿regionales o sucursales? envía el nombre del departamento"
+            else "Para ubicarte bien, primero indícame: ¿regionales o sucursales?"
         )
+        label_regionales = "Regionales"
+        label_sucursales = "Sucursales"
 
     return {
         "response": msg,
         "lang": lang,
         "no_translate": True,
-        "quick_replies": [],
+        "quick_replies": [
+            {"label": label_regionales, "value": "__ubicacion_regionales__"},
+            {"label": label_sucursales, "value": "__ubicacion_sucursales__"},
+        ],
         "location_disambiguation": True,
     }
 
@@ -659,11 +615,6 @@ def _resolver_scope_ubicacion_o_preguntar(sid: str, pregunta: str, lang: str) ->
     if scope:
         session.clear_pendiente_ubicacion(sid)
         return scope, None
-
-    geo = _detectar_geo_ubicacion(pregunta, SUCURSALES)
-    if geo is not None and ("nombre" in geo or geo.get("ciudad") is not None):
-        session.clear_pendiente_ubicacion(sid)
-        return None, None
 
     pendiente = session.get_pendiente_ubicacion(sid) or {}
     if pendiente:
@@ -687,70 +638,150 @@ def _estimate_message_tokens(message: dict) -> int:
     return rag.estimate_tokens(texto) + 4
 
 
-def _split_complete_turns(messages: list[dict]) -> list[list[dict]]:
-    """Agrupa historial como turnos user+assistant, ignorando mensajes sueltos."""
-    turns = []
-    pending_assistant = None
-    for entry in reversed(messages):
-        role = entry.get("role")
-        if role == "assistant":
-            pending_assistant = entry
-            continue
-        if role == "user" and pending_assistant is not None:
-            turns.append([entry, pending_assistant])
-            pending_assistant = None
-    return list(reversed(turns))
-
-
-def _flatten_turns(turns: list[list[dict]]) -> list[dict]:
-    flattened = []
-    for turn in turns:
-        flattened.extend(turn)
-    return flattened
-
-
 def _trim_messages_to_token_budget(messages: list[dict], max_tokens: int) -> list[dict]:
     if not messages:
         return messages
-    if max_tokens <= 0 or len(messages) <= 2:
-        return messages
     system_message = messages[0]
-    current_user_message = messages[-1]
-    if current_user_message.get("role") != "user":
-        remaining = messages[1:]
-        current_tokens = _estimate_message_tokens(system_message)
-        trimmed = []
-        for message in reversed(remaining):
-            tokens = _estimate_message_tokens(message)
-            if current_tokens + tokens > max_tokens:
-                break
-            trimmed.append(message)
-            current_tokens += tokens
-        trimmed = list(reversed(trimmed))
-        return [system_message] + trimmed
-
-    history_messages = messages[1:-1]
-    turns = _split_complete_turns(history_messages)
-    protected_turns = turns[-1:]
-    older_turns = turns[:-1]
-    protected_tail = _flatten_turns(protected_turns) + [current_user_message]
-
+    remaining = messages[1:]
     current_tokens = _estimate_message_tokens(system_message)
-    current_tokens += sum(_estimate_message_tokens(message) for message in protected_tail)
-
-    selected_older_turns = []
-    for turn in reversed(older_turns):
-        tokens = sum(_estimate_message_tokens(message) for message in turn)
+    trimmed = []
+    for message in reversed(remaining):
+        tokens = _estimate_message_tokens(message)
         if current_tokens + tokens > max_tokens:
             break
-        selected_older_turns.append(turn)
+        trimmed.append(message)
         current_tokens += tokens
+    trimmed = list(reversed(trimmed))
+    return [system_message] + trimmed
 
-    return (
-        [system_message]
-        + _flatten_turns(list(reversed(selected_older_turns)))
-        + protected_tail
-    )
+
+def _respuesta_incompleta(texto: str) -> bool:
+    """
+    Detecta si la respuesta del LLM quedó cortada a la mitad.
+    Cubre:
+    - Oraciones sin puntuación de cierre
+    - Listas que terminan antes de completarse (el modelo dice "¿Necesitas más
+      detalles?" pero la lista tiene ítems con descripción vacía o cortada)
+    """
+    if not texto or len(texto.strip()) < 20:
+        return False
+    ultimo = texto.rstrip()
+
+    # Si termina con puntuación de cierre → revisar si es lista incompleta
+    if ultimo[-1] in ".!?…":
+        # Detectar lista truncada: hay ítems con ":" pero el último ítem
+        # tiene descripción muy corta (< 8 chars después del ":") o vacía
+        lineas = [l.strip() for l in ultimo.splitlines() if l.strip()]
+        items_lista = [l for l in lineas if re.match(r'^[-*•]?\s*\w[^:]{1,40}:\s*.+', l)]
+        if len(items_lista) >= 2:
+            ultimo_item = items_lista[-1]
+            partes = ultimo_item.split(':', 1)
+            if len(partes) == 2 and len(partes[1].strip()) < 8:
+                return True  # descripción del último ítem muy corta → truncado
+        return False
+
+    # Si termina con puntuación de apertura → incompleta
+    if ultimo[-1] in ",:;-–—(":
+        return True
+
+    # Si la última palabra es una conjunción o preposición → incompleta
+    ultima_palabra = ultimo.split()[-1].lower().rstrip(".,;:")
+    palabras_incompletas = {
+        "y", "o", "e", "u", "ni", "pero", "sino", "aunque", "porque",
+        "que", "con", "sin", "de", "del", "la", "el", "los", "las",
+        "un", "una", "su", "sus", "en", "a", "al", "por", "para",
+        "como", "si", "se", "le", "lo", "también", "además",
+        "and", "or", "but", "with", "the", "a", "an", "of", "in",
+    }
+    if ultima_palabra in palabras_incompletas:
+        return True
+
+    # Si tiene más de 80 chars y no termina en puntuación → probablemente cortada
+    if len(ultimo) > 80 and ultimo[-1].isalpha():
+        return True
+
+    return False
+
+
+async def _completar_respuesta_incompleta(
+    request: Request,
+    request_id: str,
+    respuesta_parcial: str,
+    pregunta: str,
+    lang: str,
+) -> str:
+    """
+    Si la respuesta quedó cortada, hace un segundo llamado al LLM
+    para completarla. Detecta si es una lista y usa más tokens en ese caso.
+    """
+    # Detectar si es una lista para usar más tokens
+    lineas = [l.strip() for l in respuesta_parcial.splitlines() if l.strip()]
+    es_lista = sum(1 for l in lineas if re.match(r'^[-*•]?\s*\w[^:]{1,40}:', l)) >= 2
+    num_predict = 300 if es_lista else 80
+
+    if es_lista:
+        system_content = (
+            "Eres un asistente que continúa listas truncadas. "
+            "El usuario recibió una lista incompleta de ítems. "
+            "Continúa la lista desde donde se cortó, agregando los ítems faltantes "
+            "con el mismo formato 'Nombre: descripción.' "
+            "No repitas ítems ya listados. No agregues introducción. "
+            f"Responde en {lang}."
+        )
+        user_content = (
+            f"Esta lista de servicios quedó incompleta. "
+            f"Continúa agregando los ítems que faltan:\n\n{respuesta_parcial}"
+        )
+    else:
+        system_content = (
+            "Eres un asistente que completa oraciones cortadas. "
+            "Completa SOLO la última oración inacabada con máximo 2 oraciones. "
+            "No repitas lo que ya se dijo. No agregues información nueva. "
+            f"Responde en {lang}."
+        )
+        user_content = (
+            f"Esta respuesta quedó cortada, complétala brevemente:\n\n{respuesta_parcial}"
+        )
+
+    try:
+        continuacion = await asyncio.wait_for(
+            _llamar_ollama_cancelable(
+                request,
+                request_id + "_cont",
+                [
+                    {"role": "system", "content": system_content},
+                    {"role": "user",   "content": user_content},
+                ],
+                opciones={"num_predict": num_predict, "temperature": 0.1},
+            ),
+            timeout=30.0,
+        )
+        continuacion = ollama.limpiar_respuesta(continuacion).strip()
+        if continuacion:
+            separador = "\n" if es_lista else (" " if respuesta_parcial[-1].isalpha() else "")
+            return respuesta_parcial + separador + continuacion
+    except Exception:
+        pass
+
+    return respuesta_parcial + (" ¿Necesitas más detalles?" if not respuesta_parcial.rstrip().endswith("?") else "")
+
+
+def _limpiar_contexto_rag(contexto: str) -> str:
+    """
+    Normaliza el contexto RAG antes de enviarlo al LLM.
+    Convierte bullets ● y símbolos similares a formato de texto plano
+    para que el LLM no los imite en su respuesta con listas anidadas.
+    """
+    if not contexto:
+        return contexto
+    lineas = contexto.splitlines()
+    resultado = []
+    for linea in lineas:
+        # Reemplazar bullets ● • ▪ ▸ ► por guión simple para que el LLM
+        # entienda que es un dato dentro de un ítem, no un nivel de lista
+        limpia = re.sub(r"^(\s*)[●•▪▸►]\s*", r"\1- ", linea)
+        resultado.append(limpia)
+    return "\n".join(resultado)
 
 
 def _postprocess_llm_response(texto: str, sin_info: str) -> str:
@@ -768,7 +799,7 @@ def _postprocess_llm_response(texto: str, sin_info: str) -> str:
         "Desciende a continuación la información",
     )
     lineas = [ln.strip() for ln in respuesta.splitlines() if ln.strip()]
-    lineas = [ln for ln in lineas if not any(tag.lower() in ln.lower() for tag in bloqueados)]
+    lineas = [ln for ln in lineas if not any(ln.lower().startswith(tag.lower()) for tag in bloqueados)]
     if not lineas:
         return sin_info
     respuesta = "\n".join(lineas).strip()
@@ -781,6 +812,18 @@ def _postprocess_llm_response(texto: str, sin_info: str) -> str:
 
 def _normalize_response_text(texto: str) -> str:
     raw = (texto or "").replace("\r\n", "\n").replace("\r", "\n")
+
+    # Preservar saltos antes de ítems de lista (- , * , • , N. , N) )
+    # para que el frontend pueda detectarlos como lista estructurada.
+    raw = re.sub(r'\n{2,}', '\u0000PARA\u0000', raw)
+    # Colapsar \n simples en espacios, EXCEPTO cuando la línea siguiente
+    # empieza con un marcador de lista.
+    raw = re.sub(r'\n(?=[ \t]*[-*•][ \t]|\d+[.)]\s)', '\u0000ITEM\u0000', raw)
+    raw = raw.replace('\n', ' ')
+    raw = re.sub(r'[ \t]{2,}', ' ', raw)
+    raw = raw.replace('\u0000PARA\u0000', '\n\n')
+    raw = raw.replace('\u0000ITEM\u0000', '\n')
+
     normalized_lines: list[str] = []
     previous_blank = False
 
@@ -792,7 +835,6 @@ def _normalize_response_text(texto: str) -> str:
             previous_blank = True
             continue
 
-        # Conserva listas y numeraciones, pero limpia espacios internos redundantes.
         compact = re.sub(r"[ \t]+", " ", stripped)
         normalized_lines.append(compact)
         previous_blank = False
@@ -801,6 +843,193 @@ def _normalize_response_text(texto: str) -> str:
         normalized_lines.pop()
 
     return "\n".join(normalized_lines).strip()
+
+
+# Emojis por tipo de servicio/tema para enriquecer visualmente la respuesta
+_EMOJI_MAP = [
+    (re.compile(r'\b(EMS|Express Mail Service)\b', re.I),          '✈️'),
+    (re.compile(r'\b(Encomienda Postal|SEP)\b', re.I),             '📦'),
+    (re.compile(r'\b(Correo Prioritario|Prioritario)\b', re.I),    '⚡'),
+    (re.compile(r'\b(Correspondencia Agrupada|ECA)\b', re.I),      '📋'),
+    (re.compile(r'\b(Mi Encomienda)\b', re.I),                     '🏠'),
+    (re.compile(r'\b(Filatelia)\b', re.I),                         '🔖'),
+    (re.compile(r'\b(Casillas? Postales?)\b', re.I),               '📬'),
+    (re.compile(r'\b(ChasquiExpressBO|Chasqui)\b', re.I),          '🛵'),
+    (re.compile(r'\b(rastreo|tracking|seguimiento)\b', re.I),      '🔍'),
+    (re.compile(r'\b(reclamo|queja|incidencia)\b', re.I),          '📝'),
+    (re.compile(r'\b(horario|atienden|abierto)\b', re.I),          '🕐'),
+    (re.compile(r'\b(tel[eé]fono|llamar|contacto)\b', re.I),       '📞'),
+    (re.compile(r'\b(web|sitio|p[aá]gina|correos\.gob)\b', re.I), '🌐'),
+    (re.compile(r'\b(historia|origen|fundaci[oó]n)\b', re.I),      '📜'),
+    (re.compile(r'\b(estafa|fraude|phishing|alerta)\b', re.I),     '⚠️'),
+]
+
+def _emoji_para_linea(linea: str) -> str:
+    """Devuelve el emoji más apropiado para una línea de texto."""
+    for patron, emoji in _EMOJI_MAP:
+        if patron.search(linea):
+            return emoji
+    return '•'
+
+
+def _formatear_respuesta_html(texto: str) -> str:
+    """
+    Convierte la respuesta de texto plano del LLM a HTML limpio y legible.
+
+    Estrategia: no depender del formato exacto del LLM.
+    Detecta si hay múltiples líneas que parecen ítems de lista y las formatea
+    con bloques separados, nombre en negrita y datos clave resaltados.
+
+    Tipos de línea detectados:
+    - 'Nombre: descripción'          → bloque con nombre + desc
+    - 'Nombre (aclaración) desc'     → bloque con nombre + desc
+    - '1. Nombre: descripción'       → bloque numerado
+    - Línea corta sola (≤40 chars)   → nombre del ítem, siguiente línea es desc
+    - Intro (termina en ':')         → encabezado en negrita
+    - Cierre con '?'                 → pie en cursiva gris
+    - Todo lo demás                  → párrafo normal
+    """
+    if not texto:
+        return texto
+
+    # Colapsar saltos de línea simples en espacios (artefactos del tokenizer).
+    # Preservar solo los saltos dobles como separadores de párrafo real.
+    texto = re.sub(r'\n{2,}', '\u0000PARA\u0000', texto)
+    texto = texto.replace('\n', ' ')
+    texto = re.sub(r' {2,}', ' ', texto)
+    texto = texto.replace('\u0000PARA\u0000', '\n\n')
+
+    lineas = [l.strip() for l in texto.splitlines() if l.strip()]
+    if not lineas:
+        return texto
+
+    # Si todo llegó en una sola línea (el LLM no usó saltos),
+    # intentar dividir por patrones de inicio de ítem conocidos
+    if len(lineas) == 1 and len(lineas[0]) > 80:
+        # Insertar salto antes de cada ítem que empiece con mayúscula
+        # precedido de texto (ej: "...kg.EMS..." o "...colecciones.Rastreo...")
+        _pat_split = re.compile(
+            r'(?<=[a-z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00fc.!?])'
+            r'\s*(?=[A-Z\u00c1\u00c9\u00cd\u00d3\u00da\u00d1]'
+            r'[a-zA-Z\u00e1\u00e9\u00ed\u00f3\u00fa\u00f1\u00fc\u00c1\u00c9\u00cd\u00d3\u00da\u00d1]{2,}[\s(])'
+        )
+        texto_expandido = _pat_split.sub('\n', lineas[0])
+        lineas = [l.strip() for l in texto_expandido.splitlines() if l.strip()]
+
+    def _resaltar_datos(t: str) -> str:
+        return re.sub(
+            r'(\b\d+[-–a]\d+\s*(?:horas?|días?|h\b|d\b)'
+            r'|\b\d+\s*(?:kg|países?|envíos?)\b'
+            r'|\+591[\s\d]+'
+            r'|\bcorreos\.gob\.bo\b)',
+            r'<strong>\1</strong>',
+            t,
+            flags=re.I,
+        )
+
+    def _bloque(nombre: str, desc: str) -> str:
+        desc_html = (
+            '<br><span style="color:#444;font-size:0.94em">'
+            + _resaltar_datos(desc)
+            + '</span>'
+        ) if desc else ''
+        return (
+            '<div style="margin:0 0 8px 0;padding:7px 10px;'
+            'border-left:3px solid #C8860E;background:#fafafa;'
+            'border-radius:0 5px 5px 0;line-height:1.5">'
+            '<strong>' + nombre + '</strong>'
+            + desc_html +
+            '</div>'
+        )
+
+    # ── Patrones de detección ────────────────────────────────────────────
+    p_con_colon   = re.compile(r'^(\d+\.\s*)?([A-ZÁÉÍÓÚÑ][^:\n]{1,50}):\s*(.*)$')
+    p_numerado    = re.compile(r'^(\d+)[.)]\s+(.+)$')
+    p_parentesis  = re.compile(r'^([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñüÁÉÍÓÚÑÜ\s]{1,30})\s*\(([^)]+)\)\s*(.*)$')
+
+    def _es_item(l: str) -> bool:
+        return bool(
+            p_con_colon.match(l)
+            or p_numerado.match(l)
+            or p_parentesis.match(l)
+        )
+
+    # Contar ítems detectables
+    n_items = sum(1 for l in lineas if _es_item(l))
+    es_lista = n_items >= 2
+
+    if not es_lista:
+        # Respuesta simple: párrafos con datos resaltados
+        return ''.join(
+            f'<p style="margin:0 0 6px 0;line-height:1.5">{_resaltar_datos(l)}</p>'
+            for l in lineas
+        )
+
+    # ── Formatear lista ──────────────────────────────────────────────────
+    intro  = ''
+    cierre = ''
+    items  = []
+
+    for i, linea in enumerate(lineas):
+        # Intro: primera línea que termina en ':'
+        if i == 0 and linea.rstrip().endswith(':'):
+            intro = linea
+            continue
+        # Cierre: última línea con '?'
+        if i == len(lineas) - 1 and '?' in linea:
+            cierre = linea
+            continue
+
+        # 'Nombre: descripción' o '1. Nombre: descripción'
+        m = p_con_colon.match(linea)
+        if m:
+            num    = (m.group(1) or '').strip()
+            nombre = m.group(2).strip()
+            desc   = m.group(3).strip()
+            label  = f'{num} {nombre}'.strip() if num else nombre
+            items.append(_bloque(label, desc))
+            continue
+
+        # 'Nombre (aclaración) descripción'
+        m2 = p_parentesis.match(linea)
+        if m2:
+            nombre = m2.group(1).strip()
+            aclar  = m2.group(2).strip()
+            desc   = m2.group(3).strip()
+            label  = f'{nombre} ({aclar})'
+            items.append(_bloque(label, desc))
+            continue
+
+        # '1. contenido'
+        m3 = p_numerado.match(linea)
+        if m3:
+            num      = m3.group(1)
+            contenido = m3.group(2).strip()
+            if ':' in contenido:
+                nombre, _, desc = contenido.partition(':')
+                items.append(_bloque(f'{num}. {nombre.strip()}', desc.strip()))
+            else:
+                items.append(_bloque(f'{num}.', contenido))
+            continue
+
+        # Línea que no matchea ningún patrón → párrafo normal
+        items.append(
+            f'<p style="margin:0 0 6px 0;line-height:1.5">{_resaltar_datos(linea)}</p>'
+        )
+
+    # ── Ensamblar ────────────────────────────────────────────────────────
+    partes = []
+    if intro:
+        partes.append(
+            f'<p style="margin:0 0 10px 0;font-weight:600;line-height:1.4">{intro}</p>'
+        )
+    partes.extend(items)
+    if cierre:
+        partes.append(
+            f'<p style="margin:8px 0 0 0;color:#666;font-style:italic;'
+            f'font-size:0.93em;line-height:1.4">{cierre}</p>'
+        )
+    return ''.join(partes) if partes else texto
 
 
 def _stream_preview_text(texto: str) -> str:
@@ -844,19 +1073,21 @@ def _refresh_pdfs_after_start() -> None:
     try:
         pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
         if pdf_refresh.get("mejorados"):
-            print(
-                "  PDFs heredados mejorados tras arranque "
-                f"({pdf_refresh['mejorados']} mejoras) → reindexando..."
+            logger.info(
+                "PDFs heredados mejorados tras arranque, reindexando",
+                extra={"mejorados": pdf_refresh.get("mejorados", 0)},
             )
             reindexar()
         elif pdf_refresh.get("reprocesados"):
-            print(
-                "  PDFs revisados en segundo plano: "
-                f"{pdf_refresh['reprocesados']} reprocesados, "
-                f"{pdf_refresh['mejorados']} mejorados."
+            logger.info(
+                "PDFs revisados en segundo plano",
+                extra={
+                    "reprocesados": pdf_refresh.get("reprocesados", 0),
+                    "mejorados": pdf_refresh.get("mejorados", 0),
+                },
             )
     except Exception as e:
-        print(f"   Error validando PDFs tras arranque: {e}")
+        logger.error("Error validando PDFs tras arranque", extra={"error": str(e)})
 
 
 def _rag_chunks_seguro() -> int:
@@ -908,7 +1139,7 @@ def _finalizar_chat_response(
                 latency_ms=int((time.perf_counter() - started_at) * 1000),
             )
     except Exception as e:
-        print(f"   Error guardando log conversacional: {e}")
+        logger.error("Error guardando log conversacional", extra={"error": str(e)}, exc_info=True)
     if isinstance(payload, dict):
         payload["sid"] = sid
         if request_id:
@@ -1185,7 +1416,6 @@ def _tarifa_quick_replies(
     scope: str | None = None,
     family: str | None = None,
     lang: str = "es",
-    destination_group: str | None = None,
 ) -> list[dict]:
     if not missing:
         return []
@@ -1239,6 +1469,7 @@ def _tarifa_quick_replies(
             {"label": t["eca"], "value": "eca nacional"},
             {"label": t["pliegos_oficiales"], "value": "pliegos oficiales nacional"},
             {"label": t["sacas_m"], "value": "sacas m nacional"},
+            {"label": t["ems_contratos"], "value": "ems contratos nacional"},
             {"label": t["super_express"], "value": "super express nacional"},
         ]
     if "tipo_internacional" in missing:
@@ -1249,6 +1480,8 @@ def _tarifa_quick_replies(
             {"label": t["eca"], "value": "eca internacional"},
             {"label": t["pliegos_oficiales"], "value": "pliegos oficiales internacional"},
             {"label": t["sacas_m"], "value": "sacas m internacional"},
+            {"label": t["super_express_documentos"], "value": "super express documentos internacional"},
+            {"label": t["super_express_paquetes"], "value": "super express paquetes internacional"},
         ]
     if "alcance_ems" in missing:
         return [
@@ -1266,14 +1499,132 @@ def _tarifa_quick_replies(
             {"label": "800g", "value": "800g"},
             {"label": "1kg", "value": "1kg"},
         ]
-    if "destino" in missing and scope:
-        if tarifas_skill.postar_scope_requires_destination_group(scope) and not destination_group:
-            grouped = tarifas_skill.postar_destination_group_quick_replies(scope, lang=lang)
-            if grouped:
-                return grouped
-        options = tarifas_skill.postar_destination_quick_replies(scope, destination_group=destination_group)
-        if options:
-            return options
+    # Primera fase robusta: sugerencias de destino para EMS Nacional (skill1).
+    if "destino" in missing and scope == "nacional" and (family in {None, "ems"}):
+        return [
+            {"label": "Cobija", "value": "cobija"},
+            {"label": "Trinidad", "value": "trinidad"},
+            {"label": "Riberalta", "value": "riberalta"},
+            {"label": "Ciudades intermedias", "value": "ciudades intermedias"},
+            {"label": "Cobertura 1", "value": "cobertura 1"},
+            {"label": "Cobertura 2", "value": "cobertura 2"},
+            {"label": "Cobertura 3", "value": "cobertura 3"},
+            {"label": "Cobertura 4", "value": "cobertura 4"},
+        ]
+    # Segunda fase robusta: sugerencias de destino para EMS Internacional (skill2).
+    if "destino" in missing and scope == "internacional" and (family in {None, "ems"}):
+        return [
+            {"label": "América del Sur", "value": "america del sur"},
+            {"label": "América Central y Caribe", "value": "america central y caribe"},
+            {"label": "América del Norte", "value": "america del norte"},
+            {"label": "Europa", "value": "europa"},
+            {"label": "África / Asia / Oceanía", "value": "africa asia oceania"},
+        ]
+    # Tercera fase robusta: sugerencias para Mi Encomienda Prioritario Nacional (skill3).
+    if "destino" in missing and scope == "encomienda_nacional" and (family in {None, "encomienda"}):
+        return [
+            {"label": "Ciudades Capitales", "value": "ciudades capitales"},
+            {"label": "Destinos Especiales (Trinidad-Cobija)", "value": "destinos especiales"},
+            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
+            {"label": "Prov. En Otro Depto.", "value": "prov en otro depto"},
+        ]
+    # Cuarta fase robusta: sugerencias para Encomiendas Postales Internacional (skill4).
+    if "destino" in missing and scope == "encomienda_internacional" and (family in {None, "encomienda"}):
+        return [
+            {"label": "América del Sur", "value": "america del sur"},
+            {"label": "América Central y Caribe", "value": "america central y caribe"},
+            {"label": "América del Norte", "value": "america del norte"},
+            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
+            {"label": "África / Asia / Oceanía", "value": "africa asia oceania"},
+        ]
+    if "destino" in missing and scope == "ems_hoja5_nacional" and (family in {None, "ems_hoja5"}):
+        return [
+            {"label": "Local", "value": "local"},
+            {"label": "Nacional", "value": "nacional"},
+            {"label": "Depto.", "value": "depto"},
+            {"label": "Prov.", "value": "prov"},
+            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
+            {"label": "Riberalta - Guayaramerín", "value": "riberalta guayaramerin"},
+        ]
+    if "destino" in missing and scope == "ems_hoja6_internacional" and (family in {None, "ems_hoja6"}):
+        return [
+            {"label": "América del Sur", "value": "america del sur"},
+            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
+            {"label": "América del Norte", "value": "america del norte"},
+            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
+            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
+        ]
+    if "destino" in missing and scope == "eca_nacional" and (family in {None, "eca"}):
+        return [
+            {"label": "Local", "value": "local"},
+            {"label": "Nacional", "value": "nacional"},
+            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
+            {"label": "Prov. Depto. Prov.", "value": "prov depto prov"},
+            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
+            {"label": "Riberalta - Guayaramerín", "value": "riberalta guayaramerin"},
+        ]
+    if "destino" in missing and scope == "eca_internacional" and (family in {None, "eca"}):
+        return [
+            {"label": "América del Sur", "value": "america del sur"},
+            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
+            {"label": "América del Norte", "value": "america del norte"},
+            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
+            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
+        ]
+    if "destino" in missing and scope == "pliegos_nacional" and (family in {None, "pliegos"}):
+        return [
+            {"label": "Local", "value": "local"},
+            {"label": "Nacional", "value": "nacional"},
+            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
+            {"label": "Prov. Depto. Prov.", "value": "prov depto prov"},
+        ]
+    if "destino" in missing and scope == "pliegos_internacional" and (family in {None, "pliegos"}):
+        return [
+            {"label": "América del Sur", "value": "america del sur"},
+            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
+            {"label": "América del Norte", "value": "america del norte"},
+            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
+            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
+        ]
+    if "destino" in missing and scope == "sacas_m_nacional" and (family in {None, "sacas_m"}):
+        return [
+            {"label": "Nacional", "value": "nacional"},
+            {"label": "Provincial", "value": "provincial"},
+        ]
+    if "destino" in missing and scope == "sacas_m_internacional" and (family in {None, "sacas_m"}):
+        return [
+            {"label": "América del Sur", "value": "america del sur"},
+            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
+            {"label": "América del Norte", "value": "america del norte"},
+            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
+            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
+        ]
+    if "destino" in missing and scope == "ems_contratos_nacional" and (family in {None, "ems_contratos"}):
+        return [
+            {"label": "EMS Nacional", "value": "ems nacional"},
+            {"label": "Ciudades Intermedias", "value": "ciudades intermedias"},
+            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
+        ]
+    if "destino" in missing and scope == "super_express_documentos_internacional" and (family in {None, "super_express_documentos"}):
+        return [
+            {"label": "Sudamérica (Tarifa 1)", "value": "sud america"},
+            {"label": "Centroamérica/Florida (Tarifa 2)", "value": "centro america florida"},
+            {"label": "Resto de EEUU (Tarifa 3)", "value": "resto de eeuu"},
+            {"label": "Caribe (Tarifa 4)", "value": "caribe"},
+            {"label": "Europa (Tarifa 5)", "value": "europa"},
+            {"label": "Medio Oriente (Tarifa 6)", "value": "medio oriente"},
+            {"label": "África y Asia (Tarifa 7)", "value": "africa y asia"},
+        ]
+    if "destino" in missing and scope == "super_express_paquetes_internacional" and (family in {None, "super_express_paquetes"}):
+        return [
+            {"label": "Sudamérica (Tarifa 1)", "value": "sud america"},
+            {"label": "Centroamérica/Florida (Tarifa 2)", "value": "centro america florida"},
+            {"label": "Resto de EEUU (Tarifa 3)", "value": "resto de eeuu"},
+            {"label": "Caribe (Tarifa 4)", "value": "caribe"},
+            {"label": "Europa (Tarifa 5)", "value": "europa"},
+            {"label": "Medio Oriente (Tarifa 6)", "value": "medio oriente"},
+            {"label": "África y Asia (Tarifa 7)", "value": "africa y asia"},
+        ]
     return []
 
 
@@ -1300,10 +1651,6 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
         prefer_scope=pendiente.get("scope"),
         prefer_family=pendiente.get("family"),
     )
-    group_choice = tarifas_skill.resolve_postar_destination_group(
-        pregunta,
-        req.scope or fragment.scope or pendiente.get("scope"),
-    )
     level_choice = _extract_geo_level_choice(pregunta)
     scope_msg = req.scope or fragment.scope
     col_msg = req.columna or fragment.columna
@@ -1315,7 +1662,7 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
         col_msg = None
 
     should_resume_pending = bool(pendiente) and bool(
-        req.is_tarifa or scope_msg or req.peso or col_msg or req.family or fragment.family or level_choice or group_choice
+        req.is_tarifa or scope_msg or req.peso or col_msg or req.family or fragment.family or level_choice
     )
     if not req.is_tarifa and not should_resume_pending:
         return None
@@ -1323,12 +1670,10 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
     pending_scope = pendiente.get("scope")
     pending_family = pendiente.get("family")
     pending_level = pendiente.get("level")
-    pending_destination_group = pendiente.get("destination_group")
     family = req.family or fragment.family or pending_family
     scope = scope_msg or pending_scope
     peso = req.peso or fragment.peso or pendiente.get("peso")
     columna = col_msg or pendiente.get("columna")
-    destination_group = group_choice or pending_destination_group
 
     # Si el usuario está eligiendo servicio (y solo servicio), forzamos siguiente paso:
     # pedir destino en vez de inferir columna por palabras como "nacional".
@@ -1388,23 +1733,10 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
     # Si la columna quedó incompatible con el alcance actual, pedimos nuevo destino/servicio.
     if columna and scope and not tarifas_skill.columna_valida_para_scope(columna, scope):
         columna = tarifas_skill.resolve_columna(pregunta, scope=scope)
-    if not scope or not tarifas_skill.postar_scope_requires_destination_group(scope):
-        destination_group = None
-    elif group_choice:
-        # Cuando el usuario elige continente/zona primero, forzamos siguiente paso a elegir país.
-        columna = None
-    if columna:
-        destination_group = None
 
     missing = _missing_tarifa_fields(scope, peso, columna, family=family, level=level)
     if missing:
-        quick_replies = _tarifa_quick_replies(
-            missing,
-            scope=scope,
-            family=family,
-            lang=lang,
-            destination_group=destination_group,
-        )
+        quick_replies = _tarifa_quick_replies(missing, scope=scope, family=family, lang=lang)
         session.set_pendiente_tarifa(
             sid,
             {
@@ -1413,7 +1745,6 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
                 "level": level,
                 "peso": peso,
                 "columna": columna,
-                "destination_group": destination_group,
             },
         )
         msg = tarifas_skill.missing_message(missing)
@@ -1436,7 +1767,6 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
                 "level": level,
                 "peso": peso,
                 "columna": columna,
-                "destination_group": destination_group,
             },
             "quick_replies": quick_replies,
         }
@@ -1471,7 +1801,6 @@ def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.Tarifa
                 "level": level,
                 "peso": peso,
                 "columna": None,
-                "destination_group": destination_group,
             },
         )
         session.agregar_turno(sid, pregunta, msg)
@@ -1577,13 +1906,16 @@ def _reindexar_pdfs_incremental() -> bool:
     try:
         pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
         if pdf_refresh.get("reprocesados"):
-            print(
-                "   PDFs reprocesados antes de indexado incremental: "
-                f"{pdf_refresh['reprocesados']} | mejorados: {pdf_refresh['mejorados']} | "
-                f"fallidos: {pdf_refresh['fallidos']}"
+            logger.info(
+                "PDFs reprocesados antes de indexado incremental",
+                extra={
+                    "reprocesados": pdf_refresh.get("reprocesados", 0),
+                    "mejorados": pdf_refresh.get("mejorados", 0),
+                    "fallidos": pdf_refresh.get("fallidos", 0),
+                },
             )
     except Exception as e:
-        print(f"   Error refrescando PDFs antes del indexado incremental: {e}")
+        logger.error("Error refrescando PDFs antes del indexado incremental", extra={"error": str(e)})
 
     chunks, ids, metadatas = [], [], []
     try:
@@ -1615,13 +1947,16 @@ def _reindexar_pdfs_incremental() -> bool:
                 ids += pdf_ids
                 metadatas += pdf_meta
     except Exception as e:
-        print(f"   Error leyendo PDF JSON en incremental: {e}")
+        logger.error("Error leyendo PDF JSON en incremental", extra={"error": str(e)}, exc_info=True)
         return False
 
     resultado = rag.reemplazar_por_source_type("pdf", chunks, ids, metadatas)
-    print(
-        "   Indexado incremental PDFs completado "
-        f"(eliminados: {resultado.get('removed', 0)} | agregados: {resultado.get('added', 0)})"
+    logger.info(
+        "Indexado incremental PDFs completado",
+        extra={
+            "eliminados": resultado.get("removed", 0),
+            "agregados": resultado.get("added", 0),
+        },
     )
     return bool(resultado.get("ok"))
 
@@ -1701,13 +2036,16 @@ def reindexar() -> bool:
     try:
         pdf_refresh = capabilities.reprocesar_pdfs_pendientes()
         if pdf_refresh.get("reprocesados"):
-            print(
-                "   PDFs reprocesados antes de indexar: "
-                f"{pdf_refresh['reprocesados']} | mejorados: {pdf_refresh['mejorados']} | "
-                f"fallidos: {pdf_refresh['fallidos']}"
+            logger.info(
+                "PDFs reprocesados antes de indexar",
+                extra={
+                    "reprocesados": pdf_refresh.get("reprocesados", 0),
+                    "mejorados": pdf_refresh.get("mejorados", 0),
+                    "fallidos": pdf_refresh.get("fallidos", 0),
+                },
             )
     except Exception as e:
-        print(f"   Error refrescando PDFs antes del RAG: {e}")
+        logger.error("Error refrescando PDFs antes del RAG", extra={"error": str(e)})
 
     # 1. Texto principal (HTML plano acumulado)
     c, i, m = rag.archivo_a_documentos(
@@ -1760,6 +2098,7 @@ def reindexar() -> bool:
         os.path.basename(HISTORIA_FILE or ""),
         "pdfs_contenido.json",
         "skills.json",
+        "estadisticas.json",
     }
     managed_items = capabilities.listar_data_jsons()
     for item in managed_items:
@@ -1777,6 +2116,9 @@ def reindexar() -> bool:
             if payload in (None, "", [], {}):
                 continue
             source_label = filename.replace(".json", "").replace("_", " ")
+            json_skill_id = ""
+            if isinstance(payload, dict):
+                json_skill_id = str(payload.get("_skill_id", "")).strip()
             serialized = json.dumps(payload, ensure_ascii=False, indent=2)
             jc, ji, jm = rag.documento_a_chunks(
                 serialized,
@@ -1786,11 +2128,12 @@ def reindexar() -> bool:
                     "source_name": filename,
                     "source_label": source_label,
                     "source_path": json_path,
+                    "skill_id": json_skill_id,
                 },
             )
             chunks += jc; ids += ji; metadatas += jm
         except Exception as e:
-            print(f"   Error leyendo JSON complementario '{filename}': {e}")
+            logger.error("Error leyendo JSON complementario", extra={"filename": filename, "error": str(e)})
 
     # 4. Contenido de PDFs (si existe el JSON generado por el scraper)
     try:
@@ -1823,19 +2166,19 @@ def reindexar() -> bool:
                     )
                     chunks += pdf_chunks; ids += pdf_ids; metadatas += pdf_meta
     except Exception as e:
-        print(f"   Error leyendo PDF JSON: {e}")
+        logger.error("Error leyendo PDF JSON", extra={"error": str(e)}, exc_info=True)
 
     # 5. Historia institucional (si existe el JSON generado por el scraper)
     try:
         historia_path = HISTORIA_FILE
         if historia_path and not os.path.isabs(historia_path):
             historia_path = os.path.join(os.path.dirname(DATA_FILE), os.path.basename(historia_path))
-        print(f"   Buscando historia en: {historia_path}")
+        logger.info("Buscando historia", extra={"historia_path": historia_path})
         if os.path.exists(historia_path):
-            print(f"   Archivo historia encontrado, cargando...")
+            logger.info("Archivo historia encontrado, cargando...")
             with open(historia_path, "r", encoding="utf-8") as f:
                 historia = json.load(f)
-            print(f"   Historia cargada: {len(historia)} entradas")
+            logger.info("Historia cargada", extra={"entradas": len(historia)})
             for idx, item in enumerate(historia):
                 if not isinstance(item, dict):
                     continue
@@ -1843,7 +2186,7 @@ def reindexar() -> bool:
                 if not contenido:
                     continue
                 titulo = item.get("titulo") or f"Historia {idx + 1}"
-                print(f"   Procesando historia {idx + 1}: {titulo[:50]}...")
+                logger.info("Procesando historia", extra={"idx": idx + 1, "titulo": titulo[:50]})
                 hist_chunks, hist_ids, hist_meta = rag.documento_a_chunks(
                     contenido,
                     prefijo=f"hist_{idx}",
@@ -1857,13 +2200,11 @@ def reindexar() -> bool:
                     },
                 )
                 chunks += hist_chunks; ids += hist_ids; metadatas += hist_meta
-                print(f"   → {len(hist_chunks)} chunks de historia '{titulo}'")
+                logger.info("Chunks de historia generados", extra={"chunks": len(hist_chunks), "titulo": titulo})
         else:
-            print(f"   Archivo historia no encontrado: {historia_path}")
+            logger.warning("Archivo historia no encontrado", extra={"historia_path": historia_path})
     except Exception as e:
-        print(f"   Error leyendo historia institucional: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error leyendo historia institucional", extra={"error": str(e)}, exc_info=True)
 
     success = rag.indexar(chunks, ids, metadatas=metadatas)
     if success:
@@ -1903,7 +2244,7 @@ def _cargar_historia_directamente() -> str:
         
         return "\n\n".join(partes)
     except Exception as e:
-        print(f"   Error cargando historia directamente: {e}")
+        logger.error("Error cargando historia directamente", extra={"error": str(e)}, exc_info=True)
         return ""
 
 
@@ -1959,10 +2300,7 @@ async def chat(request: Request):
     sid = _resolve_sid_from_request(request, data)
     request_id = _resolve_chat_request_id(data, sid)
     started_at = time.perf_counter()
-    pregunta = data.get("message", "").strip()
-    MAX_MESSAGE_LENGTH = 2000
-    if len(pregunta) > MAX_MESSAGE_LENGTH:
-        pregunta = pregunta[:MAX_MESSAGE_LENGTH]
+    pregunta = _normalizar_texto_usuario(data.get("message", ""))
     tarifa_mode = bool(data.get("tarifa_mode", False))
     tracking_mode = bool(data.get("tracking_mode", False))
 
@@ -1977,10 +2315,8 @@ async def chat(request: Request):
         f"Idioma manual: {lang_manual or 'none'}, idioma usado: {lang}"
     )
 
-    # Enriquecer la pregunta con contexto postal si no lo tiene implícito.
-    # pregunta_llm se usa solo para el LLM.
-    # pregunta (original) se usa para logs, historial y detección de intenciones.
-    pregunta_llm = _enriquecer_pregunta(pregunta) if not _modo_general_only() else pregunta
+    # pregunta_llm se recalcula después de posibles rewrites de follow-up.
+    pregunta_llm = pregunta
 
     # ── Consulta de rastreo 100% determinista (API externa)
     if tracking_mode:
@@ -2126,6 +2462,7 @@ async def chat(request: Request):
     # no perder el tema anterior. La función `es_pedido_corto` revisa comandos
     # como "dame" o mensajes muy breves.
     pregunta_original = pregunta  # guardar antes del posible rewrite
+
     if intents.es_pedido_corto(pregunta):
         hist = session.get_historial(sid)
         # buscar el último mensaje del propio usuario en el historial
@@ -2139,6 +2476,7 @@ async def chat(request: Request):
             print(f" Follow‑up detectado, reescribiendo pregunta: '{pregunta}' → '{nueva}'")
             pregunta = nueva  # añade contexto
 
+    pregunta_llm = _enriquecer_pregunta(pregunta) if not _modo_general_only() else pregunta
     t    = idiomas.IDIOMAS[lang]
     # Usar pregunta_llm (enriquecida) para detectar skills e in_scope
     # así "que servicios ofrece" → "que servicios ofrece [contexto: Correos Bolivia]"
@@ -2216,28 +2554,6 @@ async def chat(request: Request):
             started_at=started_at,
         )
 
-    respuesta_servicios = _respuesta_servicios_correos(pregunta, lang)
-    if respuesta_servicios is not None:
-        session.agregar_turno(sid, pregunta, respuesta_servicios)
-        return _finalizar_chat_response(
-            sid=sid,
-            request_id=request_id,
-            pregunta=pregunta,
-            payload={"response": respuesta_servicios, "lang": lang},
-            started_at=started_at,
-        )
-
-    respuesta_sireco = _respuesta_sireco(pregunta, lang)
-    if respuesta_sireco is not None:
-        session.agregar_turno(sid, pregunta, respuesta_sireco)
-        return _finalizar_chat_response(
-            sid=sid,
-            request_id=request_id,
-            pregunta=pregunta,
-            payload={"response": respuesta_sireco, "lang": lang},
-            started_at=started_at,
-        )
-
     # ── 2. Despedida
     if intents.es_despedida(pregunta):
         session.limpiar_historial(sid)
@@ -2245,57 +2561,6 @@ async def chat(request: Request):
             sid=sid,
             pregunta=pregunta,
             payload={"response": t["despedida"], "despedida": True, "lang": lang},
-            started_at=started_at,
-        )
-
-    # ── 3. Filtro de instituciones externas (FedEx, DHL, UPS, etc.)
-    # Debe ejecutarse ANTES del flujo de ubicación para evitar que
-    # "¿dónde queda FedEx?" entre al flujo de sucursales de AGBC.
-    if intents.es_consulta_otra_institucion(pregunta):
-        respuesta_ext = (
-            "Solo puedo ayudarte con información de la Agencia Boliviana de Correos (AGBC). "
-            "Para consultas sobre otras empresas de envíos, te sugiero contactarlas directamente.\n\n"
-            "¿Puedo ayudarte con algo de Correos de Bolivia?"
-        )
-        session.agregar_turno(sid, pregunta, respuesta_ext)
-        return _finalizar_chat_response(
-            sid=sid,
-            request_id=request_id,
-            pregunta=pregunta,
-            payload={
-                "response": respuesta_ext,
-                "lang": lang,
-                "skill_resolution": {
-                    "in_scope": False,
-                    "primary_skill": None,
-                    "matched_skills": [],
-                },
-            },
-            started_at=started_at,
-        )
-
-    # ── 4. Filtro de información sensible/técnica (IP, modelo, credenciales, etc.)
-    if intents.es_consulta_info_sensible(pregunta):
-        respuesta_sens = (
-            "Por seguridad, no puedo compartir información técnica interna. "
-            "Soy ChatbotBO, el asistente de la Agencia Boliviana de Correos.\n\n"
-            "Puedo ayudarte con: envíos, rastreo, sucursales, tarifas y servicios postales. "
-            "¿En qué puedo ayudarte? 📬"
-        )
-        session.agregar_turno(sid, pregunta, respuesta_sens)
-        return _finalizar_chat_response(
-            sid=sid,
-            request_id=request_id,
-            pregunta=pregunta,
-            payload={
-                "response": respuesta_sens,
-                "lang": lang,
-                "skill_resolution": {
-                    "in_scope": False,
-                    "primary_skill": None,
-                    "matched_skills": [],
-                },
-            },
             started_at=started_at,
         )
 
@@ -2312,11 +2577,12 @@ async def chat(request: Request):
 
         sucursales_scope = _filtrar_sucursales_por_scope(SUCURSALES, scope_ubicacion)
 
-        geo = _detectar_geo_ubicacion(
-            pregunta,
-            sucursales_scope,
-            fallback_sucursales=SUCURSALES if scope_ubicacion == "sucursales" else None,
-        )
+        # ── 3. ¿Solo nombre de ciudad?
+        geo = intents.detectar_solo_ciudad(pregunta, sucursales_scope)
+
+        # ── 4. ¿Consulta de ubicación con palabras clave?
+        if geo is None:
+            geo = intents.detectar_consulta_ubicacion(pregunta, sucursales_scope)
 
         if scope_ubicacion and _extraer_scope_ubicacion(pregunta) is not None and geo is None:
             tipo_label = "regionales" if scope_ubicacion == "regionales" else "sucursales"
@@ -2465,7 +2731,8 @@ async def chat(request: Request):
             valid_sources = [{"source_type": "history", "source_name": "historia_institucional.json"}]
     
     if not contexto.strip() or not valid_sources:
-        respuesta = t["sin_info"]
+        fallback_payload = _sin_info_payload(lang, t)
+        respuesta = fallback_payload["response"]
         # Registrar para mejorar el RAG
         log_sin_info(pregunta, lang, primary_skill_id)
         _registrar_sin_respuesta(pregunta, lang, primary_skill_id)
@@ -2481,12 +2748,13 @@ async def chat(request: Request):
             },
             "sources": sources,
             "primary_source_type": rag_result.get("primary_source_type"),
+            "quick_replies": fallback_payload.get("quick_replies", []),
         }, started_at=started_at)
 
     hora     = session.get_hora_bolivia()
     sistema  = construir_prompt(
         t["instruccion"],
-        contexto,
+        _limpiar_contexto_rag(contexto),
         hora,
         t["sin_info"],
         skills_context="",
@@ -2521,6 +2789,15 @@ async def chat(request: Request):
         respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
         respuesta = _normalize_response_text(respuesta)
 
+        # Completar respuesta si quedó cortada a la mitad
+        if respuesta and respuesta != t["sin_info"] and _respuesta_incompleta(respuesta):
+            logger.info("RESPUESTA_INCOMPLETA detectada, completando | pregunta='%s'", pregunta[:60])
+            respuesta = await _completar_respuesta_incompleta(
+                request, request_id, respuesta, pregunta, lang
+            )
+            respuesta = ollama.limpiar_respuesta(respuesta)
+            respuesta = _normalize_response_text(respuesta)
+
         # Anti-portugués: si el LLM responde en portugués a pesar de la instrucción,
         # reemplazar con sin_info para forzar una respuesta en el idioma correcto.
         if _respuesta_en_portugues(respuesta):
@@ -2543,7 +2820,8 @@ async def chat(request: Request):
 
         # Anti-inventado: verificar que los datos concretos (números, precios,
         # fechas) de la respuesta existan en el contexto RAG y no sean inventados.
-        if respuesta and respuesta != t["sin_info"]:
+        # Solo aplicar a skills donde los números deben ser exactos — leído desde capabilities.
+        if respuesta and respuesta != t["sin_info"] and capabilities.skill_requiere_guardia_numerica(primary_skill_id):
             if datos_inventados(respuesta, contexto):
                 logger.warning("DATOS_INVENTADOS detectados | pregunta='%s' | respuesta_inicio='%s'",
                                pregunta[:80], respuesta[:80])
@@ -2582,9 +2860,15 @@ async def chat(request: Request):
             and len(respuesta) >= 40
         )
 
+        quick_replies_payload = []
+        _es_sin_info = False
         # Registrar preguntas donde el LLM terminó devolviendo sin_info
         # (alucinación detectada, confusión, evidencia inválida, etc.)
         if respuesta == t["sin_info"]:
+            _es_sin_info = True
+            fallback_payload = _sin_info_payload(lang, t)
+            respuesta = fallback_payload["response"]
+            quick_replies_payload = fallback_payload.get("quick_replies", [])
             _registrar_sin_respuesta(pregunta, lang, primary_skill_id)
         respuesta = _truncate_response_safely(respuesta)
 
@@ -2611,8 +2895,10 @@ async def chat(request: Request):
         print(f" [{lang}] {len(respuesta)} chars")
 
         # Quick replies dinámicos según el contenido de la respuesta
+        # Si fue sin_info, no agregar quick replies (ya existen botones fijos en el frontend)
         from core.intents import quick_replies_para_respuesta
-        qr_dinamicos = quick_replies_para_respuesta(respuesta, lang)
+        qr_dinamicos = [] if _es_sin_info else quick_replies_para_respuesta(respuesta, lang)
+        quick_replies = quick_replies_payload or qr_dinamicos
 
         return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
             "response": respuesta,
@@ -2624,11 +2910,11 @@ async def chat(request: Request):
             },
             "sources": rag_result.get("sources", []),
             "primary_source_type": rag_result.get("primary_source_type"),
-            "quick_replies": qr_dinamicos,
+            "quick_replies": quick_replies,
         }, started_at=started_at)
 
     except asyncio.TimeoutError:
-        fallback = "Lo siento, el sistema está tardando más de lo normal. Por favor llámanos al +591 22152423 o visita correos.gob.bo"
+        fallback = f"Lo siento, el sistema está tardando más de lo normal. Por favor llámanos al {contacto.telefono()} o visita {contacto.web()}"
         session.agregar_turno(sid, pregunta, fallback)
         logger.warning("LLM_TIMEOUT | pregunta='%s' | timeout=%ss", pregunta[:100], ollama.LLM_RESPONSE_TIMEOUT)
         return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
@@ -2650,10 +2936,7 @@ async def chat_stream(request: Request):
     sid = _resolve_sid_from_request(request, data)
     request_id = _resolve_chat_request_id(data, sid)
     started_at = time.perf_counter()
-    pregunta = data.get("message", "").strip()
-    MAX_MESSAGE_LENGTH = 2000
-    if len(pregunta) > MAX_MESSAGE_LENGTH:
-        pregunta = pregunta[:MAX_MESSAGE_LENGTH]
+    pregunta = _normalizar_texto_usuario(data.get("message", ""))
     tarifa_mode = bool(data.get("tarifa_mode", False))
     tracking_mode = bool(data.get("tracking_mode", False))
 
@@ -2681,7 +2964,7 @@ async def chat_stream(request: Request):
 
     async def stream_generator():
         pregunta_actual = pregunta
-        pregunta_actual_llm = _enriquecer_pregunta(pregunta_actual) if not _modo_general_only() else pregunta_actual
+        pregunta_actual_llm = pregunta_actual
         yield _stream_line({"type": "start", "sid": sid, "request_id": request_id, "lang": lang})
 
         if tracking_mode:
@@ -2822,6 +3105,7 @@ async def chat_stream(request: Request):
         else:
             pregunta_actual_original = pregunta_actual
 
+        pregunta_actual_llm = _enriquecer_pregunta(pregunta_actual) if not _modo_general_only() else pregunta_actual
         t = idiomas.IDIOMAS[lang]
         # Usar pregunta_actual_llm (enriquecida) para detectar skills e in_scope
         skill_resolution = capabilities.resolve_skills_for_query(pregunta_actual_llm)
@@ -2885,51 +3169,6 @@ async def chat_stream(request: Request):
                 yield line
             return
 
-        # ── Filtro de instituciones externas (FedEx, DHL, UPS, etc.)
-        if intents.es_consulta_otra_institucion(pregunta_actual):
-            respuesta_ext = (
-                "Solo puedo ayudarte con información de la Agencia Boliviana de Correos (AGBC). "
-                "Para consultas sobre otras empresas de envíos, te sugiero contactarlas directamente.\n\n"
-                "¿Puedo ayudarte con algo de Correos de Bolivia? 📬"
-            )
-            session.agregar_turno(sid, pregunta_actual, respuesta_ext)
-            async for line in instant_end(
-                {
-                    "response": respuesta_ext,
-                    "lang": lang,
-                    "skill_resolution": {
-                        "in_scope": False,
-                        "primary_skill": None,
-                        "matched_skills": [],
-                    },
-                }
-            ):
-                yield line
-            return
-
-        # ── Filtro de información sensible/técnica (IP, modelo, credenciales, etc.)
-        if intents.es_consulta_info_sensible(pregunta_actual):
-            respuesta_sens = (
-                "Por seguridad, no puedo compartir información técnica interna. "
-                "Soy ChatbotBO, el asistente de la Agencia Boliviana de Correos.\n\n"
-                "Puedo ayudarte con: envíos, rastreo, sucursales, tarifas y servicios postales. "
-                "¿En qué puedo ayudarte? 📬"
-            )
-            session.agregar_turno(sid, pregunta_actual, respuesta_sens)
-            async for line in instant_end(
-                {
-                    "response": respuesta_sens,
-                    "lang": lang,
-                    "skill_resolution": {
-                        "in_scope": False,
-                        "primary_skill": None,
-                        "matched_skills": [],
-                    },
-                }
-            ):
-                yield line
-            return
-
         if not LOCATION_USE_LLM_ONLY:
             scope_ubicacion, payload_scope_ubicacion = _resolver_scope_ubicacion_o_preguntar(
                 sid, pregunta_actual, lang
@@ -2940,11 +3179,9 @@ async def chat_stream(request: Request):
                 return
 
             sucursales_scope = _filtrar_sucursales_por_scope(SUCURSALES, scope_ubicacion)
-            geo = _detectar_geo_ubicacion(
-                pregunta_actual,
-                sucursales_scope,
-                fallback_sucursales=SUCURSALES if scope_ubicacion == "sucursales" else None,
-            )
+            geo = intents.detectar_solo_ciudad(pregunta_actual, sucursales_scope)
+            if geo is None:
+                geo = intents.detectar_consulta_ubicacion(pregunta_actual, sucursales_scope)
 
             if scope_ubicacion and _extraer_scope_ubicacion(pregunta_actual) is not None and geo is None:
                 tipo_label = "regionales" if scope_ubicacion == "regionales" else "sucursales"
@@ -3088,7 +3325,8 @@ async def chat_stream(request: Request):
                 valid_sources = [{"source_type": "history", "source_name": "historia_institucional.json"}]
         
         if not contexto.strip() or not valid_sources:
-            respuesta = _truncate_response_safely(t["sin_info"])
+            fallback_payload = _sin_info_payload(lang, t)
+            respuesta = _truncate_response_safely(fallback_payload["response"])
             session.agregar_turno(sid, pregunta_actual, respuesta)
             async for line in instant_end(
                 {
@@ -3101,6 +3339,7 @@ async def chat_stream(request: Request):
                     },
                     "sources": sources,
                     "primary_source_type": rag_result.get("primary_source_type"),
+                    "quick_replies": fallback_payload.get("quick_replies", []),
                 }
             ):
                 yield line
@@ -3109,7 +3348,7 @@ async def chat_stream(request: Request):
         hora = session.get_hora_bolivia()
         sistema = construir_prompt(
             t["instruccion"],
-            contexto,
+            _limpiar_contexto_rag(contexto),
             hora,
             t["sin_info"],
             skills_context="",
@@ -3150,6 +3389,15 @@ async def chat_stream(request: Request):
             respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
             respuesta = _normalize_response_text(respuesta)
 
+            # Completar respuesta si quedó cortada (también en streaming)
+            if respuesta and respuesta != t["sin_info"] and _respuesta_incompleta(respuesta):
+                logger.info("RESPUESTA_INCOMPLETA en streaming, completando | pregunta='%s'", pregunta_actual[:60])
+                respuesta = await _completar_respuesta_incompleta(
+                    request, request_id, respuesta, pregunta_actual, lang
+                )
+                respuesta = ollama.limpiar_respuesta(respuesta)
+                respuesta = _normalize_response_text(respuesta)
+
             # Anti-portugués: misma guardia que en /chat
             if _respuesta_en_portugues(respuesta):
                 logger.warning("RESPUESTA_PORTUGUES streaming | pregunta='%s'", pregunta_actual[:100])
@@ -3181,7 +3429,8 @@ async def chat_stream(request: Request):
                     respuesta = t["sin_info"]
 
             # Anti-inventado: misma lógica que en /chat
-            if respuesta and respuesta != t["sin_info"]:
+            # Solo aplicar a skills donde los números deben ser exactos — leído desde capabilities.
+            if respuesta and respuesta != t["sin_info"] and capabilities.skill_requiere_guardia_numerica(primary_skill_id):
                 if datos_inventados(respuesta, contexto):
                     logger.warning("DATOS_INVENTADOS streaming | pregunta='%s'", pregunta_actual[:80])
                     respuesta = t["sin_info"]
@@ -3195,9 +3444,14 @@ async def chat_stream(request: Request):
 
             should_cache = bool(respuesta and respuesta != t["sin_info"]) and bool(valid_sources) and len(respuesta) >= 40
 
+            quick_replies_payload = []
             # Registrar preguntas donde el LLM terminó devolviendo sin_info
             if respuesta == t["sin_info"]:
+                fallback_payload = _sin_info_payload(lang, t)
+                respuesta = fallback_payload["response"]
+                quick_replies_payload = fallback_payload.get("quick_replies", [])
                 _registrar_sin_respuesta(pregunta_actual, lang, primary_skill_id)
+            respuesta = _truncate_response_safely(respuesta)
 
             if should_cache:
                 cache.set_response(
@@ -3231,6 +3485,7 @@ async def chat_stream(request: Request):
                     },
                     "sources": rag_result.get("sources", []),
                     "primary_source_type": rag_result.get("primary_source_type"),
+                    "quick_replies": quick_replies_payload,
                 }
             ):
                 yield line
@@ -3514,15 +3769,7 @@ def cache_responses_clear():
     return {"ok": True, "deleted": deleted}
 
 
-@router.post("/cache/clear", dependencies=[Depends(require_admin)])
-def cache_clear_all():
-    result = cache.clear_all_cache()
-    if not result.get("available"):
-        raise HTTPException(status_code=503, detail="Redis no disponible")
-    return {"ok": True, **result}
-
-
-@router.get("/conversations", dependencies=[Depends(require_admin)])
+@router.get("/conversations")
 def conversations_list(limit: int = 300, offset: int = 0, q: str = ""):
     payload = conversation_logs.list_conversations(limit=limit, offset=offset, q=q)
     payload["stats"] = conversation_logs.stats()
@@ -3697,7 +3944,7 @@ async def conversations_rate(request: Request, log_id: int):
     return {"ok": True, "id": log_id, "rating": rating_map[raw_rating]}
 
 
-@router.post("/conversations/clear", dependencies=[Depends(require_admin)])
+@router.post("/conversations/clear")
 def conversations_clear():
     deleted = conversation_logs.clear_conversations()
     return {"ok": True, "deleted": deleted}
@@ -3759,8 +4006,13 @@ async def actualizar_data_json(request: Request, nombre_archivo: str = Path(...,
     if "content" not in data:
         raise HTTPException(status_code=400, detail="content es obligatorio")
     try:
-        resultado = capabilities.actualizar_data_json(nombre_archivo, data.get("content"))
+        resultado = capabilities.actualizar_data_json(nombre_archivo, data.get("content"), data.get("skill_id"))
         resultado["reindex_started"] = _programar_reindex_debounced("data_json_edit", mode="full")
+        # Si se editó contacto_institucional.json, recargar el cache en memoria
+        if os.path.basename(nombre_archivo) == "contacto_institucional.json":
+            contacto.reload()
+            idiomas.IDIOMAS = idiomas._build_idiomas()
+            resultado["contacto_reloaded"] = True
         return resultado
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -3783,7 +4035,8 @@ async def subir_pdf(
     fuente_url: str = Form(""),
     pagina_fuente: str = Form(""),
     clean_mode: str = Form(""),
-    skill_id: str = Form(""),
+skill_id: str = Form(""),
+    texto_frontend: str = Form(""),
 ):
     try:
         resultado = capabilities.guardar_pdf_subido(
@@ -3792,6 +4045,7 @@ async def subir_pdf(
             pagina_fuente=pagina_fuente,
             clean_mode=clean_mode,
             skill_id=skill_id,
+            texto_frontend=texto_frontend,
         )
         resultado["reindex_started"] = _programar_reindex_debounced("pdf_upload", mode="pdf_only")
         return JSONResponse(content=resultado, status_code=201 if resultado.get("created") else 200)
@@ -3955,7 +4209,6 @@ async def iniciar_tarifa(request: Request):
             "level": None,
             "peso": None,
             "columna": None,
-            "destination_group": None,
         },
     )
     missing = ["alcance"]
@@ -4170,6 +4423,28 @@ async def sucursal_mas_cercana(request: Request):
     if (lat == 0 and lng == 0) or not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
         logger.info(f"[GEO] Rechazando coordenadas: lat={lat}, lng={lng}")
         raise HTTPException(status_code=400, detail="Coordenadas no válidas. Asegúrate de permitir el acceso a tu ubicación.")
+
+    # Advertir si las coordenadas están muy lejos de Bolivia
+    # Bolivia: lat entre -23 y -9, lng entre -70 y -57
+    BOLIVIA_LAT_MIN, BOLIVIA_LAT_MAX = -23.0, -9.0
+    BOLIVIA_LNG_MIN, BOLIVIA_LNG_MAX = -70.0, -57.0
+    MARGEN = 5.0  # 5 grados de margen para zonas fronterizas
+    fuera_de_bolivia = not (
+        (BOLIVIA_LAT_MIN - MARGEN) <= lat <= (BOLIVIA_LAT_MAX + MARGEN) and
+        (BOLIVIA_LNG_MIN - MARGEN) <= lng <= (BOLIVIA_LNG_MAX + MARGEN)
+    )
+    if fuera_de_bolivia:
+        logger.warning(f"[GEO] Coordenadas fuera de Bolivia: lat={lat}, lng={lng}")
+        return {
+            "ok": False,
+            "error": "ubicacion_fuera_bolivia",
+            "sid": sid,
+            "lang": lang,
+            "response": {
+                "es": "📍 Tu ubicación detectada parece estar fuera de Bolivia. Esto puede ocurrir cuando el navegador usa tu IP en vez de GPS.\n\nEscribe el nombre de tu ciudad (ej: 'sucursal La Paz') para encontrar la más cercana.",
+                "en": "📍 Your detected location seems to be outside Bolivia. This can happen when the browser uses your IP instead of GPS.\n\nType your city name (e.g. 'branch La Paz') to find the nearest one.",
+            }.get(lang, "📍 Tu ubicación detectada parece estar fuera de Bolivia. Escribe tu ciudad para buscar la sucursal más cercana."),
+        }
     
     if not SUCURSALES:
         return {
@@ -4230,16 +4505,20 @@ async def sucursal_mas_cercana(request: Request):
 
 @router.post("/rag/rebuild")
 async def rebuild_rag():
+    """Borra y reindexa toda la base RAG de forma sincronica, sin Celery."""
     try:
-        print("  Encolando rebuild limpio del RAG...")
-        task = rebuild_rag_task.delay()
+        print("  Iniciando rebuild limpio del RAG (sincronico)...")
+        rag.reset_collection()
+        ok = reindexar()
+        total = rag.total_chunks()
+        print(f"  Rebuild completado: {total} chunks en Qdrant")
         return {
             "ok": True,
-            "mensaje": "Rebuild limpio del RAG encolado.",
-            "task_id": task.id,
+            "mensaje": f"Rebuild completado. {total} chunks indexados.",
+            "chunks": total,
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en rebuild limpio del RAG: {e}")
+        raise HTTPException(status_code=500, detail=f"Error en rebuild RAG: {e}")
 
 
 # ─────────────────────────────────────────────

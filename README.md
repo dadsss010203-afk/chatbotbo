@@ -31,7 +31,7 @@ Este repositorio contiene:
 ### 2.1 Servicios principales
 
 - `ollama`: servidor de modelo de lenguaje local.
-- `ollama-setup`: contenedor auxiliar que descarga `llama3.2:1b` y crea el modelo `correos-bot`.
+- `ollama-setup`: contenedor auxiliar que descarga y crea el modelo `correos-bot`.
 - `redis`: broker/result backend de Celery y cache de respuesta/embeddings.
 - `qdrant`: vector store para búsqueda semántica.
 - `chatbot`: backend FastAPI.
@@ -140,7 +140,7 @@ Funciones clave:
 - `get_sid()` crea/retorna un UUID de sesión.
 - `get_historial(sid)` devuelve el historial de conversación.
 - `agregar_turno(sid, pregunta, respuesta)` mantiene un historial limitado.
-- `historial_reciente(sid)` regresa turnos completos recientes para el prompt.
+- `historial_reciente(sid)` regresa mensajes recientes para el prompt.
 - `total_sesiones()` cuenta sesiones activas.
 
 ### 5.2 Flujo de cotización postal
@@ -368,9 +368,9 @@ Para colocar el chatbot en una página web real, incluye el loader embebible ant
 
 ```html
 <script
-  src="https://TU-DOMINIO-CHATBOT/widget-embed.js?v=responsive"
+  src="https://TU-DOMINIO-CHATBOT/widget-embed.js"
   data-lang="es"
-  data-position="left"
+  data-position="right"
   defer>
 </script>
 ```
@@ -379,16 +379,14 @@ Ejemplo local con Docker:
 
 ```html
 <script
-  src="http://localhost:5000/widget-embed.js?v=responsive"
+  src="http://localhost:5000/widget-embed.js"
   data-lang="es"
-  data-position="left"
+  data-position="right"
   defer>
 </script>
 ```
 
 El archivo `widget-embed.js` crea un `iframe` flotante y carga internamente `/widget.html`, `/widget.css`, `/widget.js` y `/api` desde el dominio del chatbot. Esto evita conflictos de CSS, IDs y JavaScript con la página donde se implanta.
-
-Para mostrarlo al lado derecho cambia `data-position="left"` por `data-position="right"`.
 
 Opciones disponibles por atributos `data-*`:
 
@@ -474,10 +472,9 @@ docker compose up --build
 | `BATCH_SIZE` | Batch embeddings | `500` |
 | `N_RESULTADOS` | Resultados RAG | `2` (app) / `3` (worker) |
 | `CHATBOT_GENERAL_ONLY` | Solo modo local sin RAG | `false` |
-| `LOCATION_USE_LLM_ONLY` | Forzar ubicaciones por LLM/RAG en lugar del flujo determinístico | `false` |
 | `REQUIRE_EVIDENCE` | Exigir evidencia literal | `false` |
 | `HORAS_ACTUALIZACION` | Intervalo de actualización automática | `24` |
-| `MAX_HISTORIAL` | Turnos completos de historial en prompt | `3` |
+| `MAX_HISTORIAL` | Mensajes de historial en prompt | `3` |
 | `SESSION_TTL_MINUTES` | Expiración de sesión | `180` |
 
 ### 10.4 Nota Triton
@@ -543,3 +540,5 @@ Si usas `.env`, colócalo en `backend/app/.env`.
 - `core/updater.py` ejecuta scraper y reindexa periódicamente.
 
 ---
+
+> Este README documenta con detalle la implementación actual. Si quieres, puedo también generar un diagrama de arquitectura y un ejemplo de payloads JSON para cada endpoint. 

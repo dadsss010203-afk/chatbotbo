@@ -7,7 +7,6 @@ let API_URL = '/api';
 let lang    = 'es';
 let embedMode = false;
 let widgetPos = 'right';
-let embedViewportMode = 'desktop';
 
 // ─── ESTADO ────────────────────────────────────────────────────────────
 let chatOpen    = false;
@@ -18,7 +17,6 @@ let tarifaMode  = false;
 let trackingMode = false;
 let qrLibPromise = null;
 let welcomeLoaded = false;
-let openDelayTimer = null;
 
 // ─── TEXTOS POR IDIOMA ────────────────────────────────────────────────
 const TX = {
@@ -96,14 +94,9 @@ console.log('Widget.js cargando...');
   if (params.get('api')) API_URL = params.get('api').replace(/\/+$/, '');
   if (params.get('lang')) lang = params.get('lang');
   if (params.get('embed') === '1') embedMode = true;
-  if (params.get('viewport') === 'mobile') embedViewportMode = 'mobile';
   if (params.get('pos') === 'left') widgetPos = 'left';
   if (s && s.dataset.pos === 'left') widgetPos = 'left';
-  if (embedMode) {
-    document.documentElement.classList.add('widget-shell');
-    document.body.classList.add('widget-shell');
-    setEmbedViewportMode(embedViewportMode === 'mobile');
-  }
+  if (embedMode) document.body.classList.add('widget-shell');
 
   const baseUrl = s
     ? s.src.replace(/\/widget\.js.*$/, '')
@@ -195,8 +188,10 @@ function initWidget(s) {
   // Conectar botones del header (sin onclick inline para evitar errores de scope)
   const btnClose    = document.getElementById('btn-close');
   const btnMinimize = document.getElementById('btn-minimize');
+  const btnBubble   = document.getElementById('chat-bubble');
   if (btnClose)    btnClose.addEventListener('click', () => toggleChat());
   if (btnMinimize) btnMinimize.addEventListener('click', () => minimize());
+  if (btnBubble)   btnBubble.addEventListener('click', () => toggleChat());
 
   // Cerrar mapa al hacer clic fuera
   const mapaModal = document.getElementById('mapa-modal');
@@ -380,98 +375,11 @@ function now() {
 
 function notifyEmbedState(open) {
   if (!embedMode || window.parent === window) return;
-  const payload = { type: 'chatbotbo:state', open };
-  window.parent.postMessage(payload, '*');
-  if (open) {
-    setTimeout(() => window.parent.postMessage(payload, '*'), 80);
-    setTimeout(() => window.parent.postMessage(payload, '*'), 250);
-  }
-}
-
-function setEmbedViewportMode(isMobile) {
-  if (!embedMode) return;
-  embedViewportMode = isMobile ? 'mobile' : 'desktop';
-  const root = document.documentElement;
-  root.classList.add('widget-shell');
-  root.classList.toggle('embed-mobile', isMobile);
-  root.classList.toggle('embed-desktop', !isMobile);
-  document.body.classList.add('widget-shell');
-  document.body.classList.toggle('embed-mobile', isMobile);
-  document.body.classList.toggle('embed-desktop', !isMobile);
-}
-
-function setEmbedViewportSize(width, height) {
-  if (!embedMode) return;
-  const root = document.documentElement;
-  const numericWidth = Number(width);
-  const numericHeight = Number(height);
-  if (Number.isFinite(numericWidth) && numericWidth > 0) {
-    root.style.setProperty('--embed-vw', `${Math.ceil(numericWidth)}px`);
-  }
-  if (Number.isFinite(numericHeight) && numericHeight > 0) {
-    root.style.setProperty('--embed-vh', `${Math.ceil(numericHeight)}px`);
-  }
-}
-
-function setChatOpenClass(open) {
-  document.documentElement.classList.toggle('chat-is-open', open);
-  document.body.classList.toggle('chat-is-open', open);
-}
-
-function showChatWindow() {
-  const chatWindow = document.getElementById('chat-window');
-  if (!chatWindow) {
-    console.error('chat-window no encontrado');
-    return;
-  }
-  setChatOpenClass(true);
-  chatWindow.classList.add('open');
-  chatWindow.style.opacity = '';
-  document.getElementById('badge').style.display = 'none';
-  if (!welcomeLoaded) {
-    welcomeLoaded = true;
-    loadWelcome();
-  }
-  setTimeout(() => document.getElementById('input').focus(), 420);
-}
-
-function openChat() {
-  if (chatOpen || openDelayTimer) return;
-  chatOpen = true;
-  notifyEmbedState(true);
-  if (embedMode) {
-    const delay = embedViewportMode === 'mobile' ? 80 : 120;
-    openDelayTimer = setTimeout(() => {
-      openDelayTimer = null;
-      showChatWindow();
-    }, delay);
-    return;
-  }
-  showChatWindow();
-}
-
-function closeChat() {
-  if (openDelayTimer) {
-    clearTimeout(openDelayTimer);
-    openDelayTimer = null;
-  }
-  const chatWindow = document.getElementById('chat-window');
-  if (chatWindow) {
-    chatWindow.classList.remove('open');
-    chatWindow.style.opacity = '';
-  }
-  chatOpen = false;
-  setChatOpenClass(false);
-  notifyEmbedState(false);
+  window.parent.postMessage({ type: 'chatbotbo:state', open }, '*');
 }
 
 window.addEventListener('message', (event) => {
   const data = event.data || {};
-  if (data.type === 'chatbotbo:viewport') {
-    setEmbedViewportMode(Boolean(data.mobile));
-    setEmbedViewportSize(data.width, data.height);
-    return;
-  }
   if (data.type !== 'chatbotbo:command') return;
   if (data.action === 'open' && !chatOpen) toggleChat();
   if (data.action === 'close' && chatOpen) minimize();
@@ -480,15 +388,38 @@ window.addEventListener('message', (event) => {
 // ─── TOGGLE CHAT ──────────────────────────────────────────────────────
 function toggleChat() {
   console.log('toggleChat llamado, chatOpen actual:', chatOpen);
-  if (chatOpen || openDelayTimer) {
-    closeChat();
-    return;
+  chatOpen = !chatOpen;
+  console.log('Nuevo chatOpen:', chatOpen);
+  const chatWindow = document.getElementById('chat-window');
+  const bubble = document.getElementById('chat-bubble');
+  const isMobile = window.innerWidth <= 480;
+  console.log('chat-window element:', chatWindow);
+  if (chatWindow) {
+    chatWindow.classList.toggle('open', chatOpen);
+    chatWindow.style.opacity = chatOpen ? '1' : '0';
+  } else {
+    console.error('chat-window no encontrado');
   }
-  openChat();
+  if (chatOpen) {
+    document.getElementById('badge').style.display = 'none';
+    if (isMobile && bubble) bubble.style.display = 'none';
+    if (!welcomeLoaded) {
+      welcomeLoaded = true;
+      loadWelcome();
+    }
+    setTimeout(() => document.getElementById('input').focus(), 420);
+  } else {
+    if (bubble) bubble.style.display = 'flex';
+  }
+  notifyEmbedState(chatOpen);
 }
 
 function minimize() {
-  closeChat();
+  document.getElementById('chat-window').classList.remove('open');
+  const bubble = document.getElementById('chat-bubble');
+  if (bubble) bubble.style.display = 'flex';
+  chatOpen = false;
+  notifyEmbedState(false);
 }
 
 // ─── IDIOMA ───────────────────────────────────────────────────────────
@@ -578,7 +509,7 @@ async function translateConversation() {
     const data = await res.json();
     if (Array.isArray(data.translations)) {
       data.translations.forEach((tr, i) => {
-        if (bubbles[i]) bubbles[i].textContent = (typeof tr === 'string' && tr.trim()) ? tr : originals[i];
+        if (bubbles[i]) bubbles[i].innerHTML = formatBotText((typeof tr === 'string' && tr.trim()) ? tr : originals[i]);
       });
     }
   } catch (e) {
@@ -736,8 +667,9 @@ function addWelcomeMsg(text) {
 
   const b = document.createElement('div');
   b.className = 'bub';
-  b.textContent = text;
-  b.dataset.original = text;
+  const formattedWelcome = formatBotText(text);
+  b.textContent = formattedWelcome;
+  b.dataset.original = formattedWelcome;
 
   const tm = document.createElement('span');
   tm.className = 'msg-time';
@@ -760,6 +692,121 @@ function addWelcomeMsg(text) {
   }
 }
 
+// ─── FORMATEAR TEXTO DEL BOT ──────────────────────────────────────────
+// Convierte texto plano del LLM a HTML limpio.
+// - Si ya viene con HTML del backend, lo usa directamente.
+// - Colapsa \n simples en espacios (artefactos del tokenizer).
+// - Convierte \n\n en separadores de párrafo.
+// - Detecta listas inline (" - item. - item.") y las convierte a <ul>.
+// - Detecta listas con \n por ítem y las convierte a <ul>.
+function linkifyUrls(html) {
+  return html.replace(
+    /(?<![='"(>])(https?:\/\/[^\s<>"')\]]+)/g,
+    url => {
+      const trail = url.match(/[.,;:!?)]+$/);
+      const clean = trail ? url.slice(0, -trail[0].length) : url;
+      const suffix = trail ? trail[0] : '';
+      const display = clean.length > 50 ? clean.slice(0, 47) + '…' : clean;
+      return `<a href="${clean}" target="_blank" rel="noopener noreferrer" style="color:var(--b500,#2255B8);text-decoration:underline;word-break:break-all">${display}</a>${suffix}`;
+    }
+  );
+}
+
+// Formato liviano para streaming: solo escapa HTML, saltos de línea y links.
+function formatStreamText(text) {
+  if(!text) return '';
+  if(/<[a-z][\s\S]*>/i.test(text)) return linkifyUrls(text);
+  let t = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  t = t.replace(/\r\n/g, '\n');
+  t = t.replace(/\n{2,}/g, '<br><br>');
+  t = t.replace(/\n/g, '<br>');
+  return linkifyUrls(t.trim());
+}
+
+function formatBotText(text) {
+  if (!text) return '';
+  // Si ya contiene etiquetas HTML del backend, linkificar y devolver directamente
+  if (/<[a-z][\s\S]*>/i.test(text)) return linkifyUrls(text);
+
+  // Escapar HTML
+  let t = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  t = t.replace(/\r\n/g, '\n');
+
+  // ── Detectar lista con \n por ítem ──────────────────────────────────
+  const lineas = t.split('\n');
+  const esItemLista = l => /^\s*[-*•]\s+\S/.test(l) || /^\s*\d+[.)]\s+\S/.test(l);
+  const itemsConSalto = lineas.filter(l => l.trim()).filter(esItemLista);
+
+  if (itemsConSalto.length >= 2) {
+    let introLines = [], listaLines = [], cierreLines = [], enLista = false;
+    for (const linea of lineas) {
+      if (!linea.trim()) continue;
+      if (esItemLista(linea)) {
+        enLista = true;
+        listaLines.push(linea.trim().replace(/^\s*[-*•\d.)]+\s*/, ''));
+      } else if (enLista) {
+        cierreLines.push(linea.trim());
+      } else {
+        introLines.push(linea.trim());
+      }
+    }
+    let html = '';
+    if (introLines.length) html += `<p style="margin:0 0 6px 0">${linkifyUrls(introLines.join(' '))}</p>`;
+    html += '<ul style="margin:4px 0 4px 0;padding-left:18px;line-height:1.7">';
+    listaLines.forEach(item => { html += `<li>${linkifyUrls(item)}</li>`; });
+    html += '</ul>';
+    if (cierreLines.length) html += `<p style="margin:4px 0 0 0;color:#666;font-size:0.93em">${linkifyUrls(cierreLines.join(' '))}</p>`;
+    return html;
+  }
+
+  // ── Detectar lista inline: "intro - item1 - item2 - cierre" ────────
+  // Activa con 2+ ítems separados por " - " en una sola línea larga
+  if(t.includes(' - ')){
+    const partes = t.split(/\s+-\s+/);
+    if(partes.length >= 3){
+      const intro = partes[0].trim();
+      const resto = partes.slice(1);
+      let listaItems = resto;
+      let cierre = '';
+      const ultimo = resto[resto.length - 1];
+      if(resto.length > 2 && ultimo.length > 80 && !/^[^:]{0,40}:/.test(ultimo)){
+        listaItems = resto.slice(0, -1);
+        cierre = ultimo;
+      }
+      let html = '';
+      if(intro) html += `<p style="margin:0 0 6px 0">${linkifyUrls(intro)}</p>`;
+      html += '<ul style="margin:4px 0 4px 0;padding-left:18px;line-height:1.7">';
+      listaItems.forEach(item => {
+        const colonIdx = item.indexOf(':');
+        if(colonIdx > 0 && colonIdx < 50){
+          const nombre = item.slice(0, colonIdx).trim();
+          const desc = item.slice(colonIdx + 1).trim();
+          html += `<li><strong>${nombre}</strong>${desc ? ': ' + linkifyUrls(desc) : ''}</li>`;
+        } else {
+          html += `<li>${linkifyUrls(item.trim())}</li>`;
+        }
+      });
+      html += '</ul>';
+      if(cierre) html += `<p style="margin:4px 0 0 0;color:#555;font-size:0.93em">${linkifyUrls(cierre)}</p>`;
+      return html;
+    }
+  }
+
+// ── Texto normal: preservar saltos de linea como <br> ──────────────
+  // \n\n → párrafo nuevo. \n simple → salto de línea para listas.
+  t = t.replace(/\n{2,}/g, '<br><br>');
+  t = t.replace(/\n/g, '<br>');
+  t = t.replace(/ {2,}/g, ' ');
+  return linkifyUrls(t.trim());
+}
+
 // ─── AÑADIR MENSAJE ───────────────────────────────────────────────────
 function addMsg(text, type, bye = false, loc = null, noTranslate = false, conversationLogId = null) {
   // Solo eliminar el card de chips, la burbuja de bienvenida (welcomeMsg) se queda
@@ -773,35 +820,31 @@ function addMsg(text, type, bye = false, loc = null, noTranslate = false, conver
     const card = document.createElement('div');
     card.className = 'scard';
     card.classList.add('no-translate');
-    const escapeHTML = (str) => {
-      if (!str) return '';
-      return String(str).replace(/[&<>'"]/g, 
-        tag => ({
-          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
-        }[tag] || tag)
-      );
-    };
-    
     card.innerHTML = `
       <div class="sc-head">
         <div class="sc-ico"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
-        <div class="sc-htxt"><strong>${escapeHTML(loc.nombre) || 'Sucursal'}</strong><span>Correos de Bolivia</span></div>
+        <div class="sc-htxt"><strong>${loc.nombre || 'Sucursal'}</strong><span>Correos de Bolivia</span></div>
       </div>
       <div class="sc-body">
-        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>${escapeHTML(loc.direccion) || 'No disponible'}</span></div>
-        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>${escapeHTML(loc.telefono) || 'No disponible'}</span></div>
-        ${loc.email ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>${escapeHTML(loc.email)}</span></div>` : ''}
+        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg><span>${loc.direccion || 'No disponible'}</span></div>
+        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>${loc.telefono || 'No disponible'}</span></div>
+        ${loc.email ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><span>${loc.email}</span></div>` : ''}
         <div class="sc-sep"></div>
-        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 12 2zm.5 5v6l5.25 3.15-.75 1.23L11 14V7h1.5z"/></svg><span>${escapeHTML(loc.horario) || 'No disponible'}</span></div>
+        <div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 12 2zm.5 5v6l5.25 3.15-.75 1.23L11 14V7h1.5z"/></svg><span>${loc.horario || 'No disponible'}</span></div>
       </div>
-      ${loc.maps_url ? `<a class="sc-cta" href="${escapeHTML(loc.maps_url)}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Ver en Google Maps</a>` : ''}
+      ${loc.maps_url ? `<a class="sc-cta" href="${loc.maps_url}" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Ver en Google Maps</a>` : ''}
     `;
     wrap.appendChild(mkAv(type));
     wrap.appendChild(card);
   } else {
     const b = document.createElement('div');
     b.className = 'bub' + (bye ? ' farewell' : '');
-    b.textContent = text;
+    const formattedText = (type === 'b') ? formatBotText(text) : text;
+    if (type === 'b') {
+      b.innerHTML = formattedText;
+    } else {
+      b.textContent = formattedText;
+    }
     b.dataset.original = text;
 
     const tm = document.createElement('span');
@@ -863,7 +906,7 @@ async function autoTranslateBubble(bubble, originalText) {
     if (Array.isArray(data.translations)) {
       const tr = data.translations[0];
       if (typeof tr === 'string' && tr.trim()) {
-        bubble.textContent = tr;
+        bubble.innerHTML = formatBotText(tr);
       }
     }
   } catch (e) {
@@ -883,14 +926,14 @@ async function translateMsg(bubble, btn, originalText) {
     const data = await res.json();
     if (Array.isArray(data.translations)) {
       const tr = data.translations[0];
-      bubble.textContent = (typeof tr === 'string' && tr.trim()) ? tr : originalText;
+      bubble.innerHTML = formatBotText((typeof tr === 'string' && tr.trim()) ? tr : originalText);
       btn.textContent = '↩ Original';
       btn.style.color = 'var(--y700)';
       btn.onclick = () => {
-        bubble.textContent = originalText;
-        btn.textContent    = '🌐 Traducir';
-        btn.style.color    = '';
-        btn.onclick        = () => translateMsg(bubble, btn, originalText);
+        bubble.innerHTML = formatBotText(originalText);
+        btn.textContent  = '🌐 Traducir';
+        btn.style.color  = '';
+        btn.onclick      = () => translateMsg(bubble, btn, originalText);
       };
     }
   } catch (e) {
@@ -1012,7 +1055,7 @@ async function addTrackingCard(trackingData) {
   wrap.className = 'msg b';
 
   const ev = trackingData.ultimo_evento || {};
-  const estado = ev.nombre_evento || 'Sin descripción';
+  const estado = ev.nombre_evento || 'Sin descripcion';
   const fecha = (ev.created_at || '—').replace('T', ' ').substring(0, 16);
   const servicio = ev.servicio || '—';
   const oficina = ev.office || ev.ciudad_origen || '—';
@@ -1028,18 +1071,51 @@ async function addTrackingCard(trackingData) {
   if (estadoLower.includes('retenid') || estadoLower.includes('aduana')) estadoIcon = '⚠️';
   if (estadoLower.includes('devuelt')) estadoIcon = '↩️';
 
+  // ── Flight radar timeline ──────────────────────────────────────────
+  const eventos = Array.isArray(trackingData.eventos) ? trackingData.eventos : [];
+  let timelineHTML = '';
+  if (eventos.length >= 2) {
+    const dots = eventos.slice(-4).map((e, i) => {
+      const isLast = i === Math.min(eventos.length, 4) - 1;
+      const eName = (e.nombre_evento || '').toLowerCase();
+      let dot = '○'; let icon = '⏳';
+      if (eName.includes('entregad')) { dot = '●'; icon = '✅'; }
+      else if (eName.includes('transit') || eName.includes('proceso')) { dot = '●'; icon = '🚚'; }
+      else if (eName.includes('recibid') || eName.includes('registrad')) { dot = '●'; icon = '📍'; }
+      else { dot = isLast ? '○' : '●'; }
+      const ciudad = (e.office || e.ciudad_origen || e.ciudad_destino || '...').substring(0, 4).toUpperCase();
+      return { dot, icon, ciudad };
+    });
+    timelineHTML = `
+      <div style="margin-top:10px;padding:10px;background:#f8f9fa;border-radius:10px;text-align:center">
+        <div style="font-size:0.6rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:8px">Linea de tiempo</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:6px">
+          ${dots.map(d => `<span style="font-size:1.1rem;line-height:1;width:36px;text-align:center">${d.dot}</span>`).join('<span style="color:#ccc;width:20px;text-align:center">—</span>')}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:0;margin-bottom:4px">
+          ${dots.map(d => `<span style="font-size:0.55rem;color:#999;font-weight:600;letter-spacing:0.04em;width:36px;text-align:center">${d.ciudad}</span>`).join('<span style="width:20px"></span>')}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:0">
+          ${dots.map(d => `<span style="font-size:0.85rem;width:36px;text-align:center">${d.icon}</span>`).join('<span style="width:20px"></span>')}
+        </div>
+        <div style="margin-top:8px;font-size:0.6rem;color:#aaa">
+          ${eventos.slice(-4).map(e => (e.created_at || '').replace('T',' ').substring(11,16)).join(' → ')}
+        </div>
+      </div>`;
+  }
+
   const cardEl = document.createElement('div');
   cardEl.className = 'scard no-translate';
   cardEl.innerHTML = `
     <div class="sc-head" style="background:linear-gradient(135deg,#163A80,#2255B8)">
       <div class="sc-ico"><svg viewBox="0 0 24 24"><path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"/></svg></div>
-      <div class="sc-htxt"><strong>Estado del envío</strong><span style="font-family:monospace;letter-spacing:0.04em;font-size:0.7rem">${codigo}</span></div>
+      <div class="sc-htxt"><strong>Estado del envio</strong><span style="font-family:monospace;letter-spacing:0.04em;font-size:0.7rem">${codigo}</span></div>
     </div>
     <div class="sc-body" style="gap:0;padding:12px 14px">
       <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#FFF8E7;border-radius:10px;margin-bottom:10px;border-left:3px solid #E6A817">
         <span style="font-size:1.3rem;line-height:1">${estadoIcon}</span>
         <div>
-          <div style="font-size:0.62rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1px">Último estado</div>
+          <div style="font-size:0.62rem;color:#888;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:1px">Ultimo estado</div>
           <div style="font-size:0.82rem;font-weight:700;color:#1a1a1a;line-height:1.3">${estado}</div>
         </div>
       </div>
@@ -1061,9 +1137,9 @@ async function addTrackingCard(trackingData) {
           <div style="font-size:0.75rem;font-weight:600;color:#1a1a1a">${total} registrado${total !== 1 ? 's' : ''}</div>
         </div>
       </div>
-      <!-- QR pequeño -->
+      ${timelineHTML}
       <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;padding:8px 10px;background:#f8f9fa;border-radius:10px">
-        <div id="qr-${codigo.replace(/[^a-zA-Z0-9]/g,'')}" style="flex-shrink:0"></div>
+        <div id="${safeId}" style="flex-shrink:0"></div>
         <div style="font-size:0.65rem;color:#666;line-height:1.4">📱 <strong>Escanea</strong> para ver el rastreo completo en tu celular</div>
       </div>
     </div>
@@ -1077,8 +1153,7 @@ async function addTrackingCard(trackingData) {
   chat.appendChild(wrap);
   chat.scrollTop = chat.scrollHeight;
 
-  // Generar QR pequeño
-  const qrEl = cardEl.querySelector('#qr-' + codigo.replace(/[^a-zA-Z0-9]/g, ''));
+  const qrEl = cardEl.querySelector('#' + safeId);
   if (qrEl) {
     try {
       if (!window.QRCode) await ensureQRCodeLib();
@@ -1148,8 +1223,8 @@ async function sendMsg(msg) {
           // Acumular el texto completo
           streamMsg._fullText += data.content || '';
           
-          // Mostrar el texto con efecto de escritura y cursor parpadeante
-          const textToShow = streamMsg._fullText;
+          // Durante el stream: formato liviano (sin detección de listas)
+          const textToShow = formatStreamText(streamMsg._fullText);
           streamMsg.bubble.innerHTML = textToShow + '<span class="typing-cursor">|</span>';
           streamMsg.bubble.dataset.original = textToShow;
           
@@ -1167,19 +1242,13 @@ async function sendMsg(msg) {
           removeTyping();
 
           const bye = data.despedida === true;
-          const hasTarifaCard = Boolean(data?.tarifa_card && data.tarifa_card.precio);
-          const hasTrackingCard = Boolean(data?.tracking?.found);
-          const hasStructuredCard = hasTarifaCard || hasTrackingCard;
           const isBranchesList = data?.response_type === 'branches_list' && Array.isArray(data?.branches);
           if (isBranchesList) {
             if (streamMsg) streamMsg.wrap.remove();
             streamMsg = null;
             addBranchesList(data.branches, data.message || '');
-          } else if (hasStructuredCard) {
-            if (streamMsg) streamMsg.wrap.remove();
-            streamMsg = null;
           } else if (streamMsg) {
-            const finalText = data.response || streamMsg._fullText || 'Sin respuesta disponible';
+            const finalText = formatBotText(data.response || streamMsg._fullText || 'Sin respuesta disponible');
             // Remover cursor y mostrar texto final
             streamMsg.bubble.innerHTML = finalText;
             streamMsg.bubble.dataset.original = finalText;
@@ -1218,24 +1287,9 @@ async function sendMsg(msg) {
             );
           }
 
-          const tarifaDone = Boolean(
-            data?.tarifa && (
-              data.tarifa.requires_mode ||
-              data.tarifa.ok === true ||
-              data.tarifa.pending === false
-            )
-          );
-          if (tarifaDone && tarifaMode) {
+          if (data?.tarifa?.requires_mode) {
             tarifaMode = false;
             setTarifaModeUI();
-          }
-          const trackingDone = Boolean(
-            data?.tracking &&
-            data.tracking.pending === false
-          );
-          if (trackingDone && trackingMode) {
-            trackingMode = false;
-            setTrackingModeUI();
           }
           // Mostrar tarjeta visual de tarifa si el backend la devuelve
           if (data?.tarifa_card && data.tarifa_card.precio) {
@@ -1270,12 +1324,47 @@ async function sendMsg(msg) {
 }
 
 function addBranchesList(branches, intro = '') {
-  let texto = (typeof intro === 'string' && intro.trim()) ? `${intro.trim()}\n\n` : '';
-  branches.forEach((s) => {
-    const nombre = (s?.nombre || '').trim();
-    if (nombre) texto += `• ${nombre}\n`;
+  // Mostrar mensaje introductorio
+  if (intro) addMsg(intro, 'b', false, null, true, null);
+  
+  const chat = document.getElementById('chat');
+  branches.forEach((s, i) => {
+    const nombre  = (s.nombre  || '').trim();
+    const dir     = (s.direccion || '').trim();
+    const tel     = (s.telefono || '').trim();
+    const horario = (s.horario  || '').trim();
+    const mapsUrl = s?.enlaces?.mapa || s?.enlaces?.busqueda || '';
+
+    const wrap = document.createElement('div');
+    wrap.className = 'msg b';
+
+    const card = document.createElement('div');
+    card.className = 'scard no-translate';
+    card.style.marginBottom = i < branches.length - 1 ? '8px' : '0';
+    card.innerHTML = `
+      <div class="sc-head" style="background:linear-gradient(135deg,#163A80,#2255B8)">
+        <div class="sc-ico">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="var(--y400)">
+            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+          </svg>
+        </div>
+        <div class="sc-htxt"><strong>${nombre}</strong><span>Correos de Bolivia</span></div>
+      </div>
+      <div class="sc-body">
+        ${dir ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg><span>${dir}</span></div>` : ''}
+        ${tel ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>${tel}</span></div>` : ''}
+        ${horario ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 12 2zm.5 5v6l5.25 3.15-.75 1.23L11 14V7h1.5z"/></svg><span>${horario}</span></div>` : ''}
+        <div class="sc-sep"></div>
+      </div>
+      ${mapsUrl ? `<a class="sc-cta" href="${mapsUrl}" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Ver en Google Maps</a>` : ''}
+    `;
+
+    wrap.appendChild(mkAv('b'));
+    wrap.appendChild(card);
+    chat.appendChild(wrap);
   });
-  addMsg(texto || 'No hay oficinas disponibles en este momento.', 'b', false, null, true, null);
+  chat.scrollTop = chat.scrollHeight;
 }
 
 function suggest(btn) { sendMsg(btn.textContent); }

@@ -218,8 +218,8 @@ def _extraccion_sucursales_alternativa(soup: BeautifulSoup, url: str, coords: li
             "nombre"   : lineas[0],
             "direccion": "",
             "telefono" : "",
-            "email"    : ScraperConfig.EMAIL_DEFAULT,
-            "horario"  : ScraperConfig.HORARIO_DEFAULT,
+            "email"    : ScraperConfig._get_email_default(),
+            "horario"  : ScraperConfig._get_horario_default(),
             "lat": None, "lng": None, "enlaces": {},
             "fuente"   : url,
         }
@@ -345,8 +345,8 @@ def extraer_sucursales(html: str, url: str) -> list[dict]:
             "nombre"   : titulo,
             "direccion": _extraer_campo_elementor(seccion, "Direcci"),
             "telefono" : _extraer_campo_elementor(seccion, "Tel"),
-            "email"    : _extraer_campo_elementor(seccion, "Email") or ScraperConfig.EMAIL_DEFAULT,
-            "horario"  : _extraer_campo_elementor(seccion, "Horario") or ScraperConfig.HORARIO_DEFAULT,
+            "email"    : _extraer_campo_elementor(seccion, "Email") or ScraperConfig._get_email_default(),
+            "horario"  : _extraer_campo_elementor(seccion, "Horario") or ScraperConfig._get_horario_default(),
             "lat": None, "lng": None, "enlaces": {},
             "fuente": url,
         }
@@ -369,8 +369,8 @@ def extraer_sucursales(html: str, url: str) -> list[dict]:
             texto_sec = seccion.get_text(separator="\n", strip=True)
             s = {"nombre": titulo, "fuente": url,
                  "lat": None, "lng": None, "enlaces": {},
-                 "email": ScraperConfig.EMAIL_DEFAULT,
-                 "horario": ScraperConfig.HORARIO_DEFAULT,
+                 "email": ScraperConfig._get_email_default(),
+                 "horario": ScraperConfig._get_horario_default(),
                  "direccion": "", "telefono": ""}
             for pat, campo in [
                 (r'Direcci[oó]n[:\s]+([^\n]+)', "direccion"),

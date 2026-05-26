@@ -9,6 +9,7 @@ import os
 import re
 import json
 import requests
+from core import contacto
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
@@ -58,7 +59,7 @@ def _nominatim_fallback(direccion: str, ciudad: str) -> dict | None:
             resp = requests.get(
                 "https://nominatim.openstreetmap.org/search",
                 params  = {"q": query, "format": "json", "limit": 1},
-                headers = {"User-Agent": "CorreosBoliviaBot/1.0 agbc@correos.gob.bo"},
+                headers = {"User-Agent": f"CorreosBoliviaBot/1.0 {contacto.email()}"},
                 timeout = 8,
             )
             data = resp.json()

@@ -1,11 +1,13 @@
 """
 core/idiomas.py
-Textos en 5 idiomas (ES/EN/FR/ZH/RU) + detección automática con langdetect.
+Textos en 2 idiomas (ES/EN) + detección automática con langdetect.
 Compartido por todos los chatbots.
+Los datos de contacto (telefono, web) se leen de contacto_institucional.json
+a través de core.contacto — no hardcodear aquí.
 """
 
-import re
 from langdetect import detect, LangDetectException
+from core import contacto
 
 # ─────────────────────────────────────────────
 #  MAPA langdetect → código interno
@@ -13,11 +15,7 @@ from langdetect import detect, LangDetectException
 LANG_MAP = {
     "es"   : "es",
     "en"   : "en",
-    "fr"   : "fr",
-    "zh-cn": "zh",
-    "zh-tw": "zh",
-    "ko"   : "zh",   # langdetect confunde chino/coreano en textos cortos
-    "ru"   : "ru",
+    # Cualquier otro idioma detectado → español por defecto
 }
 
 IDIOMA_DEFAULT = "es"
@@ -25,99 +23,53 @@ IDIOMA_DEFAULT = "es"
 # ─────────────────────────────────────────────
 #  TEXTOS POR IDIOMA
 # ─────────────────────────────────────────────
-IDIOMAS = {
-    "es": {
-        "nombre"       : "Español",
-        "bienvenida": (
-            "¡Hola! Bienvenido al asistente oficial de Correos de Bolivia. "
-            "Puedo ayudarte con envíos, sucursales, ubicaciones y más.\n\n"
-            "• Presiona el botón TARIFAS para activar las consultas de tarifas de envío. "
-            "Presiónalo de nuevo para desactivarlo.\n"
-            "• Presiona el botón RASTREO para rastrear un paquete. "
-            "Presiónalo de nuevo para desactivarlo.\n\n"
-            "¿En qué puedo ayudarte hoy?"
-        ),
-        "saludo"       : (
-            "¡Hola! Soy ChatbotBO, el asistente de Correos Bolivia. "
-            "Puedo ayudarte con envíos, sucursales y más. ¿En qué puedo ayudarte?"
-        ),
-        "despedida"    : (
-            "Ha sido un placer ayudarte. Que tengas un excelente día. "
-            "Recuerda que puedes visitarnos en correos.gob.bo. ¡Hasta pronto!"
-        ),
-        "sin_info"     : "No tengo esa información. Visita correos.gob.bo o llama al +591 22152423.",
-        "instruccion"  : "Responde en español, de forma clara y amable.",
-        "pedir_ciudad" : "Por favor indica una ciudad válida: {ciudades}",
-        "no_disponible": "No disponible",
-    },
-    "en": {
-        "nombre"       : "English",
-        "bienvenida"   : (
-            "Hello! Welcome to the official assistant of the Bolivian Postal. "
-            "I can help you with shipments, branches, locations and more. How can I help you today?"
-        ),
-        "saludo"       : "Hello! I am the Correos Bolivia assistant. How can I help you?",
-        "despedida"    : (
-            "It was a pleasure helping you. Have a great day. "
-            "Remember you can visit us at correos.gob.bo. Goodbye!"
-        ),
-        "sin_info"     : "I don't have that information. Visit correos.gob.bo or call +591 22152423.",
-        "instruccion"  : "Respond in English, clearly and politely.",
-        "pedir_ciudad" : "Please specify a city among: {ciudades}",
-        "no_disponible": "Not available",
-    },
-    "fr": {
-        "nombre"       : "Français",
-        "bienvenida"   : (
-            "Bonjour! Bienvenue chez l'assistant officiel de l'Agence Bolivienne des Postes (AGBC). "
-            "Je peux vous aider avec les envois, les succursales et plus encore. "
-            "Comment puis-je vous aider?"
-        ),
-        "saludo"       : "Bonjour! Je suis l'assistant de Correos Bolivia. Comment puis-je vous aider?",
-        "despedida"    : (
-            "Ce fut un plaisir de vous aider. Bonne journée. "
-            "N'oubliez pas de visiter correos.gob.bo. Au revoir!"
-        ),
-        "sin_info"     : "Je n'ai pas cette information. Visitez correos.gob.bo ou appelez le +591 22152423.",
-        "instruccion"  : "Répondez en français, clairement et poliment.",
-        "pedir_ciudad" : "Veuillez indiquer une ville parmi : {ciudades}",
-        "no_disponible": "Non disponible",
-    },
-    "zh": {
-        "nombre"       : "中文",
-        "bienvenida"   : (
-            "您好！欢迎使用玻利维亚邮政局（AGBC）官方助手。"
-            "我可以帮助您了解邮寄、费率、分支机构、位置等信息。请问有什么可以帮助您？"
-        ),
-        "saludo"       : "您好！我是玻利维亚邮政助手。有什么可以帮助您？",
-        "despedida"    : (
-            "很高兴为您服务。祝您有美好的一天。"
-            "请记得访问 correos.gob.bo。再见！"
-        ),
-        "sin_info"     : "我没有该信息。请访问 correos.gob.bo 或致电 +591 22152423。",
-        "instruccion"  : "请用中文回答，清晰友好。",
-        "pedir_ciudad" : "请在以下城市中指定一个：{ciudades}",
-         "no_disponible": "不可用",
-    },
-    "ru": {
-        "nombre"       : "Русский",
-        "bienvenida"   : (
-            "Здравствуйте! Добро пожаловать в официальный помощник "
-            "Боливийского почтового агентства (AGBC). "
-            "Я могу помочь вам с отправлениями, тарифами, отделениями и местоположениями. "
-            "Чем могу помочь?"
-        ),
-        "saludo"       : "Здравствуйте! Я помощник Correos Bolivia. Чем могу помочь?",
-        "despedida"    : (
-            "Был рад помочь. Хорошего дня! "
-            "Не забудьте посетить наш сайт correos.gob.bo. До свидания!"
-        ),
-        "sin_info"     : "У меня нет этой информации. Посетите correos.gob.bo или позвоните +591 22152423.",
-        "instruccion"  : "Отвечай на русском языке, чётко и вежливо.",
-        "pedir_ciudad" : "Пожалуйста, укажите город из списка: {ciudades}",
-         "no_disponible": "Недоступно",
-    },
-}
+def _build_idiomas() -> dict:
+    tel = contacto.telefono()
+    web = contacto.web()
+    return {
+        "es": {
+            "nombre"       : "Español",
+            "bienvenida"   : (
+                "¡Hola! Bienvenido al asistente oficial de Correos de Bolivia. "
+                "Puedo ayudarte con envíos, sucursales, ubicaciones y más.\n\n"
+                "• Presiona el botón TARIFAS para activar las consultas de tarifas de envío. "
+                "Presiónalo de nuevo para desactivarlo.\n"
+                "• Presiona el botón RASTREO para rastrear un paquete. "
+                "Presiónalo de nuevo para desactivarlo.\n\n"
+                "¿En qué puedo ayudarte hoy?"
+            ),
+            "saludo"       : (
+                "¡Hola! Soy ChatbotBO, el asistente de Correos Bolivia. "
+                "Puedo ayudarte con envíos, sucursales y más. ¿En qué puedo ayudarte?"
+            ),
+            "despedida"    : (
+                f"Ha sido un placer ayudarte. Que tengas un excelente día. "
+                f"Recuerda que puedes visitarnos en {web}. ¡Hasta pronto!"
+            ),
+            "sin_info"     : f"No tengo esa información. Visita {web} o llama al {tel}.",
+            "instruccion"  : "Responde en español, de forma clara y amable.",
+            "pedir_ciudad" : "Por favor indica una ciudad válida: {ciudades}",
+            "no_disponible": "No disponible",
+        },
+        "en": {
+            "nombre"       : "English",
+            "bienvenida"   : (
+                "Hello! Welcome to the official assistant of the Bolivian Postal. "
+                "I can help you with shipments, branches, locations and more. How can I help you today?"
+            ),
+            "saludo"       : "Hello! I am the Correos Bolivia assistant. How can I help you?",
+            "despedida"    : (
+                f"It was a pleasure helping you. Have a great day. "
+                f"Remember you can visit us at {web}. Goodbye!"
+            ),
+            "sin_info"     : f"I don't have that information. Visit {web} or call {tel}.",
+            "instruccion"  : "Respond in English, clearly and politely.",
+            "pedir_ciudad" : "Please specify a city among: {ciudades}",
+            "no_disponible": "Not available",
+        },
+    }
+
+IDIOMAS = _build_idiomas()
 
 
 # ─────────────────────────────────────────────
@@ -128,13 +80,11 @@ def detectar_idioma(texto: str) -> str:
     texto_limpio = texto.strip()
     if len(texto_limpio) < 2:
         return IDIOMA_DEFAULT
-
     try:
         codigo = detect(texto_limpio)
         lang = LANG_MAP.get(codigo, IDIOMA_DEFAULT)
     except LangDetectException:
         return IDIOMA_DEFAULT
-
     return lang
 
 

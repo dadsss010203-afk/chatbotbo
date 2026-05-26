@@ -1,6 +1,6 @@
 """
 core/ollama.py
-Cliente del modelo Ollama: llamadas, limpieza y verificación.
+Cliente del modelo Ollama: llamadas, limpieza y verificacion.
 Compartido por todos los chatbots.
 """
 
@@ -10,25 +10,27 @@ import time
 import json
 import threading
 import requests
+import logging
+
+logger = logging.getLogger("chatbotbo.ollama")
 
 # ─────────────────────────────────────────────
-#  CONFIGURACIÓN
+#  CONFIGURACION
 # ─────────────────────────────────────────────
-#LOCAL
-LLM_MODEL             = os.environ.get("LLM_MODEL",         "correos-bot")
-OLLAMA_URL            = os.environ.get("OLLAMA_URL",         "http://127.0.0.1:11434/api/chat")
-#PRUEBA CON COLAB
-#LLM_MODEL      = os.environ.get("LLM_MODEL",         "llama3.2:1b")
-#OLLAMA_URL     = os.environ.get("OLLAMA_URL",        "https://nondeceivable-contributable-daryl.ngrok-free.dev/api/chat")
+# LOCAL
+LLM_MODEL             = os.environ.get("LLM_MODEL",        "correos-bot")
+OLLAMA_URL            = os.environ.get("OLLAMA_URL",        "http://127.0.0.1:11434/api/chat")
+# PRUEBA CON COLAB
+# LLM_MODEL      = os.environ.get("LLM_MODEL",        "llama3.2:1b")
+# OLLAMA_URL     = os.environ.get("OLLAMA_URL",        "https://nondeceivable-contributable-daryl.ngrok-free.dev/api/chat")
 
-
-OLLAMA_TIMEOUT        = int(os.environ.get("OLLAMA_TIMEOUT", "800"))
-OLLAMA_RETRIES        = int(os.environ.get("OLLAMA_RETRIES", "2"))
-OLLAMA_RETRY_BACKOFF  = float(os.environ.get("OLLAMA_RETRY_BACKOFF", "0.5"))
-OLLAMA_MAX_TOKENS     = os.environ.get("OLLAMA_MAX_TOKENS")
+OLLAMA_TIMEOUT           = int(os.environ.get("OLLAMA_TIMEOUT",        "800"))
+OLLAMA_RETRIES           = int(os.environ.get("OLLAMA_RETRIES",        "2"))
+OLLAMA_RETRY_BACKOFF     = float(os.environ.get("OLLAMA_RETRY_BACKOFF","0.5"))
+OLLAMA_MAX_TOKENS        = os.environ.get("OLLAMA_MAX_TOKENS")
 OLLAMA_PROMPT_MAX_TOKENS = int(os.environ.get("OLLAMA_PROMPT_MAX_TOKENS", "1800"))
-# Timeout máximo para respuesta del LLM (segundos). Si se supera, se devuelve fallback.
-LLM_RESPONSE_TIMEOUT  = int(os.environ.get("LLM_RESPONSE_TIMEOUT", "50"))
+# Timeout maximo para respuesta del LLM (segundos). Si se supera, se devuelve fallback.
+LLM_RESPONSE_TIMEOUT     = int(os.environ.get("LLM_RESPONSE_TIMEOUT",  "50"))
 
 _SESSION = requests.Session()
 _ACTIVE_LOCK = threading.Lock()
@@ -36,12 +38,20 @@ _ACTIVE_REQUESTS: dict[str, dict] = {}
 
 
 class OllamaCancelled(Exception):
-    """La generación fue cancelada explícitamente por el usuario."""
+    """La generacion fue cancelada explicitamente por el usuario."""
 
+
+# ─────────────────────────────────────────────
+#  GESTION DE REQUESTS ACTIVOS
+# ─────────────────────────────────────────────
 
 def _register_active_request(request_id: str, cancel_event: threading.Event) -> None:
     with _ACTIVE_LOCK:
-        _ACTIVE_REQUESTS[request_id] = {"cancel_event": cancel_event, "response": None, "session": None}
+        _ACTIVE_REQUESTS[request_id] = {
+            "cancel_event": cancel_event,
+            "response": None,
+            "session": None,
+        }
 
 
 def _set_active_response(request_id: str, response) -> None:
@@ -68,7 +78,7 @@ def cancel_request(request_id: str) -> bool:
             return False
         state["cancel_event"].set()
         response = state.get("response")
-        session = state.get("session")
+        session  = state.get("session")
     try:
         if response is not None:
             try:
@@ -86,6 +96,11 @@ def cancel_request(request_id: str) -> bool:
     except Exception:
         pass
     return True
+
+
+# ─────────────────────────────────────────────
+#  HELPERS DE ENTORNO
+# ─────────────────────────────────────────────
 
 def _env_int(name: str, default: int) -> int:
     raw = os.environ.get(name)
@@ -110,18 +125,17 @@ def _env_float(name: str, default: float) -> float:
 def _default_options() -> dict:
     """
     Opciones por defecto (configurables por variables de entorno).
-
-    Nota: `num_ctx` alto ayuda a no truncar instrucciones + contexto RAG,
+    num_ctx alto ayuda a no truncar instrucciones + contexto RAG,
     lo cual reduce alucinaciones.
     """
     seed = os.environ.get("OLLAMA_SEED")
     options = {
-        "num_predict": _env_int("OLLAMA_NUM_PREDICT", 400),
-        "temperature": _env_float("OLLAMA_TEMPERATURE", 0.2),
-        "num_ctx": _env_int("OLLAMA_NUM_CTX", 2048),
-        "repeat_penalty": _env_float("OLLAMA_REPEAT_PENALTY", 1.1),
-        "top_p": _env_float("OLLAMA_TOP_P", 0.9),
-        "top_k": _env_int("OLLAMA_TOP_K", 40),
+        "num_predict":   _env_int("OLLAMA_NUM_PREDICT",   600),
+        "temperature":   _env_float("OLLAMA_TEMPERATURE", 0.2),
+        "num_ctx":       _env_int("OLLAMA_NUM_CTX",       2048),
+        "repeat_penalty":_env_float("OLLAMA_REPEAT_PENALTY", 1.1),
+        "top_p":         _env_float("OLLAMA_TOP_P",       0.9),
+        "top_k":         _env_int("OLLAMA_TOP_K",         40),
     }
     if seed is not None and seed != "":
         try:
@@ -134,36 +148,36 @@ def _default_options() -> dict:
 
 
 # ─────────────────────────────────────────────
-#  LLAMADA AL MODELO
+#  LLAMADA AL MODELO (no-streaming)
 # ─────────────────────────────────────────────
 
 def llamar_ollama(
-    mensajes : list,
-    modelo   : str  = None,
-    opciones : dict = None,
+    mensajes:   list,
+    modelo:     str  = None,
+    opciones:   dict = None,
     request_id: str | None = None,
 ) -> str:
     """
-    Envía mensajes a Ollama y devuelve la respuesta como string.
+    Envia mensajes a Ollama y devuelve la respuesta como string.
 
     Args:
-        mensajes : lista de {"role": "system/user/assistant", "content": "..."}
-        modelo   : nombre del modelo (por defecto LLM_MODEL del .env)
-        opciones : parámetros del modelo. Por defecto:
-                   num_predict=200, temperature=0, num_ctx=4096
+        mensajes   : lista de {"role": "system/user/assistant", "content": "..."}
+        modelo     : nombre del modelo (por defecto LLM_MODEL del .env)
+        opciones   : parametros del modelo
+        request_id : si se pasa, permite cancelar con cancel_request()
 
     Returns:
         Texto de la respuesta del modelo.
 
     Raises:
-        requests.exceptions.Timeout    : si el modelo tarda más de OLLAMA_TIMEOUT
-        requests.exceptions.HTTPError  : si Ollama devuelve un error HTTP
+        requests.exceptions.Timeout   : si el modelo tarda mas de OLLAMA_TIMEOUT
+        requests.exceptions.HTTPError : si Ollama devuelve un error HTTP
     """
     payload = {
-        "model"   : modelo or LLM_MODEL,
+        "model":    modelo or LLM_MODEL,
         "messages": mensajes,
-        "stream"  : bool(request_id),
-        "options" : {**_default_options(), **(opciones or {})},
+        "stream":   bool(request_id),
+        "options":  {**_default_options(), **(opciones or {})},
     }
 
     last_exception = None
@@ -176,13 +190,16 @@ def llamar_ollama(
                 if request_id:
                     request_session = requests.Session()
                     _set_active_session(request_id, request_session)
-                    with request_session.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT, stream=True) as resp:
+                    with request_session.post(
+                        OLLAMA_URL, json=payload,
+                        timeout=OLLAMA_TIMEOUT, stream=True
+                    ) as resp:
                         _set_active_response(request_id, resp)
                         resp.raise_for_status()
                         partes = []
                         for raw_line in resp.iter_lines(chunk_size=1, decode_unicode=True):
                             if cancel_event is not None and cancel_event.is_set():
-                                raise OllamaCancelled("Generación cancelada por el usuario.")
+                                raise OllamaCancelled("Generacion cancelada por el usuario.")
                             if not raw_line:
                                 continue
                             data = json.loads(raw_line)
@@ -192,8 +209,9 @@ def llamar_ollama(
                             if data.get("done"):
                                 break
                         if cancel_event is not None and cancel_event.is_set():
-                            raise OllamaCancelled("Generación cancelada por el usuario.")
+                            raise OllamaCancelled("Generacion cancelada por el usuario.")
                         return "".join(partes)
+                # Sin streaming
                 resp = _SESSION.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT)
                 resp.raise_for_status()
                 data = resp.json()
@@ -203,7 +221,7 @@ def llamar_ollama(
             except requests.exceptions.RequestException as exc:
                 last_exception = exc
                 if cancel_event is not None and cancel_event.is_set():
-                    raise OllamaCancelled("Generación cancelada por el usuario.") from exc
+                    raise OllamaCancelled("Generacion cancelada por el usuario.") from exc
                 if attempt > OLLAMA_RETRIES:
                     raise
                 time.sleep(OLLAMA_RETRY_BACKOFF * attempt)
@@ -213,23 +231,25 @@ def llamar_ollama(
             _unregister_active_request(request_id)
 
 
+# ─────────────────────────────────────────────
+#  STREAMING
+# ─────────────────────────────────────────────
+
 def stream_ollama(
-    mensajes: list,
-    modelo: str = None,
-    opciones: dict = None,
+    mensajes:   list,
+    modelo:     str  = None,
+    opciones:   dict = None,
     request_id: str | None = None,
 ):
     """
-    Envía mensajes a Ollama y produce fragmentos de respuesta conforme llegan.
-
-    Si se pasa `request_id`, la generación puede cancelarse usando
-    `cancel_request(request_id)`.
+    Envia mensajes a Ollama y produce fragmentos de respuesta conforme llegan.
+    Si se pasa request_id, la generacion puede cancelarse con cancel_request().
     """
     payload = {
-        "model": modelo or LLM_MODEL,
+        "model":    modelo or LLM_MODEL,
         "messages": mensajes,
-        "stream": True,
-        "options": {**_default_options(), **(opciones or {})},
+        "stream":   True,
+        "options":  {**_default_options(), **(opciones or {})},
     }
 
     last_exception = None
@@ -242,27 +262,31 @@ def stream_ollama(
                 request_session = requests.Session()
                 if request_id:
                     _set_active_session(request_id, request_session)
-                with request_session.post(OLLAMA_URL, json=payload, timeout=OLLAMA_TIMEOUT, stream=True) as resp:
+                with request_session.post(
+                    OLLAMA_URL, json=payload,
+                    timeout=OLLAMA_TIMEOUT, stream=True
+                ) as resp:
                     if request_id:
                         _set_active_response(request_id, resp)
                     try:
                         resp.raise_for_status()
                     except requests.exceptions.HTTPError as e:
-                        # Capturar el mensaje de error detallado de Ollama
                         error_detail = resp.text
                         try:
                             error_json = resp.json()
                             error_detail = error_json.get("error", str(error_json))
                         except Exception:
                             pass
-                        # Log the error to server console
-                        print(f"\n🚨 Ollama Error: {error_detail}\n")
+                        logger.error(
+                            "Ollama HTTP error",
+                            extra={"status": resp.status_code, "detail": error_detail},
+                        )
                         raise requests.exceptions.HTTPError(
                             f"Ollama HTTP {resp.status_code}: {error_detail}"
                         ) from e
                     for raw_line in resp.iter_lines(chunk_size=1, decode_unicode=True):
                         if cancel_event is not None and cancel_event.is_set():
-                            raise OllamaCancelled("Generación cancelada por el usuario.")
+                            raise OllamaCancelled("Generacion cancelada por el usuario.")
                         if not raw_line:
                             continue
                         data = json.loads(raw_line)
@@ -272,14 +296,14 @@ def stream_ollama(
                         if data.get("done"):
                             break
                     if cancel_event is not None and cancel_event.is_set():
-                        raise OllamaCancelled("Generación cancelada por el usuario.")
+                        raise OllamaCancelled("Generacion cancelada por el usuario.")
                     return
             except OllamaCancelled:
                 raise
             except requests.exceptions.RequestException as exc:
                 last_exception = exc
                 if cancel_event is not None and cancel_event.is_set():
-                    raise OllamaCancelled("Generación cancelada por el usuario.") from exc
+                    raise OllamaCancelled("Generacion cancelada por el usuario.") from exc
                 if attempt > OLLAMA_RETRIES:
                     raise
                 time.sleep(OLLAMA_RETRY_BACKOFF * attempt)
@@ -287,7 +311,6 @@ def stream_ollama(
     finally:
         if request_id:
             _unregister_active_request(request_id)
-    
 
 
 # ─────────────────────────────────────────────
@@ -298,30 +321,91 @@ def limpiar_respuesta(texto: str) -> str:
     """
     Limpia la respuesta del modelo eliminando:
     - Bloques <think>...</think> (modelos de razonamiento)
-    - Formato markdown (**bold**, * listas)
-    - Convierte * items y - items → bullet •
+    - Tokens Thai/Unicode que Qwen3 filtra como thinking tokens
+    - Formato markdown (**bold**, ##, __, * listas)
+    - Bullets anidados: convierte sub-bullets en continuacion de linea
+    - Espacios multiples (artefactos del tokenizer SentencePiece)
     """
+    if not texto:
+        return ""
+
     # Eliminar bloques de razonamiento interno
     texto = re.sub(r"<think>.*?</think>", "", texto, flags=re.DOTALL)
-    # Eliminar negrita markdown
-    texto = texto.replace("**", "")
-    # Convertir listas markdown a bullets
-    texto = re.sub(r"^(\s*)\* ", r"\1• ", texto, flags=re.MULTILINE)
-    texto = re.sub(r"^(\s*)- ", r"\1• ", texto, flags=re.MULTILINE)
-    # Limpiar asteriscos sueltos
-    texto = texto.replace("*", "")
+    # Eliminar tokens de pensamiento Thai que Qwen3 puede filtrar sin etiquetas XML
+    texto = re.sub(r"[\u0E00-\u0E7F]+", "", texto)
+    # Eliminar markdown: negrita, cursiva, encabezados
+    # Insertar espacio cuando el marcador está pegado a texto adyacente
+    # ej: "en**Bolivia**tiene" → "en Bolivia tiene"
+    texto = re.sub(r"(\w)\*\*(.+?)\*\*(\w)", r"\1 \2 \3", texto)
+    texto = re.sub(r"(\w)\*\*(.+?)\*\*",     r"\1 \2",    texto)
+    texto = re.sub(r"\*\*(.+?)\*\*(\w)",     r"\1 \2",    texto)
+    texto = re.sub(r"\*\*(.+?)\*\*",         r"\1",       texto)
+    texto = re.sub(r"(\w)__(.+?)__(\w)",     r"\1 \2 \3", texto)
+    texto = re.sub(r"(\w)__(.+?)__",         r"\1 \2",    texto)
+    texto = re.sub(r"__(.+?)__(\w)",         r"\1 \2",    texto)
+    texto = re.sub(r"__(.+?)__",             r"\1",       texto)
+    texto = re.sub(r"^#{1,6}\s+", "", texto, flags=re.MULTILINE)
+    # Eliminar asteriscos y guiones bajos sueltos
+    texto = re.sub(r"(\w)\*(\w)", r"\1 \2", texto)   # *pegado entre palabras
+    texto = texto.replace("*", "").replace("_", " ")
+
+    # Colapsar saltos de línea simples en espacios (artefactos del tokenizer).
+    # El modelo genera \n después de palabras en negrita: "en\nBolivia" → "en Bolivia"
+    # Preservar solo \n\n como separadores de párrafo real.
+    texto = re.sub(r'\n{2,}', '\u0000PARA\u0000', texto)
+    texto = texto.replace('\n', ' ')
+    texto = re.sub(r'[ \t]{2,}', ' ', texto)
+    texto = texto.replace('\u0000PARA\u0000', '\n\n')
+
+    # Normalizar listas (solo aplica si quedan \n\n reales)
+    lineas = texto.splitlines()
+    resultado = []
+    for linea in lineas:
+        stripped = linea.strip()
+        if not stripped:
+            resultado.append("")
+            continue
+        # Detectar sub-bullet (linea con indentacion + simbolo de lista)
+        es_sub_bullet = bool(re.match(r"^(\s{2,}|\t+)[•\-\*●○▪▸►]", linea))
+        if es_sub_bullet:
+            contenido = re.sub(r"^[\s•\-\*●○▪▸►]+", "", linea).strip()
+            if resultado and resultado[-1]:
+                resultado[-1] = resultado[-1].rstrip(".,:") + ", " + contenido
+            else:
+                resultado.append(contenido)
+        else:
+            # Bullet de primer nivel: limpiar simbolo y dejar texto plano
+            limpio = re.sub(r"^[•\-\*●○▪▸►]\s*", "", stripped)
+            resultado.append(limpio)
+
+    texto = "\n".join(resultado)
+    # Colapsar lineas en blanco multiples
+    texto = re.sub(r"\n{3,}", "\n\n", texto)
+    # Normalizar espacios multiples dentro de cada linea (artefactos del tokenizer)
+    texto = re.sub(r"[ \t]{2,}", " ", texto)
+    # Eliminar espacios antes de puntuacion
+    texto = re.sub(r" +([.,;:!?])", r"\1", texto)
+    # Filtrar caracteres no-latinos que Qwen3 mezcla de su entrenamiento
+    # multilingue (arabe, chino, emoji, cirilico, etc.)
+    # Se permite: ASCII imprimible + Latin-1 + Latin Extendido + puntuacion espanola
+    texto = re.sub(r'[^\x20-\xFF\u0100-\u024F\u2013\u2014\u2026\n]', '', texto)
+# Colapsar espacios dobles que hayan quedado al remover caracteres extranjeros
+    texto = re.sub(r"[ \t]{2,}", " ", texto)
+    # Reconstruir saltos de linea entre items de listas que el LLM genero
+    # en lineas separadas pero fueron colapsados a un solo parrafo.
+    # Patron 1: ". ItemCapitalizado:" → separa items de lista
+    # Patron 2: ": ItemCapitalizado:" → separa primer item tras intro
+    # Sistemico: funciona con cualquier lista, no solo servicios.
+    texto = re.sub(r'(?<=[.:])(\s+)(?=[A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ]+(?:\s+[a-zA-ZáéíóúñÁÉÍÓÚÑ]+)*\s*:)', r'<br>', texto)
     return texto.strip()
 
 
 # ─────────────────────────────────────────────
-#  VERIFICACIÓN
+#  VERIFICACION
 # ─────────────────────────────────────────────
 
 def ollama_disponible() -> bool:
-    """
-    Verifica si Ollama está corriendo.
-    Devuelve True si está disponible, False si no.
-    """
+    """Verifica si Ollama esta corriendo. Devuelve True si esta disponible."""
     base_url = OLLAMA_URL.replace("/api/chat", "")
     try:
         requests.get(base_url, timeout=3)
@@ -331,14 +415,10 @@ def ollama_disponible() -> bool:
 
 
 def verificar_ollama() -> bool:
-    """
-    Verifica Ollama al arrancar e imprime el resultado.
-    Devuelve True si está disponible.
-    """
+    """Verifica Ollama al arrancar e imprime el resultado. Devuelve True si disponible."""
     ok = ollama_disponible()
     if ok:
-        print(f"  Ollama conectado → modelo: {LLM_MODEL}")
+        logger.info("Ollama conectado", extra={"model": LLM_MODEL, "url": OLLAMA_URL})
     else:
-        print(f"   Ollama no responde en {OLLAMA_URL}")
-        print("   Ejecuta: ollama serve")
+        logger.warning("Ollama no responde", extra={"url": OLLAMA_URL})
     return ok

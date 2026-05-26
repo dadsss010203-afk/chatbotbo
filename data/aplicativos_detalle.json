@@ -13,7 +13,9 @@
         "EMS Internacional"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "TrackingBO - Rastreo",
@@ -45,7 +47,9 @@
       "pdfs_encontrados": [
         "https://www.upu.int/UPU/media/upu/files/UPU/outreachAndCampaigns/Dangerous%20Goods%20Campaign/UPU_Flyer_es_web.pdf"
       ],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "SIRECO - Reclamos",
@@ -110,7 +114,9 @@
         "Filatelia"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "UNIENVIO - ECA",
@@ -145,7 +151,9 @@
         "Autenticación"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "GESDO - Carteros",
@@ -178,7 +186,9 @@
       ],
       "funcionalidades": [],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "SIREN - Encomiendas",
@@ -209,7 +219,9 @@
         "Gestión encomiendas"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "ULTRAPOST - EMS",
@@ -237,7 +249,9 @@
       ],
       "funcionalidades": [],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "GESCON - Contratos",
@@ -248,7 +262,9 @@
       "forms": [],
       "funcionalidades": [],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "IPS Web Tracking",
@@ -271,7 +287,9 @@
       ],
       "funcionalidades": [],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "Filatelia",
@@ -286,7 +304,9 @@
       "pdfs_encontrados": [
         "https://correos.gob.bo/wp-content/uploads/2024/05/CATALOGO-DE-SELLOS-POSTALES-GESTION-2024-1.pdf"
       ],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "Servicio Postal SP",
@@ -297,7 +317,9 @@
       "forms": [],
       "funcionalidades": [],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "Encomienda Postal",
@@ -311,7 +333,9 @@
         "Gestión encomiendas"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "ECA - Correspondencia",
@@ -324,7 +348,9 @@
         "Calculadora de tarifas"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "EMS Internacional",
@@ -339,7 +365,9 @@
         "EMS Internacional"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "Casillas Postales",
@@ -352,7 +380,9 @@
         "Casillas postales"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     },
     {
       "nombre": "Chasqui Express",
@@ -365,7 +395,9 @@
         "Casillas postales"
       ],
       "pdfs_encontrados": [],
-      "error": null
+      "error": null,
+      "tipo": "plataforma_web",
+      "acceso": "navegador web - NO es aplicacion movil descargable"
     }
   ],
   "resumen": [
@@ -546,5 +578,6 @@
       "forms": 0,
       "error": null
     }
-  ]
+  ],
+  "nota_importante": "Todas las plataformas listadas son WEB. Se acceden unicamente por navegador en correos.gob.bo. NO son aplicaciones moviles. NO se descargan de Play Store ni App Store."
 }

@@ -26,7 +26,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from core import ollama, updater, observability
+from core.logging_config import init_logging, get_logger
 from chatbots.general import routes as general_routes
+
+# ── Inicializar logging estructurado antes que nada
+init_logging()
+logger = get_logger("main")
 
 # ─────────────────────────────────────────────
 #  LIFESPAN
@@ -145,16 +150,11 @@ async def rate_limit_middleware(request: Request, call_next):
     return response
 
 
-ALLOWED_ORIGINS = os.environ.get(
-    "CORS_ORIGINS",
-    "http://localhost:5000,http://127.0.0.1:5000"
-).split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 observability.init_app(app)
@@ -181,6 +181,11 @@ async def index():
 async def gestion_capacidades(path: str = None):
     """Sirve el panel de gestion de skills, PDFs y recursos del bot."""
     return FileResponse(os.path.join(FRONTEND_DIR, "capacidades.html"), media_type="text/html")
+
+@app.get("/chatbot.js")
+async def chatbot_js():
+    return FileResponse(os.path.join(FRONTEND_DIR, "chatbot.js"), media_type="application/javascript")
+
 
 @app.get("/widget.js")
 async def widget():
@@ -277,9 +282,7 @@ def inicializar():
     if _APP_INITIALIZED:
         return
 
-    print("\n" + "=" * 50)
-    print("   ChatbotBO — Agencia Boliviana de Correos")
-    print("=" * 50)
+    logger.info("ChatbotBO — Agencia Boliviana de Correos — Iniciando", extra={"action": "startup"})
 
     # 1. Verificar Ollama
     ollama.verificar_ollama()
@@ -287,33 +290,24 @@ def inicializar():
     # 2. Inicializar chatbot general (RAG + scheduler)
     general_routes.inicializar()
 
-    print("=" * 50)
-    print("  Rutas disponibles:")
-    print("  GET  /                  → Interfaz del chatbot")
-    print("  GET  /gestion/capacidades → Panel de gestion")
-    print("  GET  /widget.js         → Widget embebible")
-    print("  GET  /api/welcome       → Mensaje de bienvenida")
-    print("  POST /api/chat          → Enviar mensaje")
-    print("  POST /api/chat/stream   → Enviar mensaje (streaming)")
-    print("  POST /api/translate     → Traducir varios textos")
-    print("  GET  /api/sucursales    → Lista de sucursales")
-    print("  GET  /api/idiomas       → Idiomas disponibles")
-    print("  POST /api/reset         → Limpiar historial")
-    print("  GET  /api/capabilities  → Skills y estado RAG")
-    print("  GET  /api/capabilities/options → Opciones para formularios")
-    print("  GET  /api/metrics       → Métricas de observabilidad")
-    print("  POST /api/tarifa        → Cálculo directo de tarifa")
-    print("  GET  /api/skills        → Lista de skills")
-    print("  POST /api/skills        → Crear o actualizar skill")
-    print("  DELETE /api/skills/<id> → Eliminar skill")
-    print("  POST /api/rag/rebuild   → Rebuild limpio del RAG")
-    print("  GET  /api/status        → Estado del sistema")
-    print("  POST /api/actualizar    → Forzar actualización")
-    print("  POST /api/escalate      → Escalar a agente humano")
-    print("  GET  /api/escalation/tickets → Tickets pendientes")
-    print("  POST /api/sucursal/cercana → Sucursal más cercana (GPS)")
-    print("  GET  /widget-embed.js   → Widget flotante mejorado")
-    print("=" * 50)
+    routes_info = {
+        "GET /": "Interfaz del chatbot",
+        "GET /gestion/capacidades": "Panel de gestion",
+        "GET /widget.js": "Widget embebible",
+        "GET /api/welcome": "Mensaje de bienvenida",
+        "POST /api/chat": "Enviar mensaje",
+        "POST /api/chat/stream": "Enviar mensaje (streaming)",
+        "POST /api/translate": "Traducir varios textos",
+        "GET /api/sucursales": "Lista de sucursales",
+        "GET /api/idiomas": "Idiomas disponibles",
+        "POST /api/reset": "Limpiar historial",
+        "GET /api/capabilities": "Skills y estado RAG",
+        "GET /api/status": "Estado del sistema",
+        "POST /api/tarifa": "Calculo directo de tarifa",
+        "POST /api/escalate": "Escalar a agente humano",
+        "GET /widget-embed.js": "Widget flotante mejorado",
+    }
+    logger.info("Rutas disponibles", extra={"routes": routes_info, "action": "startup_complete"})
     _APP_INITIALIZED = True
 
 
@@ -327,9 +321,7 @@ if __name__ == "__main__":
     PORT  = int(os.environ.get("PORT",  "5000"))
     DEBUG = os.environ.get("DEBUG", "true").lower() == "true"
 
-    print(f"\n🚀 Servidor corriendo en http://localhost:{PORT}")
-    print(f"   Debug: {DEBUG}")
-    print(f"   Presiona Ctrl+C para detener\n")
+    logger.info("Servidor corriendo", extra={"port": PORT, "debug": DEBUG})
 
     import uvicorn
     try:
@@ -341,5 +333,5 @@ if __name__ == "__main__":
             log_level="info",
         )
     except KeyboardInterrupt:
-        print("\n🛑 Servidor detenido manualmente.")
+        logger.info("Servidor detenido manualmente")
         sys.exit(0)

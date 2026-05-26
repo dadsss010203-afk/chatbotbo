@@ -7,9 +7,12 @@ import os
 import json
 import time
 import uuid
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from pathlib import Path
+
+logger = logging.getLogger("chatbotbo.escalation")
 
 # Archivo de tickets (en producción usar base de datos)
 ESCALATION_FILE = Path(__file__).parent.parent / "data" / "escalation_tickets.json"
@@ -94,11 +97,15 @@ def create_ticket(
 
 def _notify_new_ticket(ticket: dict):
     """Notifica nuevo ticket (placeholder para integración real)."""
-    print(f"\n🔔 NUEVO TICKET DE ESCALACIÓN #{ticket['id']}")
-    print(f"   Razón: {ticket['reason']}")
-    print(f"   Prioridad: {ticket['priority']}")
-    print(f"   Mensaje: {ticket['user_message'][:80]}...")
-    print(f"   Esperando asignación...\n")
+    logger.info(
+        "Nuevo ticket de escalacion",
+        extra={
+            "ticket_id": ticket["id"],
+            "reason": ticket["reason"],
+            "priority": ticket["priority"],
+            "message_preview": (ticket.get("user_message") or "")[:80],
+        },
+    )
     # Aquí podrías enviar email, notificación Slack, etc.
 
 

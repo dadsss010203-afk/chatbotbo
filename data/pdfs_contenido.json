@@ -10,8 +10,9 @@
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "a2d169d87395cc7b",
-    "clean_mode": "aggressive"
+"content_hash": "a2d169d87395cc7b",
+    "clean_mode": "aggressive",
+    "skill_id": "historia_correos_bolivia"
   },
   {
     "url": "",
@@ -24,8 +25,9 @@
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "e1cdcc816c7c6853",
-    "clean_mode": "aggressive"
+"content_hash": "e1cdcc816c7c6853",
+    "clean_mode": "aggressive",
+    "skill_id": "servicios_correos"
   },
   {
     "url": "",
@@ -38,8 +40,9 @@
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "6fd5d21b0c9ea28e",
-    "clean_mode": "aggressive"
+"content_hash": "6fd5d21b0c9ea28e",
+    "clean_mode": "aggressive",
+    "skill_id": "historia_correos_bolivia"
   },
   {
     "url": "",
@@ -52,8 +55,9 @@
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "44f0470fb7b1e335",
-    "clean_mode": "aggressive"
+"content_hash": "44f0470fb7b1e335",
+    "clean_mode": "aggressive",
+    "skill_id": "servicios_correos"
   },
   {
     "url": "",
@@ -66,8 +70,9 @@
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "d876b1fc064b999d",
-    "clean_mode": "aggressive"
+"content_hash": "d876b1fc064b999d",
+    "clean_mode": "aggressive",
+    "skill_id": "alertas_seguridad"
   },
   {
     "url": "",
@@ -80,7 +85,8 @@
     "pagina_fuente": "",
     "subido_manual": true,
     "archivo_guardado": false,
-    "content_hash": "6a58253410f172f4",
-    "clean_mode": "aggressive"
+"content_hash": "6a58253410f172f4",
+    "clean_mode": "aggressive",
+    "skill_id": "reclamos_quejas"
   }
 ]

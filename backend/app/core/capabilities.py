@@ -11,7 +11,7 @@ import unicodedata
 import hashlib
 from datetime import datetime
 
-from core import observability
+from core import observability, contacto
 from core.capabilities_pdf import (
     PDF_CLEAN_MODE_DEFAULT,
     PDF_CLEAN_MODES,
@@ -167,10 +167,13 @@ SKILL_SCOPE_KEYWORDS = {
     "rastreo", "seguimiento", "guia", "guía", "tracking", "ems", "encomienda",
     "reclamo", "queja", "quejas", "estafa", "fraude", "seguridad", "filatelia", "sello", "sellos",
     "oficina", "oficinas", "sucursal", "sucursales", "estampilla", "estampillas",
+    # Consultas de servicios — palabras cortas pero válidas en este contexto
+    "servicio", "servicios", "chasqui", "casilla", "casillas", "giro", "giros",
+    "certificado", "ordinario", "correspondencia", "delivery",
 }
 
 SKILL_GENERIC_WORDS_BY_ID = {
-    "servicios_correos": {"servicio", "servicios"},
+    # "servicios" ya no es genérica — es una consulta válida directa al bot
     "historia_correos_bolivia": {"historia", "origen", "evolucion", "antecedentes"},
     "estado_plataforma": {"estado", "sistema", "skills", "capacidades"},
 }
@@ -542,6 +545,25 @@ def get_active_skills() -> list[dict]:
     return [item for item in listar_skills() if item.get("activa", True)]
 
 
+# IDs de skills donde los datos numéricos deben ser exactos
+# (códigos de rastreo, teléfonos, direcciones) — el guardia anti-inventado
+# solo se aplica a estas. Para el resto, el LLM responde con datos del RAG
+# que ya son válidos y el guardia genera demasiados falsos positivos.
+_SKILLS_GUARDIA_NUMERICA = {"rastreo_envios", "oficinas_contacto"}
+
+
+def skill_requiere_guardia_numerica(skill_id: str | None) -> bool:
+    """
+    Devuelve True si la skill requiere verificación estricta de datos numéricos.
+    Lee los IDs desde las skills activas para que sea dinámico:
+    cualquier skill activa cuyo ID esté en _SKILLS_GUARDIA_NUMERICA aplica el guardia.
+    """
+    if not skill_id:
+        return False
+    ids_activos = {s["id"] for s in get_active_skills()}
+    return skill_id in _SKILLS_GUARDIA_NUMERICA and skill_id in ids_activos
+
+
 def resolve_skills_for_query(pregunta: str) -> dict:
     texto = _normalizar_match_text(pregunta)
     palabras = set(texto.split())
@@ -602,14 +624,6 @@ def resolve_skills_for_query(pregunta: str) -> dict:
         in_scope = False
         strong_matches = []
 
-    # Si el usuario pregunta por otra institución de correos (FedEx, DHL, etc.),
-    # marcar como fuera de scope para evitar que el flujo de ubicación o el
-    # RAG respondan como si fuera una consulta legítima de AGBC.
-    from core import intents as _intents
-    if _intents.es_consulta_otra_institucion(pregunta):
-        in_scope = False
-        strong_matches = []
-
     return {
         "in_scope": in_scope,
         "matched_skills": strong_matches,
@@ -639,13 +653,13 @@ def preferred_sources_for_skill(skill: dict | None) -> list[str]:
     categoria = skill.get("categoria")
 
     if skill_id == "historia_correos_bolivia":
-        # Para historia institucional priorizamos primero las fuentes históricas
-        # curadas antes que PDFs genéricos de servicios.
+        # Para historia institucional priorizamos primero las fuentes historicas
+        # curadas antes que PDFs genericos de servicios.
         return ["history", "json_data", "pdf", "section", "web_main", "branch"]
     if skill_id == "filatelia_boliviana" or categoria == "documental":
         return ["pdf", "json_data", "history", "section", "web_main", "branch"]
     if skill_id == "oficinas_contacto":
-        return ["pdf", "branch", "web_main", "section", "history", "json_data"]
+        return ["json_data", "pdf", "branch", "web_main", "section", "history"]
     if skill_id in {"rastreo_envios", "servicios_correos", "guia_envio_correcto", "reclamos_quejas"}:
         return ["pdf", "web_main", "section", "json_data", "branch", "history"]
     if skill_id == "estado_plataforma":
@@ -775,23 +789,33 @@ def obtener_data_json(nombre_archivo: str) -> dict:
     path = _safe_data_json_path(nombre_archivo)
     with open(path, "r", encoding="utf-8") as fh:
         data = json.load(fh)
+    # Extraer _skill_id si existe (metadata opcional del JSON)
+    skill_id = ""
+    content_display = data
+    if isinstance(data, dict):
+        skill_id = str(data.pop("_skill_id", "")).strip()
+        content_display = {k: v for k, v in data.items() if k != "_skill_id"}
     return {
         "nombre_archivo": os.path.basename(path),
         "ruta": path,
         "tamano_bytes": os.path.getsize(path),
         "modificado_en": datetime.fromtimestamp(os.path.getmtime(path)).isoformat(),
-        "content": data,
-        "content_pretty": json.dumps(data, ensure_ascii=False, indent=2),
+        "content": content_display,
+        "content_pretty": json.dumps(content_display, ensure_ascii=False, indent=2),
+        "skill_id": skill_id,
     }
 
 
-def actualizar_data_json(nombre_archivo: str, content) -> dict:
+def actualizar_data_json(nombre_archivo: str, content, skill_id: str = None) -> dict:
     path = _safe_data_json_path(nombre_archivo)
     parsed = content
     if isinstance(content, str):
         parsed = json.loads(content)
     if not isinstance(parsed, (dict, list)):
         raise ValueError("El contenido JSON debe ser objeto o arreglo")
+    # Guardar _skill_id como metadata dentro del JSON si se proporciona
+    if skill_id and isinstance(parsed, dict):
+        parsed["_skill_id"] = skill_id
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(parsed, fh, ensure_ascii=False, indent=2)
         fh.write("\n")
@@ -1164,6 +1188,7 @@ def guardar_pdf_subido(
     pagina_fuente: str = "",
     clean_mode: str | None = None,
     skill_id: str = "",
+    texto_frontend: str = "",
 ) -> dict:
     if file_storage is None or not getattr(file_storage, "filename", ""):
         raise ValueError("Debes seleccionar un archivo PDF")
@@ -1186,7 +1211,12 @@ def guardar_pdf_subido(
     clean_mode_resolved = _resolve_clean_mode(clean_mode)
 
     try:
-        texto, metodo = extraer_texto_pdf(ruta_real, clean_mode=clean_mode_resolved)
+        # Si el frontend ya extrajo el texto (pdf.js), usarlo directamente
+        if (texto_frontend or "").strip():
+            texto = texto_frontend.strip()
+            metodo = "pdfjs_frontend"
+        else:
+            texto, metodo = extraer_texto_pdf(ruta_real, clean_mode=clean_mode_resolved)
         tamano_bytes = os.path.getsize(ruta_real) if os.path.exists(ruta_real) else 0
         observability.record_extraction(
             kind="pdf_upload",
@@ -1466,7 +1496,7 @@ def execute_special_query(tipo: str, runtime_capabilities: dict, pregunta: str =
         return {"kind": "branches", "payload": result, "response": result["text"]}
     if tipo == "tracking":
         codigo = detectar_codigo_seguimiento(pregunta)
-        url_tracking = f"https://trackingbo.correos.gob.bo:8100/search?tracking={codigo}"
+        url_tracking = f"{contacto.tracking_url()}/search?tracking={codigo}"
         return {
             "kind": "tracking",
             "payload": {"codigo": codigo, "url": url_tracking},

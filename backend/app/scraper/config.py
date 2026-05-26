@@ -115,8 +115,22 @@ class ScraperConfig:
     ]
 
     # ── Valores por defecto para sucursales
-    HORARIO_DEFAULT = "Lunes a viernes: 8:30 a 16:30"
-    EMAIL_DEFAULT   = "agbc@correos.gob.bo"
+    # Leídos desde contacto_institucional.json vía core.contacto
+    @classmethod
+    def _get_horario_default(cls) -> str:
+        try:
+            from core import contacto
+            return contacto.horario_semana()
+        except Exception:
+            return "Lunes a viernes: 8:30 a 16:30"
+
+    @classmethod
+    def _get_email_default(cls) -> str:
+        try:
+            from core import contacto
+            return contacto.email()
+        except Exception:
+            return "agbc@correos.gob.bo"
 
     # ── Patrones de detección de tipo de contenido
     PATRONES_HISTORIA = [
