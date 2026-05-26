@@ -113,9 +113,12 @@ def horario_semana() -> str:
 def horario_sabado() -> str:
     return get("horario_sabado")
 
+def horario_domingo() -> str:
+    return get("horario_domingo")
+
 def horario_resumen() -> str:
     """Horario completo en una línea."""
-    return f"{horario_semana()} | {horario_sabado()}"
+    return f"{horario_semana()} | {horario_sabado()} | {horario_domingo()}"
 
 def datos_conocidos_numericos() -> set:
     """

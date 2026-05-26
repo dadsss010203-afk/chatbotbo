@@ -50,14 +50,11 @@ MESSAGE assistant Usa el botón Sucursales en la barra inferior del chat para ve
 MESSAGE user ¿Qué es la AGBC?
 MESSAGE assistant La AGBC (Agencia Boliviana de Correos) fue creada en 2018 por Decreto Supremo N° 3495 como operador público del Estado para garantizar el servicio postal universal. En 2026 cambió su nombre oficial a Correos de Bolivia. Son la misma institución — solo actualizó su identidad. ¿Necesitas información sobre sus servicios?
 
-MESSAGE user ¿Qué es Correos de Bolivia?
-MESSAGE assistant Correos de Bolivia es la institución pública oficial encargada del servicio postal en todo el territorio boliviano. Antes se llamaba Agencia Boliviana de Correos (AGBC), nombre que tuvo desde su creación en 2018 hasta 2025. En 2026 adoptó oficialmente el nombre Correos de Bolivia. Sus servicios principales son:\n- EMS: envíos urgentes nacionales e internacionales, hasta 20 kg, con seguimiento en tiempo real.\n- Encomienda Postal: paquetes a 192 países, hasta 20 kg, con rastreo.\n- Correo Prioritario: cartas y paquetes hasta 2 kg, entrega nacional en 24-48 h.\n- Mi Encomienda: paquetería nacional económica, hasta 20 kg, con rastreo.\n- Casillas Postales: recepción segura de correspondencia en oficinas.\n- Filatelia: venta de sellos postales y exposiciones.\nHorario: lunes a viernes 8:30-16:30, sábados 9:00-13:00. Web: correos.gob.bo | Tel: +591 22152423.
 
 MESSAGE user dame todos los servicios de correos
 MESSAGE assistant Los servicios de Correos de Bolivia son:\n- EMS: envío urgente nacional (24-48 h) e internacional (5-8 días), hasta 20 kg, seguimiento en tiempo real.\n- Encomienda Postal (SEP): paquetes internacionales a 192 países (8-14 días), hasta 20 kg, con rastreo.\n- Correo Prioritario: cartas y paquetes hasta 2 kg, nacional 24-48 h, internacional 7-14 días.\n- Mi Encomienda: paquetería nacional económica (24-48 h), hasta 20 kg, con rastreo y acuse de recibo.\n- ECA (Correspondencia Agrupada): envíos masivos para empresas, mínimo 40 envíos, entrega nacional 24-72 h.\n- Chasqui Express: entrega a domicilio para empresas y emprendedores.\n- Casillas Postales: alquiler de casillas para recepción segura, disponible en sucursales principales.\n- Filatelia: venta de sellos de colección y organización de exposiciones filatélicas.\n¿Necesitas más detalles sobre alguno de estos servicios?
 
-MESSAGE user ¿Están abiertos ahora?
-MESSAGE assistant Nuestras oficinas atienden de lunes a viernes de 8:30 a 16:30 y los sábados de 9:00 a 13:00. Los domingos permanecemos cerrados. ¿Necesitas algo más?
+
 
 MESSAGE user ¿Cómo puedo rastrear mi paquete?
 MESSAGE assistant Puedo rastrearlo por vos. Presiona el boton RASTREO aqui abajo y enviame tu codigo de seguimiento para consultarlo en tiempo real. Tambien puedes usar https://trackingbo.correos.gob.bo o llamarnos al +591 22152423.
@@ -91,9 +88,6 @@ MESSAGE assistant El Decreto Supremo N° 3495 del 28 de febrero de 2018 creó la
 
 MESSAGE user numero de correos
 MESSAGE assistant El número de Correos de Bolivia es +591 22152423. También puedes visitar correos.gob.bo. ¿En qué más puedo ayudarte?
-
-MESSAGE user cual es el telefono de correos
-MESSAGE assistant El teléfono oficial de Correos de Bolivia es +591 22152423. Horario de atención: lunes a viernes 8:30 a 16:30, sábados 9:00 a 13:00.
 
 MESSAGE user como contacto a correos
 MESSAGE assistant Puedes contactar a Correos de Bolivia por: Teléfono: +591 22152423 | Web: correos.gob.bo | Horario: L-V 8:30-16:30, Sáb 9:00-13:00.

@@ -2047,14 +2047,23 @@ def reindexar() -> bool:
     except Exception as e:
         logger.error("Error refrescando PDFs antes del RAG", extra={"error": str(e)})
 
-    # 1. Texto principal (HTML plano acumulado)
-    c, i, m = rag.archivo_a_documentos(
-        DATA_FILE,
+# 1. Texto principal (desde JSON estructurado)
+    json_data_file = os.path.join(os.path.dirname(DATA_FILE), "correos_bolivia.json")
+    if os.path.exists(json_data_file):
+        with open(json_data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        texto_principal = json.dumps(data, ensure_ascii=False, indent=2)
+    else:
+        # Fallback al .txt original
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            texto_principal = f.read()
+    c, i, m = rag.documento_a_chunks(
+        texto_principal,
         prefijo="txt",
         metadata_base={
             "source_type": "web_main",
             "source_label": "Sitio principal de Correos de Bolivia",
-            "source_path": DATA_FILE,
+            "source_path": json_data_file if os.path.exists(json_data_file) else DATA_FILE,
         },
     )
     chunks += c; ids += i; metadatas += m
@@ -2099,6 +2108,7 @@ def reindexar() -> bool:
         "pdfs_contenido.json",
         "skills.json",
         "estadisticas.json",
+        "correos_bolivia.json",  # Ya se indexa como web_main
     }
     managed_items = capabilities.listar_data_jsons()
     for item in managed_items:
