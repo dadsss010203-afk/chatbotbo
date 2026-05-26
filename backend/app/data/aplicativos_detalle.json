@@ -1,0 +1,550 @@
+{
+  "detalle": [
+    {
+      "nombre": "POSTAR - Calculadora",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "estado": "ok",
+      "titulo": "Postar | AGBC",
+      "contenido": "Calculadora postal para estimar tarifas de envios nacionales e internacionales segun servicio, destino, peso, dimensiones y servicios adicionales.",
+      "forms": [],
+      "funcionalidades": [
+        "Calculadora de tarifas",
+        "Gestión encomiendas",
+        "EMS Internacional"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "TrackingBO - Rastreo",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "estado": "ok",
+      "titulo": "Tracking BO | AGBC",
+      "contenido": "Plataforma de rastreo nacional e internacional para consultar el estado de envios con codigo de seguimiento.",
+      "forms": [
+        {
+          "action": "https://trackingbo.correos.gob.bo:8100/search",
+          "method": "GET",
+          "inputs": [
+            {
+              "type": "text",
+              "name": "codigo",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "captcha",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Rastreo de envíos"
+      ],
+      "pdfs_encontrados": [
+        "https://www.upu.int/UPU/media/upu/files/UPU/outreachAndCampaigns/Dangerous%20Goods%20Campaign/UPU_Flyer_es_web.pdf"
+      ],
+      "error": null
+    },
+    {
+      "nombre": "SIRECO - Reclamos",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "estado": "ok",
+      "titulo": "SIRECO | AGBC",
+      "contenido": "Sistema de consultas, reclamos y sugerencias de la Agencia Boliviana de Correos con formulario de contacto y seguimiento de casos.",
+      "forms": [
+        {
+          "action": "",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "text",
+              "name": "fullName",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "identityCard",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "address",
+              "required": false
+            },
+            {
+              "type": "text",
+              "name": "country",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "codepostal",
+              "required": false
+            },
+            {
+              "type": "email",
+              "name": "email",
+              "required": true
+            },
+            {
+              "type": "text",
+              "name": "phone",
+              "required": true
+            },
+            {
+              "type": "textarea",
+              "name": "description",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "Reclamos/Sugerencias",
+        "Gestión encomiendas",
+        "Casillas postales",
+        "Filatelia"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "UNIENVIO - ECA",
+      "url": "https://unienvio.correos.gob.bo:8103/",
+      "estado": "ok",
+      "titulo": "UNIENVIO|AGBC",
+      "contenido": "Sistema UNIENVIO para gestion de correspondencia agrupada con acceso mediante inicio de sesion.",
+      "forms": [
+        {
+          "action": "https://unienvio.correos.gob.bo:8103/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "email",
+              "name": "email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "required": true
+            },
+            {
+              "type": "checkbox",
+              "name": "remember",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Autenticación"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "GESDO - Carteros",
+      "url": "https://gesdo.correos.gob.bo:8106/",
+      "estado": "ok",
+      "titulo": "GESDO|AGBC",
+      "contenido": "Sistema GESDO para gestion de entregas a domicilio con acceso autenticado.",
+      "forms": [
+        {
+          "action": "https://gesdo.correos.gob.bo:8106/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "email",
+              "name": "email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "required": true
+            },
+            {
+              "type": "checkbox",
+              "name": "remember",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "SIREN - Encomiendas",
+      "url": "https://siren.correos.gob.bo:8107/",
+      "estado": "ok",
+      "titulo": "SIREN | AGBC",
+      "contenido": "Sistema SIREN para gestion de paqueteria y encomiendas con inicio de sesion.",
+      "forms": [
+        {
+          "action": "https://siren.correos.gob.bo:8107/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "email",
+              "name": "email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [
+        "Autenticación",
+        "Gestión encomiendas"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "ULTRAPOST - EMS",
+      "url": "https://ultrapost.correos.gob.bo:8108/login",
+      "estado": "ok",
+      "titulo": "Login",
+      "contenido": "Portal de inicio de sesion de ULTRAPOST para el servicio EMS.",
+      "forms": [
+        {
+          "action": "https://ultrapost.correos.gob.bo:8108/login",
+          "method": "POST",
+          "inputs": [
+            {
+              "type": "email",
+              "name": "email",
+              "required": true
+            },
+            {
+              "type": "password",
+              "name": "password",
+              "required": true
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "GESCON - Contratos",
+      "url": "http://gescon.correos.gob.bo:3005/",
+      "estado": "ok",
+      "titulo": "Gescon",
+      "contenido": "Sistema GESCON para gestion de contratos.",
+      "forms": [],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "IPS Web Tracking",
+      "url": "https://ips.correos.gob.bo/ipswebtracking/",
+      "estado": "ok",
+      "titulo": "IPS Web Tracking/Item Tracking",
+      "contenido": "Servicio de seguimiento IPS para consultar eventos de un envio por identificador del item.",
+      "forms": [
+        {
+          "action": "IPSWeb_item_events.aspx",
+          "method": "get",
+          "inputs": [
+            {
+              "type": "text",
+              "name": "itemid",
+              "required": false
+            }
+          ]
+        }
+      ],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Filatelia",
+      "url": "https://correos.gob.bo/filatelia/",
+      "estado": "ok",
+      "titulo": "Filatelia - Agencia Boliviana de Correos",
+      "contenido": "Servicio de filatelia para compra de sellos, catalogos y actividades relacionadas con coleccionismo postal.",
+      "forms": [],
+      "funcionalidades": [
+        "Filatelia"
+      ],
+      "pdfs_encontrados": [
+        "https://correos.gob.bo/wp-content/uploads/2024/05/CATALOGO-DE-SELLOS-POSTALES-GESTION-2024-1.pdf"
+      ],
+      "error": null
+    },
+    {
+      "nombre": "Servicio Postal SP",
+      "url": "https://correos.gob.bo/sp/",
+      "estado": "ok",
+      "titulo": "Servicio Prioritario - Agencia Boliviana de Correos",
+      "contenido": "Servicio postal prioritario para cartas y pequenos paquetes con cobertura nacional e internacional.",
+      "forms": [],
+      "funcionalidades": [],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Encomienda Postal",
+      "url": "https://correos.gob.bo/servicio-encomienda-postal/",
+      "estado": "ok",
+      "titulo": "Servicio Encomienda Postal - Agencia Boliviana de Correos",
+      "contenido": "Servicio de encomiendas nacionales e internacionales con seguimiento para envio de paquetes y mercancias.",
+      "forms": [],
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Gestión encomiendas"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "ECA - Correspondencia",
+      "url": "https://correos.gob.bo/eca/",
+      "estado": "ok",
+      "titulo": "Envios de correspondencia Agrupada - Agencia Boliviana de Correos",
+      "contenido": "Servicio ECA de correspondencia agrupada para instituciones y empresas con tarifas preferenciales segun volumen.",
+      "forms": [],
+      "funcionalidades": [
+        "Calculadora de tarifas"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "EMS Internacional",
+      "url": "https://correos.gob.bo/ems/",
+      "estado": "ok",
+      "titulo": "Envio de Mensajeria Urgente - Agencia Boliviana de Correos",
+      "contenido": "Servicio EMS de mensajeria urgente nacional e internacional con rastreo y entrega rapida.",
+      "forms": [],
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "EMS Internacional"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Casillas Postales",
+      "url": "https://correos.gob.bo/casillas/",
+      "estado": "ok",
+      "titulo": "Casillas - Agencia Boliviana de Correos",
+      "contenido": "Servicio de alquiler de casillas postales para recepcion segura de correspondencia y paquetes.",
+      "forms": [],
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    },
+    {
+      "nombre": "Chasqui Express",
+      "url": "https://correos.gob.bo/chasquiexpressbo/",
+      "estado": "ok",
+      "titulo": "ChasquiExpressBO - Agencia Boliviana de Correos",
+      "contenido": "Servicio Chasqui Express de delivery para entrega a domicilio de productos de empresas y emprendedores.",
+      "forms": [],
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "pdfs_encontrados": [],
+      "error": null
+    }
+  ],
+  "resumen": [
+    {
+      "nombre": "POSTAR - Calculadora",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "estado": "ok",
+      "titulo": "Postar | AGBC",
+      "funcionalidades": [
+        "Calculadora de tarifas",
+        "Gestión encomiendas",
+        "EMS Internacional"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "TrackingBO - Rastreo",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "estado": "ok",
+      "titulo": "Tracking BO | AGBC",
+      "funcionalidades": [
+        "Rastreo de envíos"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "SIRECO - Reclamos",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "estado": "ok",
+      "titulo": "SIRECO | AGBC",
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "Reclamos/Sugerencias",
+        "Gestión encomiendas",
+        "Casillas postales",
+        "Filatelia"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "UNIENVIO - ECA",
+      "url": "https://unienvio.correos.gob.bo:8103/",
+      "estado": "ok",
+      "titulo": "UNIENVIO|AGBC",
+      "funcionalidades": [
+        "Autenticación"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "GESDO - Carteros",
+      "url": "https://gesdo.correos.gob.bo:8106/",
+      "estado": "ok",
+      "titulo": "GESDO|AGBC",
+      "funcionalidades": [],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "SIREN - Encomiendas",
+      "url": "https://siren.correos.gob.bo:8107/",
+      "estado": "ok",
+      "titulo": "SIREN | AGBC",
+      "funcionalidades": [
+        "Autenticación",
+        "Gestión encomiendas"
+      ],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "ULTRAPOST - EMS",
+      "url": "https://ultrapost.correos.gob.bo:8108/login",
+      "estado": "ok",
+      "titulo": "Login",
+      "funcionalidades": [],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "GESCON - Contratos",
+      "url": "http://gescon.correos.gob.bo:3005/",
+      "estado": "ok",
+      "titulo": "Gescon",
+      "funcionalidades": [],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "IPS Web Tracking",
+      "url": "https://ips.correos.gob.bo/ipswebtracking/",
+      "estado": "ok",
+      "titulo": "IPS Web Tracking/Item Tracking",
+      "funcionalidades": [],
+      "forms": 1,
+      "error": null
+    },
+    {
+      "nombre": "Filatelia",
+      "url": "https://correos.gob.bo/filatelia/",
+      "estado": "ok",
+      "titulo": "Filatelia - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Filatelia"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "Servicio Postal SP",
+      "url": "https://correos.gob.bo/sp/",
+      "estado": "ok",
+      "titulo": "Servicio Prioritario - Agencia Boliviana de Correos",
+      "funcionalidades": [],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "Encomienda Postal",
+      "url": "https://correos.gob.bo/servicio-encomienda-postal/",
+      "estado": "ok",
+      "titulo": "Servicio Encomienda Postal - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Gestión encomiendas"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "ECA - Correspondencia",
+      "url": "https://correos.gob.bo/eca/",
+      "estado": "ok",
+      "titulo": "Envios de correspondencia Agrupada - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Calculadora de tarifas"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "EMS Internacional",
+      "url": "https://correos.gob.bo/ems/",
+      "estado": "ok",
+      "titulo": "Envio de Mensajeria Urgente - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Rastreo de envíos",
+        "Calculadora de tarifas",
+        "EMS Internacional"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "Casillas Postales",
+      "url": "https://correos.gob.bo/casillas/",
+      "estado": "ok",
+      "titulo": "Casillas - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "forms": 0,
+      "error": null
+    },
+    {
+      "nombre": "Chasqui Express",
+      "url": "https://correos.gob.bo/chasquiexpressbo/",
+      "estado": "ok",
+      "titulo": "ChasquiExpressBO - Agencia Boliviana de Correos",
+      "funcionalidades": [
+        "Casillas postales"
+      ],
+      "forms": 0,
+      "error": null
+    }
+  ]
+}

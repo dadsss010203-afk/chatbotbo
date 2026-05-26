@@ -1,0 +1,64 @@
+# ─────────────────────────────────────────────
+#  ChatbotBO — Dependencias Python
+#  Instalar con: pip install -r requirements.txt
+# ─────────────────────────────────────────────
+
+# ── Servidor web (async)
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+python-dotenv==1.0.1
+python-multipart==0.0.9
+gunicorn==22.0.0
+# gevent eliminado — incompatible con uvicorn/ASGI, no hace nada útil aquí
+
+# ── Cache distribuida
+redis==5.0.1
+hiredis==2.2.3
+
+# ── HTTP
+requests==2.32.3
+
+# ── RAG / Embeddings
+sentence-transformers==3.4.1
+chromadb==0.5.23
+rank-bm25==0.2.2
+# torch CPU-only — ahorra ~200MB de RAM vs versión GPU completa
+torch==2.5.1+cpu
+# compatible con chromadb==0.5.23 (tokenizers<=0.20.3)
+transformers==4.45.2
+# cross-encoder para reranking (incluido en sentence-transformers, no requiere instalación extra)
+
+# ── Detección de idioma
+langdetect==1.0.9
+
+# ── Scheduler
+apscheduler==3.10.4
+
+# ── Progreso en consola
+tqdm==4.67.1
+
+# ── Async utilidades
+aiofiles==24.1.0
+asyncio-contextmanager==1.0.1
+celery==5.3.6
+qdrant-client==1.10.0
+onnxruntime==1.15.1; python_version < "3.12"
+onnxruntime==1.17.3; python_version >= "3.12"
+# tritonclient eliminado — USE_TRITON=false, nunca se usa
+
+# ── Scraper
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# ── PDFs
+pdfplumber==0.11.4
+PyPDF2==3.0.1
+pdf2image==1.17.0
+pytesseract==0.3.13
+
+# ── Utilidades
+python-dateutil==2.9.0
+
+# traducción local sin LLM
+deep-translator==1.11.4
+

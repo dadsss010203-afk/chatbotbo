@@ -1,0 +1,137 @@
+[
+  {
+    "nombre": "Oficina Central: La Paz",
+    "direccion": "Avenida Mariscal Santa Cruz Esquina Calle Oruro Edificio Telecomunicaciones",
+    "telefono": "+591 22152423",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -16.499149,
+    "lng": -68.135114,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-16.499149,-68.135114",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-16.499149,-68.135114",
+      "mapa": "https://www.google.com/maps/@-16.499149,-68.135114,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Cochabamba",
+    "direccion": "Calle Ayacucho esquina Av. Heroínas N° 113",
+    "telefono": "+591 22152423 INT 333",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -17.392818,
+    "lng": -66.158619,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-17.392818,-66.158619",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-17.392818,-66.158619",
+      "mapa": "https://www.google.com/maps/@-17.392818,-66.158619,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Santa Cruz",
+    "direccion": "Calle Cobija Entre Sucre y Ballivian N° 24",
+    "telefono": "+591 22152423 INT 340",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -17.783488789851294,
+    "lng": -63.17466201078211,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-17.783488789851294,-63.17466201078211",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-17.783488789851294,-63.17466201078211",
+      "mapa": "https://www.google.com/maps/@-17.783488789851294,-63.17466201078211,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Oruro",
+    "direccion": "Calle Presidente Montes Esquina Junin N° 1456",
+    "telefono": "+591 22152423 INT 339",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -17.968703,
+    "lng": -67.114877,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-17.968703,-67.114877",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-17.968703,-67.114877",
+      "mapa": "https://www.google.com/maps/@-17.968703,-67.114877,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Potosi",
+    "direccion": "Calle Hoyos Esquina Topater, Villa Imperial de Potosí",
+    "telefono": "+591 22152423 INT 338",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -19.58869664459354,
+    "lng": -65.74893067990907,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-19.58869664459354,-65.74893067990907",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-19.58869664459354,-65.74893067990907",
+      "mapa": "https://www.google.com/maps/@-19.58869664459354,-65.74893067990907,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Tarija",
+    "direccion": "Calle Mariscal Sucre esquina Virginio Lema N° 397",
+    "telefono": "+591 22152423 INT 334",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -21.536121517064114,
+    "lng": -64.73457044454491,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-21.536121517064114,-64.73457044454491",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-21.536121517064114,-64.73457044454491",
+      "mapa": "https://www.google.com/maps/@-21.536121517064114,-64.73457044454491,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Sucre",
+    "direccion": "Calle Junin Esquina Ayacucho N° 699",
+    "telefono": "+591 22152423 INT 337",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -19.047152,
+    "lng": -65.261389,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-19.047152,-65.261389",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-19.047152,-65.261389",
+      "mapa": "https://www.google.com/maps/@-19.047152,-65.261389,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Beni",
+    "direccion": "Calle Cipriano Barace N°10 Entre Manuel Limpias y Calle Sucre",
+    "telefono": "+591 22152423 INT 335",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -14.834452,
+    "lng": -64.903276,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-14.834452,-64.903276",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-14.834452,-64.903276",
+      "mapa": "https://www.google.com/maps/@-14.834452,-64.903276,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  },
+  {
+    "nombre": "Regional: Pando",
+    "direccion": "Av. Bruno Recua N.- 59",
+    "telefono": "+591 22152423 INT 336",
+    "email": "agbc@correos.gob.bo",
+    "horario": "Lunes a viernes: 8:30 a 16:30",
+    "lat": -11.017714864216165,
+    "lng": -68.7544276652199,
+    "enlaces": {
+      "busqueda": "https://www.google.com/maps/search/?api=1&query=-11.017714864216165,-68.7544276652199",
+      "direcciones": "https://www.google.com/maps/dir/?api=1&destination=-11.017714864216165,-68.7544276652199",
+      "mapa": "https://www.google.com/maps/@-11.017714864216165,-68.7544276652199,17z"
+    },
+    "fuente": "https://correos.gob.bo/contact-us"
+  }
+]
