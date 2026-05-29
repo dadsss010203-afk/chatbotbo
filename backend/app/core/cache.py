@@ -21,7 +21,6 @@ logger = logging.getLogger("chatbotbo.cache")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 REDIS_CACHE_TTL = int(os.environ.get("REDIS_CACHE_TTL", "3600"))
 REDIS_EMBEDDING_CACHE = os.environ.get("REDIS_EMBEDDING_CACHE", "true").lower() in ("1", "true", "yes")
-REDIS_TARIFF_CACHE = os.environ.get("REDIS_TARIFF_CACHE", "true").lower() in ("1", "true", "yes")
 REDIS_RESPONSE_CACHE = os.environ.get("REDIS_RESPONSE_CACHE", "true").lower() in ("1", "true", "yes")
 REDIS_RESPONSE_CACHE_TTL = int(os.environ.get("REDIS_RESPONSE_CACHE_TTL", "900"))
 
@@ -166,15 +165,34 @@ def set_embedding(text: str, vector: list) -> bool:
 #  CACHÉ DE BÚSQUEDAS RAG
 # ─────────────────────────────────────────────
 
-def get_rag_search(pregunta: str, preferred_source_types: Optional[list] = None) -> Optional[dict]:
+def get_rag_search(
+    pregunta: str,
+    preferred_source_types: Optional[list] = None,
+    strict_preferred_sources: bool = False,
+) -> Optional[dict]:
     """Obtiene resultado de búsqueda RAG cacheado."""
-    key = _make_key("rag", pregunta, str(sorted(preferred_source_types or [])))
+    key = _make_key(
+        "rag",
+        pregunta,
+        str(sorted(preferred_source_types or [])),
+        "strict_sources_on" if strict_preferred_sources else "strict_sources_off",
+    )
     return get_json(key)
 
 
-def set_rag_search(pregunta: str, resultado: dict, preferred_source_types: list[str] | None = None) -> bool:
+def set_rag_search(
+    pregunta: str,
+    resultado: dict,
+    preferred_source_types: list[str] | None = None,
+    strict_preferred_sources: bool = False,
+) -> bool:
     """Guarda resultado de búsqueda RAG."""
-    key = _make_key("rag", pregunta, str(sorted(preferred_source_types or [])))
+    key = _make_key(
+        "rag",
+        pregunta,
+        str(sorted(preferred_source_types or [])),
+        "strict_sources_on" if strict_preferred_sources else "strict_sources_off",
+    )
     return set_json(key, resultado, ttl=3600)
 
 
@@ -184,32 +202,7 @@ def clear_rag_cache() -> int:
 
 
 # ─────────────────────────────────────────────
-#  CACHÉ DE TARIFAS
-# ─────────────────────────────────────────────
-
-def get_tariff(scope: str, peso: str, columna: str, xlsx: Optional[str] = None) -> Optional[dict]:
-    """Obtiene cálculo de tarifa cacheado."""
-    if not REDIS_TARIFF_CACHE:
-        return None
-    key = _make_key("tariff", f"{scope}:{peso}:{columna}:{xlsx or ''}")
-    return get_json(key)
-
-
-def set_tariff(scope: str, peso: str, columna: str, resultado: dict, xlsx: Optional[str] = None) -> bool:
-    """Guarda cálculo de tarifa en caché."""
-    if not REDIS_TARIFF_CACHE:
-        return False
-    key = _make_key("tariff", f"{scope}:{peso}:{columna}:{xlsx or ''}")
-    return set_json(key, resultado, ttl=REDIS_CACHE_TTL)
-
-
-def clear_tariff_cache() -> int:
-    """Limpia todo el caché de tarifas."""
-    return clear_pattern("tariff:*")
-
-
-# ─────────────────────────────────────────────
-#  CACHÉ DE RESPUESTAS FINALES
+#  INFO Y STATS
 # ─────────────────────────────────────────────
 
 def _response_key(pregunta: str, lang: str, skill_id: str, model: str, require_evidence: bool) -> str:
@@ -397,7 +390,6 @@ def get_namespace_stats() -> dict:
         },
         "features": {
             "embedding_cache_enabled": REDIS_EMBEDDING_CACHE,
-            "tariff_cache_enabled": REDIS_TARIFF_CACHE,
             "response_cache_enabled": REDIS_RESPONSE_CACHE,
             "response_cache_ttl_seconds": REDIS_RESPONSE_CACHE_TTL,
             "default_ttl_seconds": REDIS_CACHE_TTL,

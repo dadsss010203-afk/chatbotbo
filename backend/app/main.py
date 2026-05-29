@@ -243,15 +243,6 @@ async def logo_gif():
     raise HTTPException(status_code=404, detail="GIF not found")
 
 
-@app.get("/pruebaapi.html")
-async def pruebaapi():
-    """Sirve la página de prueba del widget."""
-    path = os.path.join(FRONTEND_DIR, "pruebaapi.html")
-    if os.path.exists(path):
-        return FileResponse(path, media_type="text/html")
-    raise HTTPException(status_code=404, detail="Not found")
-
-
 # ─────────────────────────────────────────────
 #  MANEJO DE ERRORES
 # ─────────────────────────────────────────────
@@ -303,7 +294,6 @@ def inicializar():
         "POST /api/reset": "Limpiar historial",
         "GET /api/capabilities": "Skills y estado RAG",
         "GET /api/status": "Estado del sistema",
-        "POST /api/tarifa": "Calculo directo de tarifa",
         "POST /api/escalate": "Escalar a agente humano",
         "GET /widget-embed.js": "Widget flotante mejorado",
     }

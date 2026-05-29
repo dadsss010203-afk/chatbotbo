@@ -174,6 +174,10 @@ _PALABRAS_DOMINIO_POSTAL_PREGUNTA = {
     "servicio", "servicios", "ofrecen", "ofreceis", "tienen", "tienes",
     "disponible", "disponibles", "chasqui", "express", "delivery",
 "certificado", "ordinario", "giro", "giros", "correspondencia",
+    # Palabras de consulta de horarios y atencion
+    "horario", "atiende", "atienden", "abierto", "abiertos", "abren",
+    "cierran", "cerrado", "domingo", "domingos", "sabado", "sabados",
+    "feriado", "festivo", "laboral", "laborables",
 }
 
 # Palabras que indican intención conversacional válida con el bot

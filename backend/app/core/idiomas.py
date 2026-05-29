@@ -1,22 +1,12 @@
 """
 core/idiomas.py
-Textos en 2 idiomas (ES/EN) + detección automática con langdetect.
+Textos en 2 idiomas (ES/EN) + deteccion automatica ligera.
 Compartido por todos los chatbots.
 Los datos de contacto (telefono, web) se leen de contacto_institucional.json
-a través de core.contacto — no hardcodear aquí.
+a traves de core.contacto — no hardcodear aqui.
 """
 
-from langdetect import detect, LangDetectException
 from core import contacto
-
-# ─────────────────────────────────────────────
-#  MAPA langdetect → código interno
-# ─────────────────────────────────────────────
-LANG_MAP = {
-    "es"   : "es",
-    "en"   : "en",
-    # Cualquier otro idioma detectado → español por defecto
-}
 
 IDIOMA_DEFAULT = "es"
 
@@ -28,27 +18,27 @@ def _build_idiomas() -> dict:
     web = contacto.web()
     return {
         "es": {
-            "nombre"       : "Español",
+            "nombre"       : "Espanol",
             "bienvenida"   : (
-                "¡Hola! Bienvenido al asistente oficial de Correos de Bolivia. "
-                "Puedo ayudarte con envíos, sucursales, ubicaciones y más.\n\n"
-                "• Presiona el botón TARIFAS para activar las consultas de tarifas de envío. "
-                "Presiónalo de nuevo para desactivarlo.\n"
-                "• Presiona el botón RASTREO para rastrear un paquete. "
-                "Presiónalo de nuevo para desactivarlo.\n\n"
-                "¿En qué puedo ayudarte hoy?"
+                "Hola! Bienvenido al asistente oficial de Correos de Bolivia. "
+                "Puedo ayudarte con envios, sucursales, ubicaciones y mas.\n\n"
+                "  Presiona el boton TARIFAS para activar las consultas de tarifas de envio. "
+                "Presionalo de nuevo para desactivarlo.\n"
+                "  Presiona el boton RASTREO para rastrear un paquete. "
+                "Presionalo de nuevo para desactivarlo.\n\n"
+                "En que puedo ayudarte hoy?"
             ),
             "saludo"       : (
-                "¡Hola! Soy ChatbotBO, el asistente de Correos Bolivia. "
-                "Puedo ayudarte con envíos, sucursales y más. ¿En qué puedo ayudarte?"
+                "Hola! Soy ChatbotBO, el asistente de Correos Bolivia. "
+                "Puedo ayudarte con envios, sucursales y mas. En que puedo ayudarte?"
             ),
             "despedida"    : (
-                f"Ha sido un placer ayudarte. Que tengas un excelente día. "
-                f"Recuerda que puedes visitarnos en {web}. ¡Hasta pronto!"
+                f"Ha sido un placer ayudarte. Que tengas un excelente dia. "
+                f"Recuerda que puedes visitarnos en {web}. Hasta pronto!"
             ),
-            "sin_info"     : f"No tengo esa información. Visita {web} o llama al {tel}.",
-            "instruccion"  : "Responde en español, de forma clara y amable.",
-            "pedir_ciudad" : "Por favor indica una ciudad válida: {ciudades}",
+            "sin_info"     : f"No tengo esa informacion. Visita {web} o llama al {tel}.",
+            "instruccion"  : "Responde en espanol, de forma clara y amable.",
+            "pedir_ciudad" : "Por favor indica una ciudad valida: {ciudades}",
             "no_disponible": "No disponible",
         },
         "en": {
@@ -73,26 +63,58 @@ IDIOMAS = _build_idiomas()
 
 
 # ─────────────────────────────────────────────
-#  DETECCIÓN AUTOMÁTICA
+#  DETECCION AUTOMATICA (ligera, sin langdetect)
 # ─────────────────────────────────────────────
 
+# Palabras de alta frecuencia exclusivas de cada idioma
+_EN_MARKERS = frozenset({
+    "the", "is", "are", "was", "were", "have", "has", "had",
+    "what", "when", "where", "who", "how", "why", "which",
+    "can", "will", "would", "should", "could", "do", "does",
+    "tracking", "ship", "package", "mail", "help", "please",
+    "office", "branch", "rate", "price", "hello", "thanks",
+    "your", "you", "this", "that", "with", "from", "about",
+    "need", "send", "delivery", "code", "number", "status",
+})
+_ES_MARKERS = frozenset({
+    "que", "los", "las", "del", "por", "para", "como", "una",
+    "con", "mas", "pero", "muy", "este", "esta", "entre",
+    "envio", "rastreo", "paquete", "sucursal", "tarifa",
+    "tienes", "puedo", "ayuda", "gracias", "hola", "buenas",
+    "necesito", "saber", "donde", "cuanto", "cuando", "cual",
+    "correos", "bolivia", "envios", "servicio", "horario",
+    "codigo", "numero", "estado", "telefono", "direccion",
+})
+
+
 def detectar_idioma(texto: str) -> str:
-    texto_limpio = texto.strip()
-    if len(texto_limpio) < 2:
+    """Detecta ES o EN usando conteo de palabras marcadoras frecuentes."""
+    texto_limpio = texto.strip().lower()
+    if len(texto_limpio) < 3:
         return IDIOMA_DEFAULT
-    try:
-        codigo = detect(texto_limpio)
-        lang = LANG_MAP.get(codigo, IDIOMA_DEFAULT)
-    except LangDetectException:
-        return IDIOMA_DEFAULT
-    return lang
+
+    # Normalizar: solo letras y espacios
+    import re
+    palabras = set(re.findall(r"[a-z]+", texto_limpio))
+
+    en_hits = len(palabras & _EN_MARKERS)
+    es_hits = len(palabras & _ES_MARKERS)
+
+    # Umbral: se necesita al menos 2 hits mas que el otro idioma
+    if en_hits > es_hits + 1:
+        return "en"
+    if es_hits > en_hits + 1:
+        return "es"
+
+    # Empate o pocos hits: default espanol (idioma principal de Correos Bolivia)
+    return IDIOMA_DEFAULT
 
 
-def resolver_idioma(lang_forzado, texto: str) -> str:
+def resolver_idioma(lang_forzado: str | None, texto: str) -> str:
     """
     Prioridad:
     1. lang enviado por el frontend (selector manual)
-    2. Detección automática del texto
+    2. Deteccion automatica del texto
     """
     if lang_forzado and lang_forzado in IDIOMAS:
         return lang_forzado

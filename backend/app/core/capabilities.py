@@ -40,108 +40,7 @@ SCRAPER_SECCIONES_FILE = os.path.join(DATA_DIR, "secciones_home.json")
 SCRAPER_SUCURSALES_FILE = os.path.join(DATA_DIR, "sucursales_contacto.json")
 EXCLUDED_MANAGED_JSON_FILES = {"pdfs_contenido.json", "skills.json"}
 
-DEFAULT_SKILLS = [
-    {
-        "id": "rastreo_envios",
-        "nombre": "Rastreo de envíos",
-        "descripcion": "Atiende consultas sobre seguimiento, estado y trazabilidad de envíos postales.",
-        "modo": "rag+llm",
-        "categoria": "atencion",
-        "prioridad": 5,
-        "trigger": "rastreo, seguimiento, track, tracking, guia, código de envío, estado de envío, paquete",
-        "activa": True,
-    },
-    {
-        "id": "servicios_correos",
-        "nombre": "Servicios de Correos de Bolivia",
-        "descripcion": "Explica servicios, características, coberturas, modalidades y condiciones operativas de AGBC.",
-        "modo": "rag+llm",
-        "categoria": "atencion",
-        "prioridad": 5,
-        "trigger": "servicio, servicios, ems, certificado, ordinario, express mail service, giros, encomienda, paquetería",
-        "activa": True,
-    },
-    {
-        "id": "guia_envio_correcto",
-        "nombre": "Cómo enviar correctamente",
-        "descripcion": "Guía paso a paso para preparar, embalar, rotular y enviar documentos o paquetes correctamente.",
-        "modo": "rag+llm",
-        "categoria": "atencion",
-        "prioridad": 5,
-        "trigger": "cómo enviar, como enviar, paso a paso, guía de envío, embalaje, rotulado, destinatario, remitente",
-        "activa": True,
-    },
-    {
-        "id": "reclamos_quejas",
-        "nombre": "Reclamos y quejas",
-        "descripcion": "Orienta sobre reclamos, quejas, demoras, pérdidas, incidencias y canales de atención.",
-        "modo": "rag+llm",
-        "categoria": "atencion",
-        "prioridad": 5,
-        "trigger": "reclamo, reclamos, queja, quejas, denuncia, demora, perdido, extraviado, no llegó, no llego",
-        "activa": True,
-    },
-    {
-        "id": "alertas_seguridad",
-        "nombre": "Evita estafas y alertas de seguridad",
-        "descripcion": "Ayuda a identificar fraudes, enlaces sospechosos y prácticas seguras relacionadas con servicios postales.",
-        "modo": "rag+llm",
-        "categoria": "analitica",
-        "prioridad": 5,
-        "trigger": "estafa, fraude, phishing, alerta, seguridad, mensaje falso, enlace sospechoso, scam",
-        "activa": True,
-    },
-    {
-        "id": "filatelia_boliviana",
-        "nombre": "Filatelia boliviana",
-        "descripcion": "Informa sobre sellos de colección, productos filatélicos y contenido histórico relacionado.",
-        "modo": "rag+llm",
-        "categoria": "documental",
-        "prioridad": 4,
-        "trigger": "filatelia, sello, sellos, colección, coleccion, estampilla, estampillas",
-        "activa": True,
-    },
-    {
-        "id": "oficinas_contacto",
-        "nombre": "Oficinas, sucursales y contacto",
-        "descripcion": "Resuelve ubicación, horarios, contacto y datos de oficinas o sucursales de Correos de Bolivia.",
-        "modo": "rag+llm",
-        "categoria": "atencion",
-        "prioridad": 5,
-        "trigger": "oficina, oficinas, sucursal, sucursales, contacto, teléfono, telefono, dirección, direccion, horario",
-        "activa": True,
-    },
-    {
-        "id": "historia_correos_bolivia",
-        "nombre": "Historia de Correos Bolivia",
-        "descripcion": "Responde sobre historia institucional, evolución y antecedentes de Correos de Bolivia.",
-        "modo": "rag+llm",
-        "categoria": "documental",
-        "prioridad": 3,
-        "trigger": "historia, historia institucional, origen, evolución, evolucion, antecedentes, correos bolivia",
-        "activa": True,
-    },
-    {
-        "id": "multilenguaje",
-        "nombre": "Traducción conversacional",
-        "descripcion": "Mantiene la conversación en varios idiomas y traduce respuestas visibles del bot.",
-        "modo": "translation",
-        "categoria": "idioma",
-        "prioridad": 4,
-        "trigger": "traducir, idioma, language, traducción, translation",
-        "activa": True,
-    },
-    {
-        "id": "estado_plataforma",
-        "nombre": "Estado del sistema",
-        "descripcion": "Resume el estado operativo del bot, el modelo, el RAG y los recursos cargados.",
-        "modo": "internal",
-        "categoria": "operacion",
-        "prioridad": 3,
-        "trigger": "skills, capacidades, estado del bot, estado del sistema",
-        "activa": True,
-    },
-]
+DEFAULT_SKILLS: list = []  # Sin skills manuales. Todo es busqueda semantica en Qdrant.
 
 SUPPORTED_SKILL_MODES = [
     {"id": "rag+llm", "nombre": "RAG + LLM"},
@@ -553,117 +452,30 @@ _SKILLS_GUARDIA_NUMERICA = {"rastreo_envios", "oficinas_contacto"}
 
 
 def skill_requiere_guardia_numerica(skill_id: str | None) -> bool:
-    """
-    Devuelve True si la skill requiere verificación estricta de datos numéricos.
-    Lee los IDs desde las skills activas para que sea dinámico:
-    cualquier skill activa cuyo ID esté en _SKILLS_GUARDIA_NUMERICA aplica el guardia.
-    """
-    if not skill_id:
-        return False
-    ids_activos = {s["id"] for s in get_active_skills()}
-    return skill_id in _SKILLS_GUARDIA_NUMERICA and skill_id in ids_activos
+    """Sin skills de tarifas, no se necesita guardia numerica."""
+    return False
 
 
 def resolve_skills_for_query(pregunta: str) -> dict:
-    texto = _normalizar_match_text(pregunta)
-    palabras = set(texto.split())
-    has_postal_context = bool(palabras.intersection(POSTAL_CONTEXT_HINTS)) or "correos" in texto or "agbc" in texto
-    skills = get_active_skills()
-    matches = []
-
-    for skill in skills:
-        score = 0
-        skill_generic_words = SKILL_GENERIC_WORDS_BY_ID.get(skill["id"], set())
-        for token in skill.get("trigger_tokens", []):
-            if token and _contains_whole_phrase(texto, token):
-                if token in skill_generic_words and not has_postal_context:
-                    continue
-                score += max(3, len(token.split()) * 2)
-                continue
-            token_words = [word for word in token.split() if len(word) >= 4]
-            if token_words and all(word in palabras for word in token_words):
-                if set(token_words).issubset(skill_generic_words) and not has_postal_context:
-                    continue
-                score += max(2, len(token_words))
-        for word in skill.get("trigger_words", []):
-            if word in skill_generic_words and not has_postal_context:
-                continue
-            if word in palabras:
-                score += 1
-        if skill["id"] == "oficinas_contacto" and any(word in texto for word in ("donde", "direccion", "ubicacion", "horario", "telefono")):
-            score += 2
-        if skill["id"] == "rastreo_envios" and any(word in texto for word in ("codigo", "guia", "tracking", "seguimiento", "rastreo", "envio", "paquete")):
-            score += 3
-        if skill["id"] == "servicios_correos" and any(word in texto for word in ("ems", "certificado", "ordinario", "encomienda", "giros", "paqueteria")):
-            score += 2
-        if skill["id"] == "reclamos_quejas" and any(word in texto for word in ("reclamo", "queja", "demora", "extraviado", "perdido")):
-            score += 2
-        if score > 0:
-            item = dict(skill)
-            item["match_score"] = score + int(skill.get("prioridad", 3))
-            matches.append(item)
-
-    matches.sort(key=lambda item: (-item["match_score"], -(item.get("prioridad", 3)), item.get("nombre", "")))
-    if matches:
-        top_score = matches[0]["match_score"]
-        filtered = []
-        for idx, item in enumerate(matches):
-            if idx == 0:
-                filtered.append(item)
-                continue
-            if len(filtered) >= 2:
-                break
-            score_gap = top_score - item["match_score"]
-            if item["match_score"] >= 7 and score_gap <= 3:
-                filtered.append(item)
-        matches = filtered
-    strong_matches = [item for item in matches if int(item.get("match_score") or 0) >= 5]
-    in_scope = bool(strong_matches) or any(token in palabras for token in SKILL_SCOPE_KEYWORDS) or "correos" in texto or "agbc" in texto
-
-    if looks_like_role_override(pregunta) and not has_postal_context:
-        in_scope = False
-        strong_matches = []
-
+    """
+    Router simplificado: solo 3 reglas deterministicas.
+    Todo lo demas → busqueda semantica en Qdrant (RAG).
+    """
+    # Siempre in_scope para Correos Bolivia
     return {
-        "in_scope": in_scope,
-        "matched_skills": strong_matches,
-        "primary_skill": strong_matches[0] if strong_matches else None,
-        "skill_ids": [item["id"] for item in strong_matches],
+        "in_scope": True,
+        "matched_skills": [],
+        "primary_skill": None,
+        "skill_ids": [],
     }
 
 
 def build_skill_manifest(skills: list[dict] | None = None) -> str:
-    active = skills or get_active_skills()
-    if not active:
-        return "Sin skills activas."
-    lineas = ["Skills activas:"]
-    for item in active:
-        lineas.append(
-            f"- {item['nombre']}: {item.get('descripcion', 'Sin descripción.')} "
-            f"(categoria: {item.get('categoria', 'custom')}, prioridad: {item.get('prioridad', 3)})"
-        )
-    return "\n".join(lineas)
+    return "Busqueda semantica unificada en Qdrant. Sin skills manuales."
 
 
 def preferred_sources_for_skill(skill: dict | None) -> list[str]:
-    if not skill:
-        return ["pdf", "history", "json_data", "web_main", "section", "branch"]
-
-    skill_id = skill.get("id")
-    categoria = skill.get("categoria")
-
-    if skill_id == "historia_correos_bolivia":
-        # Para historia institucional priorizamos primero las fuentes historicas
-        # curadas antes que PDFs genericos de servicios.
-        return ["history", "json_data", "pdf", "section", "web_main", "branch"]
-    if skill_id == "filatelia_boliviana" or categoria == "documental":
-        return ["pdf", "json_data", "history", "section", "web_main", "branch"]
-    if skill_id == "oficinas_contacto":
-        return ["json_data", "pdf", "branch", "web_main", "section", "history"]
-    if skill_id in {"rastreo_envios", "servicios_correos", "guia_envio_correcto", "reclamos_quejas"}:
-        return ["pdf", "web_main", "section", "json_data", "branch", "history"]
-    if skill_id == "estado_plataforma":
-        return ["pdf", "section", "web_main", "json_data", "branch", "history"]
+    """Sin skills manuales: buscar en todas las fuentes disponibles."""
     return ["pdf", "history", "json_data", "web_main", "section", "branch"]
 
 

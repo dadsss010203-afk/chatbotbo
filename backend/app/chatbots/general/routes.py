@@ -27,11 +27,9 @@ import requests
 import json
 from fastapi import APIRouter, Request, HTTPException, Path, UploadFile, File, Form
 from fastapi.responses import JSONResponse, StreamingResponse
-from celery.result import AsyncResult
 
-from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, tarifas_skill, tarifas_sqlite, cache, conversation_logs, conversation_logs_tarifas, contacto
-from celery_app import celery
-from tasks import rebuild_rag_task, run_update_task
+from core import rag, ollama, session, location, idiomas, intents, updater, capabilities, observability, cache, conversation_logs, contacto
+from tasks import rebuild_rag as rebuild_rag_task, run_update as run_update_task
 from chatbots.general.chat_helpers import (
     buscar_contexto_local_minimo,
     respuesta_chat_vacio,
@@ -45,6 +43,7 @@ from chatbots.general.config import (
     construir_prompt, REQUIRE_EVIDENCE,
 )
 
+
 # ─────────────────────────────────────────────
 #  ROUTER
 # ─────────────────────────────────────────────
@@ -55,8 +54,6 @@ SUCURSALES: list = []
 CHATBOT_GENERAL_ONLY = os.environ.get("CHATBOT_GENERAL_ONLY", "false").strip().lower() in ("1", "true", "yes")
 REINDEX_DEBOUNCE_SECONDS = int(os.environ.get("REINDEX_DEBOUNCE_SECONDS", "30"))
 CHAT_RESPONSE_MAX_CHARS = int(os.environ.get("CHAT_RESPONSE_MAX_CHARS", "0"))
-LLM_TARIFF_ORCHESTRATOR = os.environ.get("LLM_TARIFF_ORCHESTRATOR", "true").strip().lower() in ("1", "true", "yes")
-TARIFF_DETERMINISTIC_ONLY = os.environ.get("TARIFF_DETERMINISTIC_ONLY", "true").strip().lower() in ("1", "true", "yes")
 INPUT_TEXT_NORMALIZATION = os.environ.get("INPUT_TEXT_NORMALIZATION", "true").strip().lower() in ("1", "true", "yes")
 INPUT_MAX_CHARS = int(os.environ.get("INPUT_MAX_CHARS", "420"))
 LOCATION_USE_LLM_ONLY = True
@@ -74,44 +71,10 @@ GENERAL_SYSTEM_PROMPT = (
     "Mantén respuestas breves, naturales y en el mismo idioma del usuario."
 )
 _COMMON_TYPOS_ES = {
-    "chabot": "chatbot",
-    "chatbo": "chatbot",
-    "repsondsa": "responda",
-    "respodna": "responda",
-    "flatra": "falta",
-    "apra": "para",
-    "admeas": "además",
-    "ademas": "además",
-    "laucine": "alucine",
-    "qe": "que",
-    "sertvicios": "servicios",
-    "sertvicio": "servicio",
-    "srevicios": "servicios",
-    "serivcios": "servicios",
-    "servicos": "servicios",
-    "serviciso": "servicios",
-    # Typos frecuentes adicionales
-    "sevicios": "servicios",
-    "sevicio": "servicio",
-    "servicois": "servicios",
-    "servciios": "servicios",
-    "hisotria": "historia",
-    "histoira": "historia",
-    "hisoria": "historia",
-    "coreros": "correos",
-    "corroes": "correos",
-    "corerros": "correos",
-    "tarifas": "tarifas",
-    "tairfas": "tarifas",
-    "ratreo": "rastreo",
-    "rastrear": "rastrear",
-    "encomiendas": "encomiendas",
-    "encomieda": "encomienda",
-    "paquete": "paquete",
-    "paquetes": "paquetes",
-    "lso": "los",
-    "dme": "dame",
-    "dmae": "dame",
+    "chabot": "chatbot", "chatbo": "chatbot",
+    "repsondsa": "responda", "respodna": "responda",
+    "qe": "que", "tarifas": "tarifas",
+    "sevicios": "servicios", "serivcios": "servicios",
 }
 
 _reindex_timer = None
@@ -231,8 +194,6 @@ def _normalizar_texto_usuario(texto: str) -> str:
     return normalizado
 
 
-
-
 def _safe_json_object(text: str) -> dict | None:
     raw = (text or "").strip()
     if not raw:
@@ -336,83 +297,6 @@ async def _stream_ollama_cancelable(
             raise payload
     finally:
         disconnect_task.cancel()
-
-
-def _llm_orquestar_tarifa(pregunta: str, pendiente: dict | None = None) -> dict | None:
-    """
-    Orquestador híbrido:
-    - El LLM sugiere intención y campos detectados.
-    - El backend valida y ejecuta siempre de forma determinística.
-    """
-    if not LLM_TARIFF_ORCHESTRATOR:
-        return None
-    if not ollama.ollama_disponible():
-        return None
-
-    pending = pendiente or {}
-    system = (
-        "Eres un clasificador de intención para tarifas postales. "
-        "Devuelve SOLO un JSON válido, sin markdown.\n"
-        "Campos esperados:\n"
-        "- use_tarifa_flow: boolean\n"
-        "- is_info_only: boolean\n"
-        "- family: 'ems' | 'encomienda' | 'ems_hoja5' | 'ems_hoja6' | 'eca' | 'pliegos' | 'sacas_m' | 'ems_contratos' | 'super_express' | 'super_express_documentos' | 'super_express_paquetes' | null\n"
-        "- scope: 'nacional' | 'internacional' | 'encomienda_nacional' | 'encomienda_internacional' | 'ems_hoja5_nacional' | 'ems_hoja6_internacional' | 'eca_nacional' | 'eca_internacional' | 'pliegos_nacional' | 'pliegos_internacional' | 'sacas_m_nacional' | 'sacas_m_internacional' | 'ems_contratos_nacional' | 'super_express_nacional' | 'super_express_documentos_internacional' | 'super_express_paquetes_internacional' | null\n"
-        "- peso: string como '800g' o '1.2kg' o null\n"
-        "- destino_servicio: string o null\n"
-        "- confidence: number entre 0 y 1\n"
-        "Marca is_info_only=true para preguntas informativas (ej. 'que es ems'). "
-        "Si no hay intención de cotizar precio, use_tarifa_flow=false."
-    )
-    user = (
-        f"Pregunta: {pregunta}\n"
-        f"Contexto pendiente: {json.dumps(pending, ensure_ascii=False)}"
-    )
-    try:
-        raw = ollama.llamar_ollama(
-            [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            opciones={"temperature": 0.0, "num_predict": 140},
-        )
-    except Exception:
-        return None
-
-    parsed = _safe_json_object(raw)
-    if not parsed:
-        return None
-
-    scope = tarifas_skill.resolve_scope(parsed.get("scope"))
-    family = parsed.get("family")
-    if family not in {
-        "ems", "encomienda", "ems_hoja5", "ems_hoja6", "eca", "pliegos", "sacas_m",
-        "ems_contratos", "super_express", "super_express_documentos", "super_express_paquetes",
-    }:
-        family = tarifas_skill.detect_family(parsed.get("family") or parsed.get("destino_servicio") or pregunta)
-
-    frag_peso = tarifas_skill.extract_tarifa_fragment(str(parsed.get("peso") or ""))
-    peso = frag_peso.peso
-
-    destino_servicio = (parsed.get("destino_servicio") or "").strip()
-    columna = None
-    if destino_servicio:
-        columna = tarifas_skill.resolve_columna(destino_servicio, scope=scope) or tarifas_skill.resolve_columna(destino_servicio)
-
-    try:
-        confidence = float(parsed.get("confidence", 0) or 0)
-    except Exception:
-        confidence = 0.0
-
-    return {
-        "use_tarifa_flow": bool(parsed.get("use_tarifa_flow")),
-        "is_info_only": bool(parsed.get("is_info_only")),
-        "family": family,
-        "scope": scope,
-        "peso": peso,
-        "columna": columna,
-        "confidence": confidence,
-    }
 
 
 def _modo_general_only() -> bool:
@@ -1149,725 +1033,6 @@ def _finalizar_chat_response(
     return payload
 
 
-def _persistir_flujo_tarifa(
-    sid: str,
-    *,
-    status: str,
-    scope: str = "",
-    peso: str = "",
-    columna: str = "",
-    servicio: str = "",
-    precio: str = "",
-) -> int | None:
-    flow = session.pop_tarifa_flow(sid)
-    if not flow:
-        return None
-    started_at_ts = float(flow.get("started_at_ts") or time.time())
-    latency_ms = max(int((time.time() - started_at_ts) * 1000), 0)
-    return conversation_logs_tarifas.log_tarifa_flow(
-        session_id=sid,
-        status=status,
-        flow_messages=flow.get("messages") or [],
-        scope=scope,
-        peso=peso,
-        columna=columna,
-        servicio=servicio,
-        precio=precio,
-        latency_ms=latency_ms,
-    )
-
-
-def _missing_tarifa_fields(
-    scope: str | None,
-    peso: str | None,
-    columna: str | None,
-    family: str | None = None,
-    level: str | None = None,
-) -> list[str]:
-    missing: list[str] = []
-    if not scope:
-        if level in {"nacional", "internacional"} and not family:
-            missing.append(f"tipo_{level}")
-        elif family == "ems":
-            missing.append("alcance_ems")
-        elif family == "encomienda":
-            missing.append("alcance_encomienda")
-        else:
-            missing.append("alcance")
-    if not peso:
-        missing.append("peso")
-    if not columna:
-        missing.append("destino")
-    return missing
-
-
-def _wants_reset_tarifa(texto: str) -> bool:
-    t = (texto or "").strip().lower()
-    if not t:
-        return False
-    keywords = (
-        "cancelar", "cancela", "olvida", "reiniciar", "reinicia",
-        "empezar de nuevo", "comenzar de nuevo", "borrar",
-    )
-    return any(k in t for k in keywords)
-
-
-def _is_service_selection_only(texto: str) -> bool:
-    t = " ".join((texto or "").strip().lower().split())
-    options = {
-        "ems",
-        "encomienda",
-        "prioritario",
-        "encomiendas postales",
-        "correo prioritario lc/ao nacional",
-        "correo prioritario lc ao nacional",
-        "correo prioritario lc/ao internacional",
-        "correo prioritario lc ao internacional",
-        "eca nacional",
-        "eca internacional",
-        "pliegos oficiales nacional",
-        "pliegos oficiales internacional",
-        "sacas m nacional",
-        "sacas m internacional",
-        "ems contratos nacional",
-        "super express nacional",
-        "super express documentos internacional",
-        "super express paquetes internacional",
-    }
-    return t in options
-
-
-def _extract_geo_level_choice(texto: str) -> str | None:
-    t = (texto or "").strip().lower()
-    if t in {"nacional", "nacional.", "nacional!", "nacional?"}:
-        return "nacional"
-    if t in {"internacional", "internacional.", "internacional!", "internacional?"}:
-        return "internacional"
-    return None
-
-
-def _scope_from_family_and_level(family: str | None, level: str | None) -> str | None:
-    if family not in {
-        "ems", "encomienda", "ems_hoja5", "ems_hoja6", "eca", "pliegos", "sacas_m",
-        "ems_contratos", "super_express", "super_express_documentos", "super_express_paquetes",
-    }:
-        return None
-    if family == "ems_contratos":
-        return "ems_contratos_nacional"
-    if family == "super_express":
-        return "super_express_nacional"
-    if family == "super_express_documentos":
-        return "super_express_documentos_internacional"
-    if family == "super_express_paquetes":
-        return "super_express_paquetes_internacional"
-    if level not in {"nacional", "internacional"}:
-        return None
-    if family == "ems":
-        return "nacional" if level == "nacional" else "internacional"
-    if family == "ems_hoja5":
-        return "ems_hoja5_nacional" if level == "nacional" else None
-    if family == "ems_hoja6":
-        return "ems_hoja6_internacional" if level == "internacional" else None
-    if family == "eca":
-        return "eca_nacional" if level == "nacional" else "eca_internacional"
-    if family == "pliegos":
-        return "pliegos_nacional" if level == "nacional" else "pliegos_internacional"
-    if family == "sacas_m":
-        return "sacas_m_nacional" if level == "nacional" else "sacas_m_internacional"
-    return "encomienda_nacional" if level == "nacional" else "encomienda_internacional"
-
-
-def _family_for_scope(scope: str | None) -> str | None:
-    sc = (scope or "").strip().lower()
-    if sc in {"nacional", "internacional"}:
-        return "ems"
-    if sc in {"encomienda_nacional", "encomienda_internacional"}:
-        return "encomienda"
-    if sc == "ems_hoja5_nacional":
-        return "ems_hoja5"
-    if sc == "ems_hoja6_internacional":
-        return "ems_hoja6"
-    if sc in {"eca_nacional", "eca_internacional"}:
-        return "eca"
-    if sc in {"pliegos_nacional", "pliegos_internacional"}:
-        return "pliegos"
-    if sc in {"sacas_m_nacional", "sacas_m_internacional"}:
-        return "sacas_m"
-    if sc == "ems_contratos_nacional":
-        return "ems_contratos"
-    if sc == "super_express_nacional":
-        return "super_express"
-    if sc == "super_express_documentos_internacional":
-        return "super_express_documentos"
-    if sc == "super_express_paquetes_internacional":
-        return "super_express_paquetes"
-    return None
-
-
-def _level_for_scope(scope: str | None) -> str | None:
-    sc = (scope or "").strip().lower()
-    if sc in {
-        "nacional", "encomienda_nacional", "ems_hoja5_nacional", "eca_nacional",
-        "pliegos_nacional", "sacas_m_nacional", "ems_contratos_nacional", "super_express_nacional",
-    }:
-        return "nacional"
-    if sc in {
-        "internacional", "encomienda_internacional", "ems_hoja6_internacional", "eca_internacional",
-        "pliegos_internacional", "sacas_m_internacional",
-        "super_express_documentos_internacional", "super_express_paquetes_internacional",
-    }:
-        return "internacional"
-    return None
-
-
-def _scopes_for_level(level: str | None) -> list[str]:
-    lv = (level or "").strip().lower()
-    if lv == "nacional":
-        return [
-            "nacional", "encomienda_nacional", "ems_hoja5_nacional", "eca_nacional",
-            "pliegos_nacional", "sacas_m_nacional", "ems_contratos_nacional", "super_express_nacional",
-        ]
-    if lv == "internacional":
-        return [
-            "internacional", "encomienda_internacional", "ems_hoja6_internacional", "eca_internacional",
-            "pliegos_internacional", "sacas_m_internacional",
-            "super_express_documentos_internacional", "super_express_paquetes_internacional",
-        ]
-    return []
-
-
-def _service_button_for_scope(scope: str) -> dict | None:
-    if scope == "nacional":
-        return {"label": "Express Mail Service (EMS)", "value": "ems"}
-    if scope == "encomienda_nacional":
-        return {"label": "Prioritario", "value": "encomienda"}
-    if scope == "ems_hoja5_nacional":
-        return {"label": "Correo Prioritario LC/AO", "value": "correo prioritario lc/ao nacional"}
-    if scope == "internacional":
-        return {"label": "Express Mail Service (EMS)", "value": "ems"}
-    if scope == "encomienda_internacional":
-        return {"label": "Encomiendas Postales", "value": "encomienda"}
-    if scope == "ems_hoja6_internacional":
-        return {"label": "Correo Prioritario LC/AO", "value": "correo prioritario lc/ao internacional"}
-    if scope == "eca_nacional":
-        return {"label": "Correspondencia Agrupada (ECA)", "value": "eca nacional"}
-    if scope == "eca_internacional":
-        return {"label": "Correspondencia Agrupada (ECA)", "value": "eca internacional"}
-    if scope == "pliegos_nacional":
-        return {"label": "Pliegos Oficiales", "value": "pliegos oficiales nacional"}
-    if scope == "pliegos_internacional":
-        return {"label": "Pliegos Oficiales", "value": "pliegos oficiales internacional"}
-    if scope == "sacas_m_nacional":
-        return {"label": "Sacas M", "value": "sacas m nacional"}
-    if scope == "sacas_m_internacional":
-        return {"label": "Sacas M", "value": "sacas m internacional"}
-    if scope == "ems_contratos_nacional":
-        return {"label": "EMS Contratos", "value": "ems contratos nacional"}
-    if scope == "super_express_nacional":
-        return {"label": "Super Express", "value": "super express nacional"}
-    if scope == "super_express_documentos_internacional":
-        return {"label": "Super Express Documentos", "value": "super express documentos internacional"}
-    if scope == "super_express_paquetes_internacional":
-        return {"label": "Super Express Paquetes", "value": "super express paquetes internacional"}
-    return None
-
-
-def _out_of_range_alternatives(
-    peso: str,
-    pregunta: str,
-    current_scope: str,
-    current_columna: str | None,
-) -> list[dict]:
-    level = _level_for_scope(current_scope)
-    if not level:
-        return []
-
-    buttons: list[dict] = []
-    seen: set[str] = set()
-    for scope in _scopes_for_level(level):
-        if scope == current_scope:
-            continue
-
-        col = None
-        if current_columna and tarifas_skill.columna_valida_para_scope(current_columna, scope):
-            col = current_columna
-        if not col:
-            col = tarifas_skill.resolve_columna(pregunta, scope=scope)
-        if not col:
-            continue
-
-        intento = tarifas_skill.ejecutar_tarifa(peso=peso, columna=col, scope=scope)
-        if not intento.get("ok"):
-            continue
-
-        btn = _service_button_for_scope(scope)
-        if not btn:
-            continue
-        if btn["value"] in seen:
-            continue
-        seen.add(btn["value"])
-        buttons.append(btn)
-
-    return buttons
-
-
-def _tarifa_quick_replies(
-    missing: list[str],
-    scope: str | None = None,
-    family: str | None = None,
-    lang: str = "es",
-) -> list[dict]:
-    if not missing:
-        return []
-    
-    # Traducciones
-    labels = {
-        "es": {
-            "nacional": "Nacional",
-            "internacional": "Internacional",
-            "ems": "Express Mail Service (EMS)",
-            "prioritario": "Prioritario",
-            "correo_prioritario_lc_ao": "Correo Prioritario LC/AO",
-            "eca": "Correspondencia Agrupada (ECA)",
-            "pliegos_oficiales": "Pliegos Oficiales",
-            "sacas_m": "Sacas M",
-            "ems_contratos": "EMS Contratos",
-            "super_express": "Super Express",
-            "encomiendas": "Encomiendas Postales",
-            "super_express_documentos": "Super Express Documentos",
-            "super_express_paquetes": "Super Express Paquetes",
-        },
-        "en": {
-            "nacional": "National",
-            "internacional": "International",
-            "ems": "Express Mail Service (EMS)",
-            "prioritario": "Priority",
-            "correo_prioritario_lc_ao": "Priority LC/AO Mail",
-            "eca": "Grouped Correspondence (ECA)",
-            "pliegos_oficiales": "Official Documents",
-            "sacas_m": "M Bags",
-            "ems_contratos": "EMS Contracts",
-            "super_express": "Super Express",
-            "encomiendas": "Postal Parcels",
-            "super_express_documentos": "Super Express Documents",
-            "super_express_paquetes": "Super Express Packages",
-        }
-    }
-    
-    t = labels.get(lang, labels["es"])
-    
-    if "alcance" in missing:
-        return [
-            {"label": t["nacional"], "value": "nacional"},
-            {"label": t["internacional"], "value": "internacional"},
-        ]
-    if "tipo_nacional" in missing:
-        return [
-            {"label": t["ems"], "value": "ems"},
-            {"label": t["prioritario"], "value": "encomienda"},
-            {"label": t["correo_prioritario_lc_ao"], "value": "correo prioritario lc/ao nacional"},
-            {"label": t["eca"], "value": "eca nacional"},
-            {"label": t["pliegos_oficiales"], "value": "pliegos oficiales nacional"},
-            {"label": t["sacas_m"], "value": "sacas m nacional"},
-            {"label": t["ems_contratos"], "value": "ems contratos nacional"},
-            {"label": t["super_express"], "value": "super express nacional"},
-        ]
-    if "tipo_internacional" in missing:
-        return [
-            {"label": t["ems"], "value": "ems"},
-            {"label": t["encomiendas"], "value": "encomienda"},
-            {"label": t["correo_prioritario_lc_ao"], "value": "correo prioritario lc/ao internacional"},
-            {"label": t["eca"], "value": "eca internacional"},
-            {"label": t["pliegos_oficiales"], "value": "pliegos oficiales internacional"},
-            {"label": t["sacas_m"], "value": "sacas m internacional"},
-            {"label": t["super_express_documentos"], "value": "super express documentos internacional"},
-            {"label": t["super_express_paquetes"], "value": "super express paquetes internacional"},
-        ]
-    if "alcance_ems" in missing:
-        return [
-            {"label": t["nacional"], "value": "nacional"},
-            {"label": t["internacional"], "value": "internacional"},
-        ]
-    if "alcance_encomienda" in missing:
-        return [
-            {"label": t["nacional"], "value": "nacional"},
-            {"label": t["internacional"], "value": "internacional"},
-        ]
-    if "peso" in missing:
-        return [
-            {"label": "500g", "value": "500g"},
-            {"label": "800g", "value": "800g"},
-            {"label": "1kg", "value": "1kg"},
-        ]
-    # Primera fase robusta: sugerencias de destino para EMS Nacional (skill1).
-    if "destino" in missing and scope == "nacional" and (family in {None, "ems"}):
-        return [
-            {"label": "Cobija", "value": "cobija"},
-            {"label": "Trinidad", "value": "trinidad"},
-            {"label": "Riberalta", "value": "riberalta"},
-            {"label": "Ciudades intermedias", "value": "ciudades intermedias"},
-            {"label": "Cobertura 1", "value": "cobertura 1"},
-            {"label": "Cobertura 2", "value": "cobertura 2"},
-            {"label": "Cobertura 3", "value": "cobertura 3"},
-            {"label": "Cobertura 4", "value": "cobertura 4"},
-        ]
-    # Segunda fase robusta: sugerencias de destino para EMS Internacional (skill2).
-    if "destino" in missing and scope == "internacional" and (family in {None, "ems"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y Caribe", "value": "america central y caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa", "value": "europa"},
-            {"label": "África / Asia / Oceanía", "value": "africa asia oceania"},
-        ]
-    # Tercera fase robusta: sugerencias para Mi Encomienda Prioritario Nacional (skill3).
-    if "destino" in missing and scope == "encomienda_nacional" and (family in {None, "encomienda"}):
-        return [
-            {"label": "Ciudades Capitales", "value": "ciudades capitales"},
-            {"label": "Destinos Especiales (Trinidad-Cobija)", "value": "destinos especiales"},
-            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
-            {"label": "Prov. En Otro Depto.", "value": "prov en otro depto"},
-        ]
-    # Cuarta fase robusta: sugerencias para Encomiendas Postales Internacional (skill4).
-    if "destino" in missing and scope == "encomienda_internacional" and (family in {None, "encomienda"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y Caribe", "value": "america central y caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África / Asia / Oceanía", "value": "africa asia oceania"},
-        ]
-    if "destino" in missing and scope == "ems_hoja5_nacional" and (family in {None, "ems_hoja5"}):
-        return [
-            {"label": "Local", "value": "local"},
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Depto.", "value": "depto"},
-            {"label": "Prov.", "value": "prov"},
-            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
-            {"label": "Riberalta - Guayaramerín", "value": "riberalta guayaramerin"},
-        ]
-    if "destino" in missing and scope == "ems_hoja6_internacional" and (family in {None, "ems_hoja6"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "eca_nacional" and (family in {None, "eca"}):
-        return [
-            {"label": "Local", "value": "local"},
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
-            {"label": "Prov. Depto. Prov.", "value": "prov depto prov"},
-            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
-            {"label": "Riberalta - Guayaramerín", "value": "riberalta guayaramerin"},
-        ]
-    if "destino" in missing and scope == "eca_internacional" and (family in {None, "eca"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "pliegos_nacional" and (family in {None, "pliegos"}):
-        return [
-            {"label": "Local", "value": "local"},
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Prov. Dentro Depto.", "value": "prov dentro depto"},
-            {"label": "Prov. Depto. Prov.", "value": "prov depto prov"},
-        ]
-    if "destino" in missing and scope == "pliegos_internacional" and (family in {None, "pliegos"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "sacas_m_nacional" and (family in {None, "sacas_m"}):
-        return [
-            {"label": "Nacional", "value": "nacional"},
-            {"label": "Provincial", "value": "provincial"},
-        ]
-    if "destino" in missing and scope == "sacas_m_internacional" and (family in {None, "sacas_m"}):
-        return [
-            {"label": "América del Sur", "value": "america del sur"},
-            {"label": "América Central y el Caribe", "value": "america central y el caribe"},
-            {"label": "América del Norte", "value": "america del norte"},
-            {"label": "Europa y Medio Oriente", "value": "europa y medio oriente"},
-            {"label": "África, Asia y Oceanía", "value": "africa asia y oceania"},
-        ]
-    if "destino" in missing and scope == "ems_contratos_nacional" and (family in {None, "ems_contratos"}):
-        return [
-            {"label": "EMS Nacional", "value": "ems nacional"},
-            {"label": "Ciudades Intermedias", "value": "ciudades intermedias"},
-            {"label": "Trinidad - Cobija", "value": "trinidad cobija"},
-        ]
-    if "destino" in missing and scope == "super_express_documentos_internacional" and (family in {None, "super_express_documentos"}):
-        return [
-            {"label": "Sudamérica (Tarifa 1)", "value": "sud america"},
-            {"label": "Centroamérica/Florida (Tarifa 2)", "value": "centro america florida"},
-            {"label": "Resto de EEUU (Tarifa 3)", "value": "resto de eeuu"},
-            {"label": "Caribe (Tarifa 4)", "value": "caribe"},
-            {"label": "Europa (Tarifa 5)", "value": "europa"},
-            {"label": "Medio Oriente (Tarifa 6)", "value": "medio oriente"},
-            {"label": "África y Asia (Tarifa 7)", "value": "africa y asia"},
-        ]
-    if "destino" in missing and scope == "super_express_paquetes_internacional" and (family in {None, "super_express_paquetes"}):
-        return [
-            {"label": "Sudamérica (Tarifa 1)", "value": "sud america"},
-            {"label": "Centroamérica/Florida (Tarifa 2)", "value": "centro america florida"},
-            {"label": "Resto de EEUU (Tarifa 3)", "value": "resto de eeuu"},
-            {"label": "Caribe (Tarifa 4)", "value": "caribe"},
-            {"label": "Europa (Tarifa 5)", "value": "europa"},
-            {"label": "Medio Oriente (Tarifa 6)", "value": "medio oriente"},
-            {"label": "África y Asia (Tarifa 7)", "value": "africa y asia"},
-        ]
-    return []
-
-
-def _resolver_tarifa_en_turno(sid: str, pregunta: str, req: tarifas_skill.TarifaRequest, lang: str = "es") -> dict | None:
-    """
-    Completa consultas de tarifa en varios turnos usando estado temporal de sesión.
-    Retorna un payload listo para jsonify() cuando corresponde interceptar el turno;
-    en caso contrario retorna None para seguir flujo normal.
-    """
-    pendiente = session.get_pendiente_tarifa(sid) or {}
-    if not session.tarifa_flow_active(sid):
-        session.start_tarifa_flow(sid, metadata={"mode": "deterministic_tarifa"})
-
-    if pendiente and _wants_reset_tarifa(pregunta):
-        session.clear_pendiente_tarifa(sid)
-        msg = "Listo, reinicié el cálculo de tarifa. Indícame peso y destino/servicio."
-        session.append_tarifa_flow_turn(sid, user_text=pregunta, assistant_text=msg, stage="reset")
-        _persistir_flujo_tarifa(sid, status="reset")
-        session.agregar_turno(sid, pregunta, msg)
-        return {"response": msg, "tarifa": {"ok": False, "pending": False, "reset": True}}
-
-    fragment = tarifas_skill.extract_tarifa_fragment(
-        pregunta,
-        prefer_scope=pendiente.get("scope"),
-        prefer_family=pendiente.get("family"),
-    )
-    level_choice = _extract_geo_level_choice(pregunta)
-    scope_msg = req.scope or fragment.scope
-    col_msg = req.columna or fragment.columna
-
-    # Si el usuario responde solo "nacional/internacional", lo tratamos como paso
-    # de navegación (nivel) y no como selección final de scope.
-    if pendiente and level_choice and not (req.family or fragment.family):
-        scope_msg = None
-        col_msg = None
-
-    should_resume_pending = bool(pendiente) and bool(
-        req.is_tarifa or scope_msg or req.peso or col_msg or req.family or fragment.family or level_choice
-    )
-    if not req.is_tarifa and not should_resume_pending:
-        return None
-
-    pending_scope = pendiente.get("scope")
-    pending_family = pendiente.get("family")
-    pending_level = pendiente.get("level")
-    family = req.family or fragment.family or pending_family
-    scope = scope_msg or pending_scope
-    peso = req.peso or fragment.peso or pendiente.get("peso")
-    columna = col_msg or pendiente.get("columna")
-
-    # Si el usuario está eligiendo servicio (y solo servicio), forzamos siguiente paso:
-    # pedir destino en vez de inferir columna por palabras como "nacional".
-    if pendiente and not pending_family and family and _is_service_selection_only(pregunta):
-        columna = None
-
-    level = pending_level or level_choice
-
-    if scope in {
-        "nacional", "encomienda_nacional", "ems_hoja5_nacional", "eca_nacional",
-        "pliegos_nacional", "sacas_m_nacional", "ems_contratos_nacional", "super_express_nacional",
-    }:
-        level = "nacional"
-    elif scope in {
-        "internacional", "encomienda_internacional", "ems_hoja6_internacional", "eca_internacional",
-        "pliegos_internacional", "sacas_m_internacional",
-        "super_express_documentos_internacional", "super_express_paquetes_internacional",
-    }:
-        level = "internacional"
-    if scope in {"nacional", "internacional"} and not family:
-        scope = None
-
-    forced_scope = _scope_from_family_and_level(family, level)
-    if forced_scope:
-        scope = forced_scope
-    elif not scope:
-        scope = _scope_from_family_and_level(family, level)
-
-    # Si llega un destino que sugiere otro alcance, priorizamos la intención más reciente.
-    fragment_scope = fragment.columna_scope
-    if not family:
-        if fragment_scope and pending_scope and fragment_scope != pending_scope and not scope_msg:
-            scope = fragment_scope
-        if scope_msg and pending_scope and scope_msg != pending_scope:
-            scope = scope_msg
-    else:
-        # Con familia elegida, no permitimos saltar de EMS<->Encomienda por alias sueltos.
-        scope_family = _family_for_scope(scope)
-        if scope_family and scope_family != family:
-            scope = forced_scope or pending_scope or scope
-
-    if not scope and columna:
-        scope = tarifas_skill.infer_scope_from_columna(columna)
-    if scope in {
-        "nacional", "encomienda_nacional", "ems_hoja5_nacional", "eca_nacional",
-        "pliegos_nacional", "sacas_m_nacional", "ems_contratos_nacional", "super_express_nacional",
-    }:
-        level = "nacional"
-    elif scope in {
-        "internacional", "encomienda_internacional", "ems_hoja6_internacional", "eca_internacional",
-        "pliegos_internacional", "sacas_m_internacional",
-        "super_express_documentos_internacional", "super_express_paquetes_internacional",
-    }:
-        level = "internacional"
-    if scope and not columna:
-        columna = tarifas_skill.resolve_columna(pregunta, scope=scope) or tarifas_skill.default_columna_for_scope(scope)
-    # Si la columna quedó incompatible con el alcance actual, pedimos nuevo destino/servicio.
-    if columna and scope and not tarifas_skill.columna_valida_para_scope(columna, scope):
-        columna = tarifas_skill.resolve_columna(pregunta, scope=scope)
-
-    missing = _missing_tarifa_fields(scope, peso, columna, family=family, level=level)
-    if missing:
-        quick_replies = _tarifa_quick_replies(missing, scope=scope, family=family, lang=lang)
-        session.set_pendiente_tarifa(
-            sid,
-            {
-                "scope": scope,
-                "family": family,
-                "level": level,
-                "peso": peso,
-                "columna": columna,
-            },
-        )
-        msg = tarifas_skill.missing_message(missing)
-        session.append_tarifa_flow_turn(
-            sid,
-            user_text=pregunta,
-            assistant_text=msg,
-            stage="missing",
-            meta={"scope": scope or "", "peso": peso or "", "columna": columna or "", "family": family or ""},
-        )
-        session.agregar_turno(sid, pregunta, msg)
-        return {
-            "response": msg,
-            "tarifa": {
-                "ok": False,
-                "missing": missing,
-                "pending": True,
-                "scope": scope,
-                "family": family,
-                "level": level,
-                "peso": peso,
-                "columna": columna,
-            },
-            "quick_replies": quick_replies,
-        }
-
-    resultado_tarifa = tarifas_skill.ejecutar_tarifa(
-        peso=peso or "",
-        columna=(columna or "").upper(),
-        scope=scope or "",
-    )
-    if not resultado_tarifa.get("ok") and resultado_tarifa.get("error_code") == "out_of_range":
-        alternativas = _out_of_range_alternatives(
-            peso=peso or "",
-            pregunta=pregunta,
-            current_scope=scope or "",
-            current_columna=(columna or "").upper() or None,
-        )
-        msg = "Peso fuera de rango para este tarifario."
-        if alternativas:
-            msg += " Puedes probar otro servicio del mismo alcance."
-        session.append_tarifa_flow_turn(
-            sid,
-            user_text=pregunta,
-            assistant_text=msg,
-            stage="out_of_range",
-            meta={"scope": scope or "", "peso": peso or "", "columna": ""},
-        )
-        session.set_pendiente_tarifa(
-            sid,
-            {
-                "scope": scope,
-                "family": family,
-                "level": level,
-                "peso": peso,
-                "columna": None,
-            },
-        )
-        session.agregar_turno(sid, pregunta, msg)
-        return {
-            "response": msg,
-            "tarifa": {
-                **resultado_tarifa,
-                "scope": scope,
-                "family": family,
-                "level": level,
-                "peso": peso,
-            },
-            "quick_replies": alternativas,
-        }
-
-    respuesta_tarifa = tarifas_skill.format_tarifa_response(resultado_tarifa)
-    primary_skill = resultado_tarifa.get("skill_id") or "tarifa_ems"
-    session.append_tarifa_flow_turn(
-        sid,
-        user_text=pregunta,
-        assistant_text=respuesta_tarifa,
-        stage="completed",
-        meta={
-            "scope": scope or "",
-            "peso": peso or "",
-            "columna": (columna or "").upper(),
-            "servicio": resultado_tarifa.get("servicio") or "",
-            "precio": str(resultado_tarifa.get("precio") or ""),
-        },
-    )
-    session.clear_pendiente_tarifa(sid)
-    _persistir_flujo_tarifa(
-        sid,
-        status="completed",
-        scope=scope or "",
-        peso=peso or "",
-        columna=(columna or "").upper(),
-        servicio=resultado_tarifa.get("servicio") or "",
-        precio=str(resultado_tarifa.get("precio") or ""),
-    )
-    session.agregar_turno(sid, pregunta, respuesta_tarifa)
-
-    # Construir tarjeta visual estructurada para el frontend
-    rango = resultado_tarifa.get("rango") or {}
-    tarifa_card = {
-        "tipo": "tarifa",
-        "precio": str(resultado_tarifa.get("precio") or ""),
-        "servicio": resultado_tarifa.get("servicio") or "",
-        "scope": resultado_tarifa.get("scope") or scope or "",
-        "peso_g": str(resultado_tarifa.get("peso_g") or ""),
-        "rango_min": str(rango.get("min_g") or ""),
-        "rango_max": str(rango.get("max_g") or ""),
-        "columna": (columna or "").upper(),
-    }
-
-    return {
-        "response": respuesta_tarifa,
-        "tarifa": resultado_tarifa,
-        "tarifa_card": tarifa_card,
-        "skill_resolution": {
-            "in_scope": True,
-            "primary_skill": primary_skill,
-            "matched_skills": [primary_skill],
-        },
-    }
-
-
 def _disparar_reindex_async(origen: str) -> bool:
     """
     Lanza reindexado en segundo plano para que cambios en Capacidades
@@ -2024,7 +1189,7 @@ def _programar_reindex_debounced(origen: str, mode: str = "full") -> bool:
 # ─────────────────────────────────────────────
 
 def reindexar() -> bool:
-    """Indexa en ChromaDB los datos generados por el scraper.
+    """Indexa en Qdrant los datos de data/ (JSONs, PDFs, texto web).
 
     Además del texto principal y las sucursales/secciones, incorpora los
     textos extraídos de los PDF que el scraper descargó. El JSON
@@ -2047,14 +1212,23 @@ def reindexar() -> bool:
     except Exception as e:
         logger.error("Error refrescando PDFs antes del RAG", extra={"error": str(e)})
 
-    # 1. Texto principal (HTML plano acumulado)
-    c, i, m = rag.archivo_a_documentos(
-        DATA_FILE,
+# 1. Texto principal (desde JSON estructurado)
+    json_data_file = os.path.join(os.path.dirname(DATA_FILE), "correos_bolivia.json")
+    if os.path.exists(json_data_file):
+        with open(json_data_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        texto_principal = json.dumps(data, ensure_ascii=False, indent=2)
+    else:
+        # Fallback al .txt original
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            texto_principal = f.read()
+    c, i, m = rag.documento_a_chunks(
+        texto_principal,
         prefijo="txt",
         metadata_base={
             "source_type": "web_main",
             "source_label": "Sitio principal de Correos de Bolivia",
-            "source_path": DATA_FILE,
+            "source_path": json_data_file if os.path.exists(json_data_file) else DATA_FILE,
         },
     )
     chunks += c; ids += i; metadatas += m
@@ -2099,6 +1273,7 @@ def reindexar() -> bool:
         "pdfs_contenido.json",
         "skills.json",
         "estadisticas.json",
+        "correos_bolivia.json",  # Ya se indexa como web_main
     }
     managed_items = capabilities.listar_data_jsons()
     for item in managed_items:
@@ -2135,7 +1310,7 @@ def reindexar() -> bool:
         except Exception as e:
             logger.error("Error leyendo JSON complementario", extra={"filename": filename, "error": str(e)})
 
-    # 4. Contenido de PDFs (si existe el JSON generado por el scraper)
+    # 4. Contenido de PDFs (si existe el JSON disponible en data/)
     try:
         pdf_path = os.path.join(os.path.dirname(DATA_FILE), "pdfs_contenido.json")
         if os.path.exists(pdf_path):
@@ -2168,7 +1343,7 @@ def reindexar() -> bool:
     except Exception as e:
         logger.error("Error leyendo PDF JSON", extra={"error": str(e)}, exc_info=True)
 
-    # 5. Historia institucional (si existe el JSON generado por el scraper)
+    # 5. Historia institucional (si existe el JSON disponible en data/)
     try:
         historia_path = HISTORIA_FILE
         if historia_path and not os.path.isabs(historia_path):
@@ -2261,7 +1436,7 @@ def inicializar():
     print(f"    Sucursales cargadas: {len(SUCURSALES)}")
     if not SUCURSALES:
         print(f"  ⚠️  ADVERTENCIA: No se encontraron sucursales en {SUCURSALES_FILE}")
-        print(f"     Ejecuta el scraper: python scraper/runner.py")
+        print(f"     Sube archivos desde el panel de gestion /gestion/capacidades")
 
     if _modo_general_only():
         print("  Modo general activo → sin embeddings, sin ChromaDB y sin RAG al arranque")
@@ -2292,6 +1467,18 @@ async def welcome(lang: str = idiomas.IDIOMA_DEFAULT):
     if lang not in idiomas.IDIOMAS:
         lang = idiomas.IDIOMA_DEFAULT
     return {"response": idiomas.IDIOMAS[lang]["bienvenida"], "lang": lang}
+
+
+@router.get("/institucion")
+def institucion():
+    """Devuelve todos los datos institucionales desde la fuente unica de verdad."""
+    try:
+        import json
+        path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "institucion.json")
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"error": "institucion.json no encontrado"}
 
 
 @router.post("/chat")
@@ -2342,47 +1529,22 @@ async def chat(request: Request):
             skip_general_log=True,
         )
 
-    # ── Consulta de tarifas 100% determinista (sin LLM)
-    tarifa_req = tarifas_skill.parse_tarifa_request(pregunta)
-    if TARIFF_DETERMINISTIC_ONLY:
-        pendiente_tarifa = session.get_pendiente_tarifa(sid) or {}
-        if tarifa_mode:
-            tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta, tarifa_req, lang)
-            if tarifa_payload is not None:
-                tarifa_payload["lang"] = lang
-                return _finalizar_chat_response(
-                    sid=sid,
-                    request_id=request_id,
-                    pregunta=pregunta,
-                    payload=tarifa_payload,
-                    started_at=started_at,
-                    skip_general_log=True,
-                )
-        elif pendiente_tarifa:
-            try:
-                session.append_tarifa_flow_turn(
-                    sid,
-                    user_text=pregunta,
-                    assistant_text="Flujo de tarifas cerrado por cambio a conversación general.",
-                    stage="cancelled",
-                )
-                _persistir_flujo_tarifa(sid, status="cancelled")
-            except Exception as e:
-                print(f"   Error cerrando flujo tarifa al salir de modo: {e}")
-            session.clear_pendiente_tarifa(sid)
-            session.clear_tarifa_flow(sid)
-        elif tarifa_req.is_tarifa:
-            payload = {
-                "response": "Para cotizar sin ambigüedad, activa el modo Tarifas con el botón 'Tarifas'.",
-                "lang": lang,
-                "tarifa": {"ok": False, "requires_mode": True, "pending": False},
-            }
-            return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload=payload, started_at=started_at)
+    # ── Tarifa mode → proxy a API externa
+    if tarifa_mode:
+        tariff_payload = _proxy_tariff_request("chat", {
+            "message": pregunta,
+            "lang": lang,
+            "sid": sid,
+            "tarifa_mode": True,
+        })
+        tariff_payload["lang"] = lang
+        return _finalizar_chat_response(
+            sid=sid, request_id=request_id, pregunta=pregunta,
+            payload=tariff_payload, started_at=started_at, skip_general_log=True,
+        )
 
-    # traducción automática: el frontend envía un mensaje como
-    # "Traduce EXACTAMENTE este texto al <idioma>...". No queremos aplicar
-    # la detección de intenciones ni devolver la lista de sucursales.
-    # Simplemente reenviamos la petición al modelo y devolvemos lo que diga.
+    # ── Consulta de tarifas 100% determinista (sin LLM)
+    # tarifa_req removed (external API)
     if pregunta.lower().startswith("traduce exactamente"):
         try:
             # construimos mensajes mínimos para Ollama
@@ -2704,230 +1866,41 @@ async def chat(request: Request):
                 "cache_hit": True,
             }, started_at=started_at)
 
-    # ── 6. Consulta general → RAG + Ollama
-    try:
-        rag_result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: rag.buscar(
-                pregunta,
-                preferred_source_types=capabilities.preferred_sources_for_skill(
-                    primary_skill
-                ),
-                skill_id=primary_skill_id if primary_skill_id else None,
-            )
-        )
-        contexto = rag_result.get("context", "")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en búsqueda RAG: {e}")
+    # ── 6. RAG + LLM via pipeline unificado
+    from chatbots.general.services.chat_pipeline import run_rag_llm_pipeline
 
-    sources = rag_result.get("sources", [])
-    valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
-    
-    # Fallback para skill de historia: cargar archivo directamente si RAG no encuentra nada
-    if (not contexto.strip() or not valid_sources) and primary_skill_id == "historia_correos_bolivia":
-        contexto_historia = _cargar_historia_directamente()
-        if contexto_historia:
-            contexto = contexto_historia
-            valid_sources = [{"source_type": "history", "source_name": "historia_institucional.json"}]
-    
-    if not contexto.strip() or not valid_sources:
-        fallback_payload = _sin_info_payload(lang, t)
-        respuesta = fallback_payload["response"]
-        # Registrar para mejorar el RAG
-        log_sin_info(pregunta, lang, primary_skill_id)
-        _registrar_sin_respuesta(pregunta, lang, primary_skill_id)
-        session.agregar_turno(sid, pregunta, respuesta)
-        respuesta = _truncate_response_safely(respuesta)
-        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
-            "response": respuesta,
-            "lang": lang,
-            "skill_resolution": {
-                "in_scope": skill_resolution["in_scope"],
-                "primary_skill": (skill_resolution.get("primary_skill") or {}).get("id"),
-                "matched_skills": skill_resolution.get("skill_ids", []),
-            },
-            "sources": sources,
-            "primary_source_type": rag_result.get("primary_source_type"),
-            "quick_replies": fallback_payload.get("quick_replies", []),
-        }, started_at=started_at)
+    async def _llm_fn(mensajes):
+        return await _llamar_ollama_cancelable(request, request_id, mensajes)
 
-    hora     = session.get_hora_bolivia()
-    sistema  = construir_prompt(
-        t["instruccion"],
-        _limpiar_contexto_rag(contexto),
-        hora,
-        t["sin_info"],
-        skills_context="",
-        skill_name=primary_skill.get("nombre", ""),
-        skill_description=primary_skill.get("descripcion", ""),
-        skill_triggers=primary_skill.get("trigger", ""),
-    )
-    mensajes = [
-        {"role": "system", "content": sistema},
-        *session.historial_reciente(sid),
-        {"role": "user",   "content": pregunta_llm},
-    ]
-    mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
-    prompt_tokens = sum(_estimate_message_tokens(m) for m in mensajes)
-    observability.log_event(
-        "llm.request",
-        lang=lang,
-        model=ollama.LLM_MODEL,
-        primary_skill=primary_skill.get("id"),
-        prompt_tokens=prompt_tokens,
-        source_type=rag_result.get("primary_source_type"),
-        source_count=len(sources),
-    )
+    ctx = {
+        "sid": sid, "pregunta": pregunta, "pregunta_llm": pregunta_llm,
+        "lang": lang, "skill_resolution": skill_resolution,
+        "general_only": False, "request": request, "request_id": request_id,
+    }
 
     try:
-        print(f" [{lang}] {pregunta[:60]}")
-        respuesta = await asyncio.wait_for(
-            _llamar_ollama_cancelable(request, request_id, mensajes),
-            timeout=float(ollama.LLM_RESPONSE_TIMEOUT),
-        )
-        respuesta = ollama.limpiar_respuesta(respuesta)
-        respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
-        respuesta = _normalize_response_text(respuesta)
-
-        # Completar respuesta si quedó cortada a la mitad
-        if respuesta and respuesta != t["sin_info"] and _respuesta_incompleta(respuesta):
-            logger.info("RESPUESTA_INCOMPLETA detectada, completando | pregunta='%s'", pregunta[:60])
-            respuesta = await _completar_respuesta_incompleta(
-                request, request_id, respuesta, pregunta, lang
-            )
-            respuesta = ollama.limpiar_respuesta(respuesta)
-            respuesta = _normalize_response_text(respuesta)
-
-        # Anti-portugués: si el LLM responde en portugués a pesar de la instrucción,
-        # reemplazar con sin_info para forzar una respuesta en el idioma correcto.
-        if _respuesta_en_portugues(respuesta):
-            logger.warning("RESPUESTA_PORTUGUES detectada | pregunta='%s'", pregunta[:100])
-            respuesta = t["sin_info"]
-
-        # Anti-alucinación: detectar frases genéricas de modelo
-        from core.intents import detectar_alucinacion, respuesta_fuera_de_dominio, datos_inventados
-        if detectar_alucinacion(respuesta):
-            logger.warning("ALUCINACION detectada | pregunta='%s'", pregunta[:100])
-            respuesta = t["sin_info"]
-
-        # Anti-confusión: verificar que la respuesta tenga relación semántica
-        # con la pregunta original. Usa la función centralizada en intents.py.
-        if respuesta and respuesta != t["sin_info"]:
-            if respuesta_fuera_de_dominio(pregunta, respuesta):
-                logger.warning("CONFUSION detectada | pregunta='%s' | respuesta_inicio='%s'",
-                               pregunta[:80], respuesta[:80])
-                respuesta = t["sin_info"]
-
-        # Anti-inventado: verificar que los datos concretos (números, precios,
-        # fechas) de la respuesta existan en el contexto RAG y no sean inventados.
-        # Solo aplicar a skills donde los números deben ser exactos — leído desde capabilities.
-        if respuesta and respuesta != t["sin_info"] and capabilities.skill_requiere_guardia_numerica(primary_skill_id):
-            if datos_inventados(respuesta, contexto):
-                logger.warning("DATOS_INVENTADOS detectados | pregunta='%s' | respuesta_inicio='%s'",
-                               pregunta[:80], respuesta[:80])
-                respuesta = t["sin_info"]
-
-        observability.log_event(
-            "llm.response",
-            lang=lang,
-            model=ollama.LLM_MODEL,
-            primary_skill=primary_skill.get("id"),
-            response_chars=len(respuesta),
-            prompt_tokens=prompt_tokens,
-        )
-
-        # Guardia anti-alucinación: si se exige evidencia, solo aceptamos la
-        # respuesta si trae 1-2 citas literales que existan en el contexto RAG.
-        if REQUIRE_EVIDENCE:
-            citas = extraer_citas_evidencia(respuesta)
-            if not validar_evidencia_en_contexto(citas, contexto):
-                respuesta = t["sin_info"]
-
-        # si el modelo no encontró nada relevante a partir del contexto, a
-        # veces devuelve simplemente el system prompt o la frase de
-        # presentación. Detectamos esa situación y devolvemos el texto de
-        # "sin_info" en lugar de repetir el saludo.
-        presentacion_corta = (
-            "Soy ChatbotBO, el asistente virtual de  Correos de Bolivia. "
-            " ¿En qué puedo ayudarte?"
-        )
-        if respuesta.startswith("Eres ChatbotBO") or respuesta.strip().startswith(presentacion_corta):
-            respuesta = t["sin_info"]
-
-        should_cache = (
-            bool(respuesta and respuesta != t["sin_info"])
-            and bool(valid_sources)
-            and len(respuesta) >= 40
-        )
-
-        quick_replies_payload = []
-        _es_sin_info = False
-        # Registrar preguntas donde el LLM terminó devolviendo sin_info
-        # (alucinación detectada, confusión, evidencia inválida, etc.)
-        if respuesta == t["sin_info"]:
-            _es_sin_info = True
-            fallback_payload = _sin_info_payload(lang, t)
-            respuesta = fallback_payload["response"]
-            quick_replies_payload = fallback_payload.get("quick_replies", [])
-            _registrar_sin_respuesta(pregunta, lang, primary_skill_id)
-        respuesta = _truncate_response_safely(respuesta)
-
-        if should_cache:
-            cache.set_response(
-                pregunta=pregunta,
-                lang=lang,
-                skill_id=primary_skill_id,
-                model=os.environ.get("LLM_MODEL", "correos-bot"),
-                require_evidence=REQUIRE_EVIDENCE,
-                payload={
-                    "response": respuesta,
-                    "sources": rag_result.get("sources", []),
-                    "primary_source_type": rag_result.get("primary_source_type"),
-                },
-            )
-            observability.log_event(
-                "cache.response_set",
-                lang=lang,
-                primary_skill=primary_skill_id,
-            )
-
-        session.agregar_turno(sid, pregunta, respuesta)
-        print(f" [{lang}] {len(respuesta)} chars")
-
-        # Quick replies dinámicos según el contenido de la respuesta
-        # Si fue sin_info, no agregar quick replies (ya existen botones fijos en el frontend)
-        from core.intents import quick_replies_para_respuesta
-        qr_dinamicos = [] if _es_sin_info else quick_replies_para_respuesta(respuesta, lang)
-        quick_replies = quick_replies_payload or qr_dinamicos
-
-        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
-            "response": respuesta,
-            "lang": lang,
-            "skill_resolution": {
-                "in_scope": skill_resolution["in_scope"],
-                "primary_skill": primary_skill_id,
-                "matched_skills": skill_resolution.get("skill_ids", []),
-            },
-            "sources": rag_result.get("sources", []),
-            "primary_source_type": rag_result.get("primary_source_type"),
-            "quick_replies": quick_replies,
-        }, started_at=started_at)
-
-    except asyncio.TimeoutError:
-        fallback = f"Lo siento, el sistema está tardando más de lo normal. Por favor llámanos al {contacto.telefono()} o visita {contacto.web()}"
-        session.agregar_turno(sid, pregunta, fallback)
-        logger.warning("LLM_TIMEOUT | pregunta='%s' | timeout=%ss", pregunta[:100], ollama.LLM_RESPONSE_TIMEOUT)
-        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
-            "response": fallback,
-            "lang": lang,
-            "timeout": True,
-        }, started_at=started_at)
+        result = await run_rag_llm_pipeline(ctx, _llm_fn)
     except ollama.OllamaCancelled:
         raise HTTPException(status_code=499, detail="Consulta cancelada por el usuario.")
-    except requests.exceptions.Timeout:
-        raise HTTPException(status_code=504, detail="El modelo tardó demasiado. Intenta de nuevo.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generando respuesta: {e}")
+        fallback = f"Lo siento, ocurrio un error. Intenta de nuevo o llamanos al {contacto.telefono()}."
+        session.agregar_turno(sid, pregunta, fallback)
+        logger.error("PIPELINE_ERROR | pregunta='%s' | error='%s'", pregunta[:100], str(e))
+        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
+            "response": fallback, "lang": lang, "error": "internal",
+        }, started_at=started_at)
+
+    respuesta = result.get("response", t["sin_info"])
+    session.agregar_turno(sid, pregunta, respuesta)
+    return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
+        "response": respuesta,
+        "lang": lang,
+        "skill_resolution": result.get("skill_resolution", skill_resolution),
+        "sources": result.get("sources", []),
+        "primary_source_type": result.get("primary_source_type"),
+        "quick_replies": result.get("quick_replies", []),
+        "timeout": result.get("timeout", False),
+    }, started_at=started_at)
 
 
 @router.post("/chat/stream")
@@ -2981,40 +1954,20 @@ async def chat_stream(request: Request):
                 yield line
             return
 
-        tarifa_req = tarifas_skill.parse_tarifa_request(pregunta_actual)
-        if TARIFF_DETERMINISTIC_ONLY:
-            pendiente_tarifa = session.get_pendiente_tarifa(sid) or {}
-            if tarifa_mode:
-                tarifa_payload = _resolver_tarifa_en_turno(sid, pregunta_actual, tarifa_req, lang)
-                if tarifa_payload is not None:
-                    tarifa_payload["lang"] = lang
-                    async for line in instant_end(tarifa_payload, skip_general_log=True):
-                        yield line
-                    return
-            elif pendiente_tarifa:
-                try:
-                    session.append_tarifa_flow_turn(
-                        sid,
-                        user_text=pregunta_actual,
-                        assistant_text="Flujo de tarifas cerrado por cambio a conversación general.",
-                        stage="cancelled",
-                    )
-                    _persistir_flujo_tarifa(sid, status="cancelled")
-                except Exception as e:
-                    print(f"   Error cerrando flujo tarifa al salir de modo: {e}")
-                session.clear_pendiente_tarifa(sid)
-                session.clear_tarifa_flow(sid)
-            elif tarifa_req.is_tarifa:
-                async for line in instant_end(
-                    {
-                        "response": "Para cotizar sin ambigüedad, activa el modo Tarifas con el botón 'Tarifas'.",
-                        "lang": lang,
-                        "tarifa": {"ok": False, "requires_mode": True, "pending": False},
-                    }
-                ):
-                    yield line
-                return
+        # ── Tarifa mode → proxy a API externa (stream)
+        if tarifa_mode:
+            tariff_payload = _proxy_tariff_request("chat", {
+                "message": pregunta_actual,
+                "lang": lang,
+                "sid": sid,
+                "tarifa_mode": True,
+            })
+            tariff_payload["lang"] = lang
+            async for line in instant_end(tariff_payload, skip_general_log=True):
+                yield line
+            return
 
+        # tarifa_req removed (external API)
         if pregunta_actual.lower().startswith("traduce exactamente"):
             try:
                 partes: list[str] = []
@@ -3300,207 +2253,48 @@ async def chat_stream(request: Request):
                     yield line
                 return
 
-        try:
-            rag_result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: rag.buscar(
-                    pregunta_actual,
-                    preferred_source_types=capabilities.preferred_sources_for_skill(primary_skill),
-                    skill_id=primary_skill_id if primary_skill_id else None,
-                ),
-            )
-            contexto = rag_result.get("context", "")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error en búsqueda RAG: {e}")
+        # ── 6. RAG + LLM via pipeline unificado
+        from chatbots.general.services.chat_pipeline import run_rag_llm_pipeline
 
-        sources = rag_result.get("sources", [])
-        valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
-        
-        # Fallback para skill de historia en streaming: cargar archivo directamente si RAG no encuentra nada
-        primary_skill_id = (skill_resolution.get("primary_skill") or {}).get("id")
-        if (not contexto.strip() or not valid_sources) and primary_skill_id == "historia_correos_bolivia":
-            contexto_historia = _cargar_historia_directamente()
-            if contexto_historia:
-                contexto = contexto_historia
-                valid_sources = [{"source_type": "history", "source_name": "historia_institucional.json"}]
-        
-        if not contexto.strip() or not valid_sources:
-            fallback_payload = _sin_info_payload(lang, t)
-            respuesta = _truncate_response_safely(fallback_payload["response"])
-            session.agregar_turno(sid, pregunta_actual, respuesta)
-            async for line in instant_end(
-                {
-                    "response": respuesta,
-                    "lang": lang,
-                    "skill_resolution": {
-                        "in_scope": skill_resolution["in_scope"],
-                        "primary_skill": (skill_resolution.get("primary_skill") or {}).get("id"),
-                        "matched_skills": skill_resolution.get("skill_ids", []),
-                    },
-                    "sources": sources,
-                    "primary_source_type": rag_result.get("primary_source_type"),
-                    "quick_replies": fallback_payload.get("quick_replies", []),
-                }
-            ):
-                yield line
-            return
+        _stream_result = []
 
-        hora = session.get_hora_bolivia()
-        sistema = construir_prompt(
-            t["instruccion"],
-            _limpiar_contexto_rag(contexto),
-            hora,
-            t["sin_info"],
-            skills_context="",
-            skill_name=primary_skill.get("nombre", ""),
-            skill_description=primary_skill.get("descripcion", ""),
-            skill_triggers=primary_skill.get("trigger", ""),
-        )
-        mensajes = [
-            {"role": "system", "content": sistema},
-            *session.historial_reciente(sid),
-            {"role": "user", "content": pregunta_actual_llm},
-        ]
-        mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
-        prompt_tokens = sum(_estimate_message_tokens(m) for m in mensajes)
-        observability.log_event(
-            "llm.request",
-            lang=lang,
-            model=ollama.LLM_MODEL,
-            primary_skill=primary_skill.get("id"),
-            prompt_tokens=prompt_tokens,
-            source_type=rag_result.get("primary_source_type"),
-            source_count=len(sources),
-        )
-
-        try:
-            print(f" [{lang}] {pregunta_actual[:60]}")
-            partes: list[str] = []
-            last_preview = ""
+        async def _llm_fn(mensajes):
+            partes = []
             async for fragmento in _stream_ollama_cancelable(request, request_id, mensajes):
                 partes.append(fragmento)
-                preview = _stream_preview_text("".join(partes))
-                delta = preview[len(last_preview):]
-                if delta:
-                    yield _stream_line({"type": "token", "content": delta})
-                    last_preview = preview
+            _stream_result.append(ollama.limpiar_respuesta("".join(partes)))
+            return _stream_result[0]
 
-            respuesta = ollama.limpiar_respuesta("".join(partes))
-            respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
-            respuesta = _normalize_response_text(respuesta)
+        ctx = {
+            "sid": sid, "pregunta": pregunta_actual, "pregunta_llm": pregunta_actual_llm,
+            "lang": lang, "skill_resolution": skill_resolution,
+            "general_only": False, "request": request, "request_id": request_id,
+        }
 
-            # Completar respuesta si quedó cortada (también en streaming)
-            if respuesta and respuesta != t["sin_info"] and _respuesta_incompleta(respuesta):
-                logger.info("RESPUESTA_INCOMPLETA en streaming, completando | pregunta='%s'", pregunta_actual[:60])
-                respuesta = await _completar_respuesta_incompleta(
-                    request, request_id, respuesta, pregunta_actual, lang
-                )
-                respuesta = ollama.limpiar_respuesta(respuesta)
-                respuesta = _normalize_response_text(respuesta)
-
-            # Anti-portugués: misma guardia que en /chat
-            if _respuesta_en_portugues(respuesta):
-                logger.warning("RESPUESTA_PORTUGUES streaming | pregunta='%s'", pregunta_actual[:100])
-                respuesta = t["sin_info"]
-
-            observability.log_event(
-                "llm.response",
-                lang=lang,
-                model=ollama.LLM_MODEL,
-                primary_skill=primary_skill.get("id"),
-                response_chars=len(respuesta),
-                prompt_tokens=prompt_tokens,
-            )
-
-            if REQUIRE_EVIDENCE:
-                citas = extraer_citas_evidencia(respuesta)
-                if not validar_evidencia_en_contexto(citas, contexto):
-                    respuesta = t["sin_info"]
-
-            # Anti-alucinación y anti-confusión: misma lógica centralizada que en /chat
-            from core.intents import detectar_alucinacion, respuesta_fuera_de_dominio, datos_inventados
-            if detectar_alucinacion(respuesta):
-                logger.warning("ALUCINACION streaming | pregunta='%s'", pregunta_actual[:100])
-                respuesta = t["sin_info"]
-
-            if respuesta and respuesta != t["sin_info"]:
-                if respuesta_fuera_de_dominio(pregunta_actual, respuesta):
-                    logger.warning("CONFUSION streaming | pregunta='%s'", pregunta_actual[:80])
-                    respuesta = t["sin_info"]
-
-            # Anti-inventado: misma lógica que en /chat
-            # Solo aplicar a skills donde los números deben ser exactos — leído desde capabilities.
-            if respuesta and respuesta != t["sin_info"] and capabilities.skill_requiere_guardia_numerica(primary_skill_id):
-                if datos_inventados(respuesta, contexto):
-                    logger.warning("DATOS_INVENTADOS streaming | pregunta='%s'", pregunta_actual[:80])
-                    respuesta = t["sin_info"]
-
-            presentacion_corta = (
-                "Soy ChatbotBO, el asistente virtual de la Agencia Boliviana de "
-                "Correos. ¿En qué puedo ayudarte?"
-            )
-            if respuesta.startswith("Eres ChatbotBO") or respuesta.strip().startswith(presentacion_corta):
-                respuesta = t["sin_info"]
-
-            should_cache = bool(respuesta and respuesta != t["sin_info"]) and bool(valid_sources) and len(respuesta) >= 40
-
-            quick_replies_payload = []
-            # Registrar preguntas donde el LLM terminó devolviendo sin_info
-            if respuesta == t["sin_info"]:
-                fallback_payload = _sin_info_payload(lang, t)
-                respuesta = fallback_payload["response"]
-                quick_replies_payload = fallback_payload.get("quick_replies", [])
-                _registrar_sin_respuesta(pregunta_actual, lang, primary_skill_id)
-            respuesta = _truncate_response_safely(respuesta)
-
-            if should_cache:
-                cache.set_response(
-                    pregunta=pregunta_actual,
-                    lang=lang,
-                    skill_id=primary_skill_id,
-                    model=os.environ.get("LLM_MODEL", "correos-bot"),
-                    require_evidence=REQUIRE_EVIDENCE,
-                    payload={
-                        "response": respuesta,
-                        "sources": rag_result.get("sources", []),
-                        "primary_source_type": rag_result.get("primary_source_type"),
-                    },
-                )
-                observability.log_event(
-                    "cache.response_set",
-                    lang=lang,
-                    primary_skill=primary_skill_id,
-                )
-
-            session.agregar_turno(sid, pregunta_actual, respuesta)
-            print(f" [{lang}] {len(respuesta)} chars")
-            async for line in instant_end(
-                {
-                    "response": respuesta,
-                    "lang": lang,
-                    "skill_resolution": {
-                        "in_scope": skill_resolution["in_scope"],
-                        "primary_skill": primary_skill_id,
-                        "matched_skills": skill_resolution.get("skill_ids", []),
-                    },
-                    "sources": rag_result.get("sources", []),
-                    "primary_source_type": rag_result.get("primary_source_type"),
-                    "quick_replies": quick_replies_payload,
-                }
-            ):
-                yield line
-            return
+        try:
+            result = await run_rag_llm_pipeline(ctx, _llm_fn)
         except ollama.OllamaCancelled:
             return
-        except requests.exceptions.HTTPError as e:
-            error_detail = str(e)
-            print(f"🚨 Ollama HTTP Error en streaming: {error_detail}")
-            yield _stream_line({"type": "error", "content": "Lo siento, el servicio de IA no está disponible temporalmente. Por favor, intenta más tarde."})
+        except Exception:
+            async for line in instant_end({
+                "response": f"Error interno. Intenta de nuevo o llama al {contacto.telefono()}.",
+                "lang": lang, "error": "internal",
+            }):
+                yield line
             return
-        except Exception as e:
-            print(f"🚨 Error inesperado en streaming: {str(e)}")
-            yield _stream_line({"type": "error", "content": "Ocurrió un error inesperado. Por favor, intenta nuevamente."})
-            return
+
+        respuesta = result.get("response", t["sin_info"])
+        session.agregar_turno(sid, pregunta_actual, respuesta)
+        async for line in instant_end({
+            "response": respuesta,
+            "lang": lang,
+            "skill_resolution": result.get("skill_resolution", skill_resolution),
+            "sources": result.get("sources", []),
+            "primary_source_type": result.get("primary_source_type"),
+            "quick_replies": result.get("quick_replies", []),
+        }):
+            yield line
+        return
 
     return StreamingResponse(
         stream_generator(),
@@ -3573,7 +2367,7 @@ async def listar_sucursales():
         return {
             "sucursales": [],
             "error": "No hay sucursales cargadas",
-            "ayuda": "Ejecuta el scraper: python scraper/runner.py o usa POST /api/sucursales/recargar"
+            "ayuda": "Sube archivos desde el panel de gestion /gestion/capacidades o usa POST /api/sucursales/recargar"
         }
     return {
         "sucursales": [location.sucursal_a_dict(s) for s in SUCURSALES],
@@ -3606,7 +2400,7 @@ async def recargar_sucursales():
                 content={
                     "error": f"Archivo no encontrado: {SUCURSALES_FILE}",
                     "rutas_buscadas": [SUCURSALES_FILE] + alternativas,
-                    "sugerencia": "Ejecuta el scraper primero: python scraper/runner.py"
+                    "sugerencia": "Sube archivos desde el panel de gestion"
                 }
             )
         ruta_usar = ruta_encontrada
@@ -3634,13 +2428,7 @@ async def listar_idiomas():
 async def reset(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
-    try:
-        _persistir_flujo_tarifa(sid, status="reset")
-    except Exception as e:
-        print(f"   Error guardando flujo tarifa al reset: {e}")
     session.limpiar_historial(sid)
-    session.clear_pendiente_tarifa(sid)
-    session.clear_tarifa_flow(sid)
     return {"ok": True, "sid": sid}
 
 
@@ -3655,32 +2443,87 @@ async def cancelar_chat(request: Request):
 
 @router.get("/status")
 def status():
-    estado_cap = _estado_capacidades()
+    rag_info = {"chunks": _rag_chunks_seguro(), "vector_store": os.environ.get("RAG_VECTOR_STORE", "qdrant")}
+    model_name = os.environ.get("LLM_MODEL", "correos-bot")
+    # Detectar modelo base desde el Modelfile o variable
+    model_base = "qwen2.5:1.5b"  # default, se lee del Modelfile
+    try:
+        import re
+        mf_path = os.path.join(os.path.dirname(__file__), "..", "core", "Modelfile")
+        if os.path.exists(mf_path):
+            with open(mf_path) as f:
+                first = f.readline().strip()
+            m = re.match(r'^FROM\s+(.+)$', first)
+            if m: model_base = m.group(1).strip()
+    except Exception:
+        pass
+
     return ({
-        "status"          : "ok",
-        "chunks"          : _rag_chunks_seguro(),
-        "modelo"          : os.environ.get("LLM_MODEL", "correos-bot"),
-        "ollama"          : ollama.ollama_disponible(),
+        "status": "ok",
+        "modelo": model_name,
+        "modelo_base": model_base,
+        "ollama": ollama.ollama_disponible(),
+        "rag": rag_info,
+        "qdrant_url": os.environ.get("QDRANT_URL", "http://localhost:6333"),
         "sesiones_activas": session.total_sesiones(),
-        "sucursales"      : len(SUCURSALES),
-        "idiomas"         : list(idiomas.IDIOMAS.keys()),
-        "actualizacion"   : updater.get_estado(),
-        "skills"          : estado_cap["skills"],
-        "rag"             : estado_cap["rag"],
-        "general_only"    : _modo_general_only(),
+        "sucursales": len(SUCURSALES),
+        "idiomas": list(idiomas.IDIOMAS.keys()),
+        "actualizacion": updater.get_estado(),
+        "tarifa_api": os.environ.get("TARIFF_API_URL", "http://localhost:5001"),
+        "modo": "busqueda_semantica_qdrant",
+        "general_only": _modo_general_only(),
     })
+
+
+@router.get("/health")
+def health():
+    """Healthcheck completo: Ollama, Qdrant, Redis, Tarifa API."""
+    import requests as _r
+    checks = {"ollama": False, "qdrant": False, "redis": False, "tarifa_api": False}
+
+    # Ollama
+    try:
+        _r.get(os.environ.get("OLLAMA_URL", "http://localhost:11434").replace("/api/chat", ""), timeout=3)
+        checks["ollama"] = True
+    except Exception:
+        pass
+
+    # Qdrant
+    try:
+        qdrant_url = os.environ.get("QDRANT_URL", "http://localhost:6333")
+        _r.get(f"{qdrant_url}/collections", timeout=3)
+        checks["qdrant"] = True
+    except Exception:
+        pass
+
+    # Redis
+    try:
+        from core.cache import health_check
+        checks["redis"] = health_check()
+    except Exception:
+        pass
+
+    # Tarifa API
+    tariff_url = os.environ.get("TARIFF_API_URL", "")
+    if tariff_url:
+        try:
+            _r.get(f"{tariff_url}/api/status", timeout=3)
+            checks["tarifa_api"] = True
+        except Exception:
+            pass
+
+    all_ok = all(checks.values())
+    return {
+        "status": "healthy" if all_ok else "degraded",
+        "checks": checks,
+        "modelo": os.environ.get("LLM_MODEL", "correos-bot"),
+        "chunks": _rag_chunks_seguro(),
+    }
 
 
 @router.get("/tasks/{task_id}")
 def task_status(task_id: str):
-    resultado = AsyncResult(task_id, app=celery)
-    return {
-        "task_id": task_id,
-        "status": resultado.status,
-        "ready": resultado.ready(),
-        "failed": resultado.failed(),
-        "result": resultado.result if resultado.ready() else None,
-    }
+    return {"task_id": task_id, "status": "Celery eliminado. Tareas ejecutan en threads locales."}
 
 
 @router.get("/metrics")
@@ -3774,149 +2617,6 @@ def conversations_list(limit: int = 300, offset: int = 0, q: str = ""):
     payload = conversation_logs.list_conversations(limit=limit, offset=offset, q=q)
     payload["stats"] = conversation_logs.stats()
     return payload
-
-
-@router.get("/conversations/tarifas")
-def conversations_tarifas_list(limit: int = 300, offset: int = 0, q: str = ""):
-    payload = conversation_logs_tarifas.list_tarifa_conversations(limit=limit, offset=offset, q=q)
-    payload["stats"] = conversation_logs_tarifas.stats()
-    return payload
-
-
-@router.delete("/conversations/tarifas/{log_id}")
-def conversations_tarifas_delete(log_id: int):
-    if not conversation_logs_tarifas.delete_tarifa_conversation(log_id):
-        raise HTTPException(status_code=404, detail="Log de tarifas no encontrado")
-    return {"ok": True, "id": log_id}
-
-
-@router.post("/conversations/tarifas/clear")
-def conversations_tarifas_clear():
-    deleted = conversation_logs_tarifas.clear_tarifa_conversations()
-    return {"ok": True, "deleted": deleted}
-
-
-@router.get("/tarifas/stats")
-def tarifas_stats():
-    tarifas_sqlite.ensure_catalog(skill_config=tarifas_skill.SKILL_CONFIG)
-    data = tarifas_sqlite.stats(skill_config=tarifas_skill.SKILL_CONFIG)
-    data["engine"] = os.environ.get("TARIFF_ENGINE", "sqlite").strip().lower()
-    return data
-
-
-@router.post("/tarifas/reload")
-def tarifas_reload():
-    result = tarifas_sqlite.rebuild_catalog_from_xlsx(skill_config=tarifas_skill.SKILL_CONFIG)
-    cache.clear_tariff_cache()
-    stats_payload = tarifas_sqlite.stats(skill_config=tarifas_skill.SKILL_CONFIG)
-    return {
-        "ok": True,
-        "reload": result,
-        "stats": stats_payload,
-    }
-
-
-@router.get("/tarifas/rates")
-def tarifas_rates(scope: str = "", column_code: str = "", limit: int = 1000, offset: int = 0):
-    tarifas_sqlite.ensure_catalog(skill_config=tarifas_skill.SKILL_CONFIG)
-    payload = tarifas_sqlite.list_rates(
-        scope=scope,
-        column_code=column_code,
-        limit=limit,
-        offset=offset,
-    )
-    return payload
-
-
-@router.post("/tarifas/rates")
-async def tarifas_rates_create(request: Request):
-    data = await request.json()
-    if not isinstance(data, dict):
-        raise HTTPException(status_code=400, detail="Payload inválido")
-
-    scope = tarifas_skill.resolve_scope(data.get("scope"))
-    if not scope:
-        raise HTTPException(status_code=400, detail="scope inválido")
-    col = (data.get("column_code") or "").strip().upper()
-    if not tarifas_skill.columna_valida_para_scope(col, scope):
-        raise HTTPException(status_code=400, detail="column_code inválido para el scope indicado")
-
-    payload = dict(data)
-    payload["scope"] = scope
-    payload["column_code"] = col
-
-    try:
-        result = tarifas_sqlite.create_rate(payload)
-        cache.clear_tariff_cache()
-        return JSONResponse(content=result, status_code=201)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creando tarifa: {e}")
-
-
-@router.put("/tarifas/rates/{rate_id}")
-async def tarifas_rates_update(request: Request, rate_id: int):
-    data = await request.json()
-    if not isinstance(data, dict):
-        raise HTTPException(status_code=400, detail="Payload inválido")
-
-    payload = dict(data)
-    if "scope" in payload:
-        scope = tarifas_skill.resolve_scope(payload.get("scope"))
-        if not scope:
-            raise HTTPException(status_code=400, detail="scope inválido")
-        payload["scope"] = scope
-
-    if "column_code" in payload:
-        payload["column_code"] = str(payload.get("column_code") or "").strip().upper()
-
-    if "scope" in payload and "column_code" in payload:
-        if not tarifas_skill.columna_valida_para_scope(payload["column_code"], payload["scope"]):
-            raise HTTPException(status_code=400, detail="column_code inválido para el scope indicado")
-
-    try:
-        result = tarifas_sqlite.update_rate(rate_id, payload)
-        if not result.get("ok"):
-            raise HTTPException(status_code=404, detail=result.get("error") or "Tarifa no encontrada")
-        cache.clear_tariff_cache()
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error actualizando tarifa: {e}")
-
-
-@router.delete("/tarifas/rates/{rate_id}")
-def tarifas_rates_delete(rate_id: int):
-    if not tarifas_sqlite.delete_rate(rate_id):
-        raise HTTPException(status_code=404, detail="Tarifa no encontrada")
-    cache.clear_tariff_cache()
-    return {"ok": True, "id": int(rate_id)}
-
-
-@router.post("/tarifas/calculate")
-async def tarifas_calculate(request: Request):
-    data = await request.json()
-    if not isinstance(data, dict):
-        raise HTTPException(status_code=400, detail="Payload inválido")
-
-    scope = tarifas_skill.resolve_scope(data.get("scope") or data.get("alcance") or data.get("tipo"))
-    peso = (data.get("peso") or "").strip()
-    columna = tarifas_skill.resolve_columna(data.get("column_code") or data.get("columna"), scope=scope) or ""
-
-    if not scope:
-        raise HTTPException(status_code=400, detail="scope es obligatorio")
-    if not peso:
-        raise HTTPException(status_code=400, detail="peso es obligatorio")
-    if not columna:
-        raise HTTPException(status_code=400, detail="column_code es obligatorio")
-
-    result = tarifas_skill.ejecutar_tarifa(scope=scope, peso=peso, columna=columna)
-    status = 200 if result.get("ok") else 422
-    return JSONResponse(content=result, status_code=status)
 
 
 @router.delete("/conversations/{log_id}")
@@ -4026,7 +2726,7 @@ async def actualizar_data_json(request: Request, nombre_archivo: str = Path(...,
 
 @router.get("/scraping")
 def scraping_info():
-    return (capabilities.get_scraping_summary())
+    return {"scraper": "eliminado", "modo": "subida_manual_pdfs"}
 
 
 @router.post("/pdfs/upload")
@@ -4118,119 +2818,95 @@ def eliminar_skill(skill_id: str = Path(..., description="ID del skill a elimina
 def actualizar():
     if updater.estado["en_proceso"]:
         raise HTTPException(status_code=409, detail="  Actualización ya en proceso.")
-    task = run_update_task.delay()
-    return {"ok": True, "mensaje": "Actualización encolada.", "task_id": task.id}
-
-
-@router.post("/tarifa")
-async def calcular_tarifa(request: Request):
-    data = await request.json()
-    peso = (data.get("peso") or "").strip()
-    scope = tarifas_skill.resolve_scope(data.get("scope") or data.get("alcance") or data.get("tipo"))
-    columna = tarifas_skill.resolve_columna(data.get("columna"), scope=scope) or ""
-    destino = (data.get("destino") or "").strip()
-    servicio = (data.get("servicio") or "").strip()
-    pregunta = (data.get("message") or "").strip()
-
-    if not columna and destino:
-        columna = tarifas_skill.resolve_columna(destino, scope=scope) or ""
-    if not columna and servicio:
-        columna = tarifas_skill.resolve_columna(servicio, scope=scope) or ""
-    if not scope and columna:
-        scope = tarifas_skill.infer_scope_from_columna(columna)
-
-    if not peso or not columna or not scope:
-        req = tarifas_skill.parse_tarifa_request(pregunta)
-        if not scope:
-            scope = req.scope
-        if not peso:
-            peso = req.peso or ""
-        if not columna:
-            columna = (req.columna or "").upper()
-
-    if not scope:
-        raise HTTPException(status_code=400, detail=tarifas_skill.missing_message(["alcance"]))
-
-    if not peso:
-        raise HTTPException(status_code=400, detail=tarifas_skill.missing_message(["peso"]))
-    if not columna:
-        raise HTTPException(status_code=400, detail=tarifas_skill.missing_message(["destino"]))
-
-    resultado = tarifas_skill.ejecutar_tarifa(
-        peso=peso,
-        columna=columna,
-        scope=scope,
-        xlsx=(data.get("xlsx") or "").strip() or None,
-    )
-    status = 200 if resultado.get("ok") else 422
-    return JSONResponse(content=resultado, status_code=status)
-
-
-@router.post("/tarifa/cancel")
-async def cancelar_tarifa(request: Request):
-    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
-    try:
-        if session.tarifa_flow_active(sid):
-            session.append_tarifa_flow_turn(
-                sid,
-                user_text=(data.get("message") if isinstance(data, dict) else "") or "cancelar tarifa",
-                assistant_text="Flujo de tarifas cancelado por el usuario.",
-                stage="cancelled",
-            )
-            _persistir_flujo_tarifa(sid, status="cancelled")
-    except Exception as e:
-        print(f"   Error guardando flujo tarifa cancelado: {e}")
-    session.clear_pendiente_tarifa(sid)
-    session.clear_tarifa_flow(sid)
-    return {
-        "ok": True,
-        "sid": sid,
-        "tarifa": {"pending": False, "cancelled": True},
-    }
-
-
-@router.post("/tarifa/start")
-async def iniciar_tarifa(request: Request):
-    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
-    # Usar el idioma seleccionado manualmente para los mensajes del sistema
-    lang = idiomas.resolver_idioma((data or {}).get("lang"), "")
-    try:
-        _persistir_flujo_tarifa(sid, status="cancelled")
-    except Exception:
-        pass
-    session.start_tarifa_flow(sid, metadata={"mode": "deterministic_tarifa"})
-    session.set_pendiente_tarifa(
-        sid,
-        {
-            "scope": None,
-            "family": None,
-            "level": None,
-            "peso": None,
-            "columna": None,
-        },
-    )
-    missing = ["alcance"]
-    msg = "Rates mode activated. What service do you want to use?" if lang == "en" else "¿Será nacional o internacional?"
-    session.append_tarifa_flow_turn(
-        sid,
-        user_text="(inicio modo tarifas)",
-        assistant_text=msg,
-        stage="start",
-    )
-    return {
-        "ok": True,
-        "sid": sid,
-        "lang": lang,
-        "response": msg,
-        "quick_replies": _tarifa_quick_replies(missing, lang=lang),
-        "tarifa": {"ok": False, "pending": True, "start": True, "missing": missing},
-    }
+    result = run_update_task()
+    return {"ok": True, "mensaje": result.get("message", "Actualizacion encolada.")}
 
 
 # ─────────────────────────────────────────────
-#  ESCALACIÓN A HUMANO
+#  PROXY DE TARIFAS → API EXTERNA (chatbotbo)
+# ─────────────────────────────────────────────
+
+TARIFF_API_URL = os.environ.get("TARIFF_API_URL", "http://localhost:5001")
+
+# Circuit breaker para el proxy de tarifas
+_tariff_failures = 0
+_tariff_open_until = 0.0
+TARIFF_CB_THRESHOLD = 3
+TARIFF_CB_TIMEOUT = 30
+
+
+def _proxy_tariff_request(endpoint: str, data: dict | None = None) -> dict:
+    """Reenvia peticion de tarifa a la API externa con circuit breaker."""
+    global _tariff_failures, _tariff_open_until
+
+    # Circuit breaker abierto?
+    now = __import__("time").time()
+    if _tariff_failures >= TARIFF_CB_THRESHOLD and now < _tariff_open_until:
+        raise HTTPException(status_code=503,
+                            detail="API de tarifas temporalmente no disponible. Intenta en unos segundos.")
+
+    import requests as _requests
+    url = f"{TARIFF_API_URL.rstrip('/')}/api/{endpoint.lstrip('/')}"
+    try:
+        resp = _requests.post(url, json=data or {}, timeout=8)
+        resp.raise_for_status()
+        _tariff_failures = 0  # reset al exito
+        return resp.json()
+    except _requests.exceptions.Timeout:
+        _tariff_failures += 1
+        if _tariff_failures >= TARIFF_CB_THRESHOLD:
+            _tariff_open_until = now + TARIFF_CB_TIMEOUT
+        raise HTTPException(status_code=504, detail="La API de tarifas no responde a tiempo.")
+    except _requests.exceptions.ConnectionError:
+        _tariff_failures += 1
+        if _tariff_failures >= TARIFF_CB_THRESHOLD:
+            _tariff_open_until = now + TARIFF_CB_TIMEOUT
+        raise HTTPException(status_code=502, detail="No se puede conectar a la API de tarifas.")
+    except _requests.exceptions.HTTPError as e:
+        _tariff_failures += 1
+        if _tariff_failures >= TARIFF_CB_THRESHOLD:
+            _tariff_open_until = now + TARIFF_CB_TIMEOUT
+        try:
+            return e.response.json()
+        except Exception:
+            raise HTTPException(status_code=e.response.status_code if e.response else 502,
+                                detail=f"Error en API de tarifas: {e}")
+
+
+@router.post("/tarifa/start")
+async def tarifa_start_proxy(request: Request):
+    """Proxy: inicia flujo de tarifas en la API externa."""
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    data["sid"] = sid
+    return _proxy_tariff_request("tarifa/start", data)
+
+
+@router.post("/tarifa/cancel")
+async def tarifa_cancel_proxy(request: Request):
+    """Proxy: cancela flujo de tarifas en la API externa."""
+    data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    data["sid"] = sid
+    return _proxy_tariff_request("tarifa/cancel", data)
+
+
+@router.post("/tarifa")
+async def tarifa_calculate_proxy(request: Request):
+    """Proxy: calcula tarifa directamente via API externa."""
+    data = await request.json()
+    return _proxy_tariff_request("tarifa", data)
+
+
+@router.post("/tarifas/calculate")
+async def tarifas_calculate_proxy(request: Request):
+    """Proxy: calcula tarifa via API externa (endpoint alternativo)."""
+    data = await request.json()
+    return _proxy_tariff_request("tarifas/calculate", data)
+
+
+# ─────────────────────────────────────────────
+#  ESCALACION A HUMANO
 # ─────────────────────────────────────────────
 
 @router.post("/escalate")

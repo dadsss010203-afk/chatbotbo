@@ -5128,6 +5128,7 @@ function updateTopStrip() {
 
   const chunks = Number(rag.chunks || 0);
   const llmModel = runtime.modelo || ai.llm?.modelo || "Sin modelo";
+  const llmBase = runtime.modelo_base || "N/D";
   const embeddingModel = ai.embeddings?.modelo || rag.embedding_model || "Sin embeddings";
   const sessions = Number(runtime.sesiones_activas || 0);
   const ollamaOk = runtime.ollama === true;
@@ -5145,8 +5146,8 @@ function updateTopStrip() {
   const resultado = actualizacion.ultimo_resultado || "Sin ejecución";
 
   els.topCardHealth.innerHTML = `<span>Salud general</span><strong>${escapeHtml(healthValue)}</strong><p>${escapeHtml(healthNote)}</p>`;
-  els.topCardRag.innerHTML = `<span>RAG</span><strong>${escapeHtml(String(chunks))} chunks</strong><p>Embeddings: ${escapeHtml(embeddingModel)} · PDFs: ${escapeHtml(String(pdfs.total ?? 0))}</p>`;
-  els.topCardContent.innerHTML = `<span>Modelo activo</span><strong>${escapeHtml(llmModel)}</strong><p>Sesiones activas: ${escapeHtml(String(sessions))} · Sucursales: ${escapeHtml(String(runtime.sucursales ?? 0))}</p>`;
+  els.topCardRag.innerHTML = `<span>RAG (${escapeHtml(rag.vector_store || 'qdrant')})</span><strong>${escapeHtml(String(chunks))} chunks</strong><p>Embeddings: ${escapeHtml(embeddingModel)} · PDFs: ${escapeHtml(String(pdfs.total ?? 0))}</p>`;
+  els.topCardContent.innerHTML = `<span>Modelo activo</span><strong>${escapeHtml(llmModel)}</strong><p>Base: ${escapeHtml(llmBase)} · Sesiones: ${escapeHtml(String(sessions))} · Sucursales: ${escapeHtml(String(runtime.sucursales ?? 0))}</p>`;
   els.topCardUpdate.innerHTML = `<span>Actualización</span><strong>${escapeHtml(ultima)}</strong><p>Próxima: ${escapeHtml(proxima)} · ${escapeHtml(resultado)}</p>`;
 }
 
@@ -5158,14 +5159,13 @@ function renderStats() {
   const vectorStore = ai.storage?.chroma_path?.exists ? "chroma (activo)" : "chroma";
 
   const cards = [
-    { value: rag.chunks ?? 0, label: "Chunks RAG", note: "Volumen actual de conocimiento utilizable por el bot." },
-    { value: (cap.skills || []).length, label: "Skills activas", note: "Capacidades funcionales declaradas en el sistema." },
+    { value: rag.chunks ?? 0, label: "Chunks en Qdrant", note: "Conocimiento vectorizado para busqueda semantica." },
+    { value: runtime.modo || "Qdrant", label: "Modo", note: "Busqueda semantica unificada sin skills manuales." },
     { value: pdfs.total ?? 0, label: "PDFs registrados", note: "Documentos disponibles para extracción y revisión." },
     { value: pdfs.con_texto ?? 0, label: "PDFs con texto", note: "Fuentes aptas para consulta documental inmediata." },
     { value: pdfs.sin_texto ?? 0, label: "PDFs sin texto", note: "Fuentes candidatas a reproceso u OCR." },
     { value: `${pdfs.tamano_directorio_kb ?? 0} KB`, label: "Carpeta PDF", note: "Tamaño estimado del repositorio documental." },
-    { value: ai.capabilities?.skills_registradas ?? (cap.skills || []).length, label: "Skills registradas", note: "Cantidad total de skills mantenidas." },
-    { value: vectorStore, label: "Vector store", note: "Motor activo para almacenamiento/vectorización." }
+    { value: vectorStore, label: "Vector store", note: "Motor activo para almacenamiento/vectorizacion." }
   ];
 
   els.statsGrid.innerHTML = cards.map((item) => `
@@ -6550,12 +6550,15 @@ async function previewDataJson(name) {
 
 async function editDataJson(name) {
   // Archivos que se pueden editar desde el panel
-  const EDITABLES = [
+const EDITABLES = [
     "contacto_institucional.json",
     "aplicativos_detalle.json",
     "enlaces_interes.json",
     "estadisticas.json",
     "historia_institucional.json",
+    "correos_bolivia.json",
+    "sucursales_contacto.json",
+    "secciones_home.json",
     "secciones_home.json",
     "sucursales_contacto.json",
   ];

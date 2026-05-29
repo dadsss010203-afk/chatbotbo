@@ -1,42 +1,62 @@
-# ─────────────────────────────────────────────
-#  .dockerignore — CHATBOTBO
-# ─────────────────────────────────────────────
+# Git
+.git
+.gitignore
+.gitattributes
 
-# Entorno virtual Python
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Entornos virtuales
 .venv/
 venv/
 env/
 
-# Cache Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-
-# ChromaDB (se monta como volumen)
-chroma_db/
-
-# Variables de entorno
+# Variables de entorno (seguridad)
 .env
 .env.*
+!.env.example
 
-# Git
-.git/
-.gitignore
-
-# Editores
-.vscode/
+# IDE
 .idea/
+.vscode/
 *.swp
+*.swo
+*~
+
+# Datos y DBs (se montan como volumenes)
+*.db
+*.sqlite3
+chroma_db/
+chroma_data/
+ollama_data/
+
+# PDFs descargados y archivos temporales
+data/pdfs_descargados/
+data/*.xlsx
+data/*.pdf
+*.log
+*.pid
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
 
-# Datos temporales del scraper (opcionales, se regeneran)
-# data/         ← comenta esta línea si quieres incluir los datos pre-generados
+# Archivos de documentacion local
+ejecuciones.md
+SETUP.md
+preguntas.md
+
+# Skills data (Excel files)
+skills/*/data/*.xlsx

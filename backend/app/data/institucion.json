@@ -1,0 +1,71 @@
+{
+  "_descripcion": "Fuente unica de verdad para ChatbotBO. Edita este archivo para cambiar cualquier dato institucional. No hardcodees nada en el codigo.",
+
+  "institucion": {
+    "nombre": "Correos de Bolivia",
+    "nombre_anterior": "AGBC - Agencia Boliviana de Correos",
+    "decreto_creacion": "3495",
+    "anio_creacion": 2018,
+    "anio_nombre_actual": 2026
+  },
+
+  "contacto": {
+    "telefono": "+591 22152423",
+    "telefono_corto": "22152423",
+    "email": "agbc@correos.gob.bo",
+    "web": "correos.gob.bo",
+    "web_url": "https://correos.gob.bo"
+  },
+
+  "horario": {
+    "semana": "Lunes a viernes 8:30 a 16:30",
+    "sabado": "Sabados 9:00 a 13:00",
+    "domingo": "Domingos cerrado",
+    "apertura_semana": "8:30",
+    "cierre_semana": "16:30",
+    "apertura_sabado": "9:00",
+    "cierre_sabado": "13:00"
+  },
+
+  "tracking": {
+    "url": "https://trackingbo.correos.gob.bo:8100",
+    "api_url": "https://trackingbo.correos.gob.bo:8100/api/public/tracking/eventos",
+    "ejemplo_codigo": "C0028A03441BO"
+  },
+
+  "tarifas": {
+    "calculadora_url": "https://postar.correos.gob.bo"
+  },
+
+  "enlaces": [
+    {"nombre": "TrackingBO - Rastreo",      "url": "https://trackingbo.correos.gob.bo:8100/"},
+    {"nombre": "SIRECO - Reclamos",         "url": "https://sireco.correos.gob.bo:8102/"},
+    {"nombre": "UNIENVIO - ECA",            "url": "https://unienvio.correos.gob.bo:8103/"},
+    {"nombre": "GESDO - Carteros",          "url": "https://gesdo.correos.gob.bo:8106/"},
+    {"nombre": "SIREN - Encomiendas",       "url": "https://siren.correos.gob.bo:8107/"},
+    {"nombre": "ULTRAPOST - EMS",           "url": "https://ultrapost.correos.gob.bo:8108/login"},
+    {"nombre": "Filatelia",                 "url": "https://correos.gob.bo/filatelia/"},
+    {"nombre": "Servicio Postal SP",        "url": "https://correos.gob.bo/sp/"},
+    {"nombre": "Encomienda Postal",         "url": "https://correos.gob.bo/servicio-encomienda-postal/"},
+    {"nombre": "ECA - Correspondencia",     "url": "https://correos.gob.bo/eca/"},
+    {"nombre": "EMS Internacional",         "url": "https://correos.gob.bo/ems/"}
+  ],
+
+  "servicios": [
+    {"nombre": "EMS", "descripcion": "Envio urgente nacional (24-48 h) e internacional (5-8 dias), hasta 20 kg, seguimiento en tiempo real."},
+    {"nombre": "Encomienda Postal (SEP)", "descripcion": "Paquetes internacionales a 192 paises (8-14 dias), hasta 20 kg, con rastreo."},
+    {"nombre": "Correo Prioritario", "descripcion": "Cartas y paquetes hasta 2 kg, nacional 24-48 h, internacional 7-14 dias."},
+    {"nombre": "Mi Encomienda", "descripcion": "Paqueteria nacional economica (24-48 h), hasta 20 kg, con rastreo y acuse de recibo."},
+    {"nombre": "ECA (Correspondencia Agrupada)", "descripcion": "Envios masivos para empresas, minimo 40 envios, entrega nacional 24-72 h."},
+    {"nombre": "Chasqui Express", "descripcion": "Entrega a domicilio para empresas y emprendedores."},
+    {"nombre": "Casillas Postales", "descripcion": "Alquiler de casillas para recepcion segura, disponible en sucursales principales."},
+    {"nombre": "Filatelia", "descripcion": "Venta de sellos de coleccion y organizacion de exposiciones filatelicas."}
+  ],
+
+  "respuestas_fijas": {
+    "sin_info": "No tengo esa informacion. Visita {web} o llama al {telefono}.",
+    "fuera_dominio": "Solo puedo ayudarte con temas de Correos Bolivia. ¿Tienes alguna consulta sobre envios, rastreo o servicios postales?",
+    "rastreo_prompt": "Enviame tu codigo de rastreo completo, por ejemplo: {ejemplo_codigo}",
+    "tarifa_prompt": "Para cotizar sin ambiguedad, activa el modo Tarifas con el boton 'Tarifas'."
+  }
+}

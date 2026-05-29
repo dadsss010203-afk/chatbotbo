@@ -164,6 +164,14 @@ def inicializar(chroma_path: str = None, embedding_model: str = None, collection
     kwargs["model_kwargs"] = {"ignore_mismatched_sizes": True}
 
     _embedder = SentenceTransformer(modelo, **kwargs)
+    # Usar todos los cores disponibles para embeddings
+    try:
+        import torch
+        cpu_count = os.cpu_count() or 4
+        torch.set_num_threads(cpu_count)
+        logger.info("Torch threads configurados", extra={"threads": cpu_count})
+    except Exception:
+        pass
     logger.info("Modelo de embeddings cargado", extra={"ignore_mismatched_sizes": True})
 
     if _use_qdrant():
@@ -1038,6 +1046,7 @@ def buscar(
     n_resultados: int = None,
     preferred_source_types: list[str] | None = None,
     skill_id: str | None = None,
+    strict_preferred_sources: bool = False,
 ) -> dict:
     col = get_collection()
     emb = get_embedder()
@@ -1045,7 +1054,11 @@ def buscar(
     n_query = min(max(n * 5, 8), 24)
 
     # Cache de búsqueda RAG completa para preguntas repetidas
-    cached_search = get_rag_search(pregunta, preferred_source_types)
+    cached_search = get_rag_search(
+        pregunta,
+        preferred_source_types,
+        strict_preferred_sources=strict_preferred_sources,
+    )
     if cached_search is not None:
         return cached_search
 
@@ -1120,15 +1133,17 @@ def buscar(
                     continue
 
         # 2) Completar con búsqueda global para no perder cobertura
-        for hit in _qdrant_search_global():
-            hit_id = str(getattr(hit, "id", ""))
-            if hit_id and hit_id in seen_ids:
-                continue
-            if hit_id:
-                seen_ids.add(hit_id)
-            search_results.append(hit)
-            if len(search_results) >= qdrant_limit:
-                break
+        # (opcionalmente desactivado para skills con fuentes estrictas).
+        if not strict_preferred_sources:
+            for hit in _qdrant_search_global():
+                hit_id = str(getattr(hit, "id", ""))
+                if hit_id and hit_id in seen_ids:
+                    continue
+                if hit_id:
+                    seen_ids.add(hit_id)
+                search_results.append(hit)
+                if len(search_results) >= qdrant_limit:
+                    break
 
         documents = []
         metadatas = []
@@ -1275,7 +1290,7 @@ def buscar(
                     break
             if len(seleccionados) >= n:
                 break
-        if len(seleccionados) < n:
+        if len(seleccionados) < n and not strict_preferred_sources:
             for idx, item in enumerate(candidatos):
                 if idx in usados:
                     continue
@@ -1394,5 +1409,10 @@ def buscar(
         "sources": sources,
         "primary_source_type": primary_source_type,
     }
-    set_rag_search(pregunta, result, preferred_source_types)
+    set_rag_search(
+        pregunta,
+        result,
+        preferred_source_types,
+        strict_preferred_sources=strict_preferred_sources,
+    )
     return result

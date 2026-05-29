@@ -1,0 +1,78 @@
+{
+  "_skill_id": "",
+  "fuente": "correos.gob.bo",
+  "servicios": [
+    {
+      "nombre": "EMS - Express Mail Service",
+      "descripcion": "Envio urgente nacional e internacional con rastreo. Entrega rapida a mas de 180 paises. Incluye seguimiento en tiempo real.",
+      "web": "https://correos.gob.bo/ems/"
+    },
+    {
+      "nombre": "Encomienda Postal",
+      "descripcion": "Envio de paquetes y mercancias nacionales e internacionales. Con seguimiento y rastreo incluido. Cobertura en los 9 departamentos de Bolivia.",
+      "web": "https://correos.gob.bo/servicio-encomienda-postal/"
+    },
+    {
+      "nombre": "Servicio Postal Prioritario (SP)",
+      "descripcion": "Envio de cartas y pequenos paquetes. Cobertura nacional e internacional.",
+      "web": "https://correos.gob.bo/sp/"
+    },
+    {
+      "nombre": "ECA - Correspondencia Agrupada",
+      "descripcion": "Para instituciones y empresas con alto volumen de correspondencia. Tarifas preferenciales segun volumen.",
+      "web": "https://correos.gob.bo/eca/"
+    },
+    {
+      "nombre": "Mi Encomienda",
+      "descripcion": "Paqueteria nacional economica con entrega en oficinas. Entrega en 24 a 48 horas en ciudades capitales. Incluye rastreo y acuse de recibo.",
+      "web": "https://correos.gob.bo/mi-encomienda/"
+    },
+    {
+      "nombre": "Chasqui Express - Delivery a Domicilio",
+      "descripcion": "Entrega a domicilio para empresas y emprendedores. Servicio de delivery nacional.",
+      "web": "https://correos.gob.bo/chasquiexpressbo/"
+    },
+    {
+      "nombre": "Casillas Postales",
+      "descripcion": "Alquiler de casillas para recepcion segura de correspondencia y paquetes. Disponible en sucursales principales.",
+      "web": "https://correos.gob.bo/casillas/"
+    },
+    {
+      "nombre": "Filatelia",
+      "descripcion": "Venta de sellos postales de coleccion. Catalogos y productos filatelicos bolivianos.",
+      "web": "https://correos.gob.bo/filatelia/"
+    }
+  ],
+  "plataformas_digitales": [
+    {
+      "nombre": "TrackingBO",
+      "descripcion": "Rastreo de envios nacionales e internacionales",
+      "url": "https://trackingbo.correos.gob.bo:8100/",
+      "tipo": "plataforma_web"
+    },
+    {
+      "nombre": "POSTAR",
+      "descripcion": "Calculadora de tarifas postales",
+      "url": "https://postar.correos.gob.bo:8104/",
+      "tipo": "plataforma_web"
+    },
+    {
+      "nombre": "SIRECO",
+      "descripcion": "Sistema de reclamos y sugerencias",
+      "url": "https://sireco.correos.gob.bo:8102/",
+      "tipo": "plataforma_web"
+    },
+    {
+      "nombre": "UNIENVIO",
+      "descripcion": "Gestion de correspondencia agrupada (ECA)",
+      "url": "https://unienvio.correos.gob.bo:8103/",
+      "tipo": "plataforma_web"
+    }
+  ],
+  "contacto": {
+    "telefono": "+591 22152423",
+    "web": "correos.gob.bo",
+    "horario": "Lunes a viernes 8:30 a 16:30 | Sabados 9:00 a 13:00 | Domingos cerrado"
+  },
+  "nota": "Datos extraidos de correos_bolivia.txt. Editable desde capacidades.html."
+}

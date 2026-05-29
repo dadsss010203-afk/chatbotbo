@@ -5,11 +5,41 @@ Compartido por todos los chatbots.
 """
 
 import os
+import re
 import threading
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
 from core import contacto
+
+
+def _parse_hora_float(value: str, default: str = "0:00") -> float:
+    """Convierte una hora 'HH:MM' en valor decimal (por ejemplo 8.5)."""
+    if not isinstance(value, str):
+        value = default
+    value = value.strip()
+    try:
+        horas, minutos = value.split(":")
+        return int(horas) + int(minutos) / 60
+    except Exception:
+        try:
+            return float(value)
+        except Exception:
+            horas, minutos = default.split(":")
+            return int(horas) + int(minutos) / 60
+
+
+def _parse_interval_from_text(value: str) -> tuple[float, float] | None:
+    """Extrae un intervalo de horas 'HH:MM' desde texto libre."""
+    if not isinstance(value, str):
+        return None
+    matches = re.findall(r"(\d{1,2}:\d{2})", value)
+    if len(matches) >= 2:
+        inicio = _parse_hora_float(matches[0], "0:00")
+        fin = _parse_hora_float(matches[1], "0:00")
+        return inicio, fin
+    return None
+
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
@@ -330,15 +360,26 @@ def get_hora_bolivia() -> dict:
     ahora      = datetime.now(bolivia)
     hora_float = ahora.hour + ahora.minute / 60
 
+    apertura_semana = _parse_hora_float(contacto.get('horario_apertura_semana', '8:30'), '8:30')
+    cierre_semana = _parse_hora_float(contacto.get('horario_cierre_semana', '16:30'), '16:30')
+    apertura_sabado = _parse_hora_float(contacto.get('horario_apertura_sabado', '9:00'), '9:00')
+    cierre_sabado = _parse_hora_float(contacto.get('horario_cierre_sabado', '13:00'), '13:00')
+    horario_domingo_text = contacto.get('horario_domingo', 'cerrado los domingos')
+    intervalo_domingo = _parse_interval_from_text(horario_domingo_text)
+
     if ahora.weekday() < 5:           # Lunes a Viernes
-        abierto = 8.5 <= hora_float < 18.5
+        abierto = apertura_semana <= hora_float < cierre_semana
         horario = f"lunes a viernes de {contacto.get('horario_apertura_semana', '8:30')} a {contacto.get('horario_cierre_semana', '16:30')}"
     elif ahora.weekday() == 5:        # Sábado
-        abierto = 9.0 <= hora_float < 13.0
+        abierto = apertura_sabado <= hora_float < cierre_sabado
         horario = f"sábados de {contacto.get('horario_apertura_sabado', '9:00')} a {contacto.get('horario_cierre_sabado', '13:00')}"
     else:                             # Domingo
-        abierto = False
-        horario = "cerrado los domingos"
+        horario = horario_domingo_text
+        if intervalo_domingo is None:
+            abierto = False
+        else:
+            apertura_domingo, cierre_domingo = intervalo_domingo
+            abierto = apertura_domingo <= hora_float < cierre_domingo
 
     return {
         "fecha"  : ahora.strftime("%d/%m/%Y"),
