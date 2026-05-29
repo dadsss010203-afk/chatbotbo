@@ -217,10 +217,11 @@ def _safe_json_object(text: str) -> dict | None:
 def _resolve_sid_from_request(request: Request, data: dict | None = None) -> str:
     payload = data or {}
     sid = str(payload.get("sid") or request.headers.get("X-Session-Id") or "").strip()
-    if sid:
-        # toca/crea la sesión para mantener consistencia interna
+    if sid and len(sid) >= 8:
+        # toca/crea la sesion para mantener consistencia interna
         session.get_historial(sid)
         return sid
+    # sid vacio, muy corto, o invalido → generar uno nuevo
     return session.get_sid()
 
 
@@ -2253,48 +2254,58 @@ async def chat_stream(request: Request):
                     yield line
                 return
 
-        # ── 6. RAG + LLM via pipeline unificado
-        from chatbots.general.services.chat_pipeline import run_rag_llm_pipeline
-
-        _stream_result = []
-
-        async def _llm_fn(mensajes):
-            partes = []
-            async for fragmento in _stream_ollama_cancelable(request, request_id, mensajes):
-                partes.append(fragmento)
-            _stream_result.append(ollama.limpiar_respuesta("".join(partes)))
-            return _stream_result[0]
-
-        ctx = {
-            "sid": sid, "pregunta": pregunta_actual, "pregunta_llm": pregunta_actual_llm,
-            "lang": lang, "skill_resolution": skill_resolution,
-            "general_only": False, "request": request, "request_id": request_id,
-        }
-
+        # ── 6. RAG + LLM con streaming de tokens
         try:
-            result = await run_rag_llm_pipeline(ctx, _llm_fn)
-        except ollama.OllamaCancelled:
-            return
+            rag_result = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: rag.buscar(pregunta_actual, preferred_source_types=capabilities.preferred_sources_for_skill(None))
+            )
+            contexto = rag_result.get("context", "")
+            sources = rag_result.get("sources", [])
         except Exception:
-            async for line in instant_end({
-                "response": f"Error interno. Intenta de nuevo o llama al {contacto.telefono()}.",
-                "lang": lang, "error": "internal",
-            }):
+            async for line in instant_end({"response": t["sin_info"], "lang": lang}):
                 yield line
             return
 
-        respuesta = result.get("response", t["sin_info"])
-        session.agregar_turno(sid, pregunta_actual, respuesta)
-        async for line in instant_end({
-            "response": respuesta,
-            "lang": lang,
-            "skill_resolution": result.get("skill_resolution", skill_resolution),
-            "sources": result.get("sources", []),
-            "primary_source_type": result.get("primary_source_type"),
-            "quick_replies": result.get("quick_replies", []),
-        }):
-            yield line
-        return
+        if not contexto.strip():
+            async for line in instant_end({"response": t["sin_info"], "lang": lang}):
+                yield line
+            return
+
+        hora = session.get_hora_bolivia()
+        sistema = construir_prompt(t["instruccion"], _limpiar_contexto_rag(contexto), hora, t["sin_info"])
+        mensajes = [{"role": "system", "content": sistema}, *session.historial_reciente(sid), {"role": "user", "content": pregunta_actual_llm}]
+        mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
+
+        try:
+            partes = []
+            last_preview = ""
+            async for fragmento in _stream_ollama_cancelable(request, request_id, mensajes):
+                partes.append(fragmento)
+                preview = _stream_preview_text("".join(partes))
+                delta = preview[len(last_preview):]
+                if delta:
+                    yield _stream_line({"type": "token", "content": delta})
+                    last_preview = preview
+
+            respuesta = ollama.limpiar_respuesta("".join(partes))
+            respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
+            respuesta = _normalize_response_text(respuesta)
+            session.agregar_turno(sid, pregunta_actual, respuesta)
+            async for line in instant_end({
+                "response": respuesta, "lang": lang,
+                "skill_resolution": {"in_scope": True, "primary_skill": "", "matched_skills": []},
+                "sources": rag_result.get("sources", []),
+                "primary_source_type": rag_result.get("primary_source_type"),
+            }):
+                yield line
+            return
+        except ollama.OllamaCancelled:
+            return
+        except Exception:
+            async for line in instant_end({"response": t["sin_info"], "lang": lang}):
+                yield line
+            return
 
     return StreamingResponse(
         stream_generator(),

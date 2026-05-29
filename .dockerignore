@@ -36,6 +36,7 @@ env/
 chroma_db/
 chroma_data/
 ollama_data/
+data/qdrant_storage/
 
 # PDFs descargados y archivos temporales
 data/pdfs_descargados/
