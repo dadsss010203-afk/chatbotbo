@@ -27,6 +27,7 @@ from contextlib import asynccontextmanager
 
 from core import ollama, updater, observability
 from core.logging_config import init_logging, get_logger
+from core import auth as auth_module
 from chatbots.general import routes as general_routes
 
 # ── Inicializar logging estructurado antes que nada
@@ -161,6 +162,9 @@ observability.init_app(app)
 
 # ── Registrar rutas del chatbot general (/api/*)
 app.include_router(general_routes.router)
+
+# ── Auth routes ──────────────────────────────────
+app.include_router(auth_module.router)
 
 # ── Directorio del frontend
 FRONTEND_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "frontend"))

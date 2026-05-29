@@ -3324,4 +3324,3 @@ async def api_root(request: Request):
     # si el cuerpo contiene 'message' asumimos chat
     if "message" in data:
         return await chat()
-    raise HTTPException(status_code=400, detail="requisição inválida")

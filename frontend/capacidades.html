@@ -4220,49 +4220,39 @@
       <section class="section view-section" id="view-tariffs">
         <div class="section-head">
           <div>
-            <h3>Tarifas SQLite</h3>
-            <p>Parte gestionable del catálogo tarifario con filtros y simulación de cálculo.</p>
+            <h3>Tarifas — POSTAR API</h3>
+            <p>Simulación del flujo determinístico de tarifas usando la API POSTAR de Correos de Bolivia.</p>
           </div>
           <div class="toolbar">
-            <button class="btn btn-secondary" type="button" onclick="reloadTariffCatalog()">Recargar desde XLSX</button>
-            <button class="btn btn-secondary" type="button" onclick="createTariffRate()">Nueva tarifa</button>
-            <button class="btn btn-secondary" type="button" onclick="loadAll()">Refrescar</button>
+            <button class="btn btn-secondary" type="button" onclick="loadPostarOptions()">Recargar opciones</button>
           </div>
         </div>
         <div class="section-summary" id="tariffs-summary"></div>
-        <div class="resource-grid" id="tariffs-engine" style="margin-bottom:14px"></div>
         <div class="detail-card" style="margin-bottom:14px">
-          <h5 style="margin-bottom:10px">Probar cálculo</h5>
-          <div style="display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:10px">
-            <select id="tariffs-scope-filter"></select>
-            <select id="tariffs-column-filter" title="Seleccionar servicio"></select>
-            <input id="tariffs-weight-input" placeholder="Peso (ej: 800g o 1.2kg)">
-            <button class="btn btn-primary" type="button" onclick="calculateTariffFromPanel()">Calcular</button>
+          <h5 style="margin-bottom:10px">Probar flujo de tarifas</h5>
+          <p style="color:var(--ink-soft);font-size:.85rem;margin-bottom:12px">Simula el mismo flujo que usa el chatbot: alcance → servicio → destino → peso → calcular</p>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px">
+            <select id="tariffs-scope" onchange="onScopeChange()">
+              <option value="">1. Nacional/Internacional</option>
+              <option value="nacional">🇧🇴 Nacional</option>
+              <option value="internacional">🌎 Internacional</option>
+            </select>
+            <select id="tariffs-service" onchange="onServiceChange()" disabled>
+              <option value="">2. Servicio</option>
+            </select>
+            <select id="tariffs-destination" onchange="onDestChange()" disabled>
+              <option value="">3. Destino</option>
+            </select>
+            <input id="tariffs-weight" placeholder="4. Peso (ej: 500g, 2kg)" disabled>
           </div>
-          <p id="tariffs-calc-result" style="margin-top:10px"></p>
+          <button class="btn btn-primary" type="button" onclick="calculateTariffFromPanel()" disabled id="tariffs-calc-btn" style="margin-top:10px">Calcular</button>
+          <p id="tariffs-calc-result" style="margin-top:10px;font-weight:700"></p>
         </div>
-        <div class="detail-card" style="margin-bottom:14px">
-          <h5 style="margin-bottom:10px">Ver tabla por tarifa</h5>
-          <div id="tariffs-scope-buttons" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+        <div class="detail-card">
+          <h5 style="margin-bottom:10px">Opciones disponibles</h5>
+          <p style="color:var(--ink-soft);font-size:.85rem;margin-bottom:12px">Categorías y destinos cargados desde postar_options_grouped.json</p>
+          <div class="resource-grid" id="tariffs-options-grid"></div>
         </div>
-        <div class="table-wrap">
-          <table id="tariffs-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Columna</th>
-                <th>Servicio</th>
-                <th>Min (g)</th>
-                <th>Max (g)</th>
-                <th>Precio (Bs)</th>
-                <th>Origen</th>
-                <th>Opciones</th>
-              </tr>
-            </thead>
-            <tbody id="tariffs-body"></tbody>
-          </table>
-        </div>
-        <div class="table-footer"><span id="tariffs-count">0 registros</span></div>
       </section>
 
       <section class="section view-section" id="view-conversations">
@@ -4352,7 +4342,7 @@
             <div class="field">
               <label>Rol</label>
               <select id="new-user-role">
-                <option value="editor">Editor</option>
+                <option value="operador">Operador</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -4413,6 +4403,8 @@
           <div class="table-footer"><span id="sin-respuesta-count">0 preguntas</span></div>
         </div>
       </section>
+
+
     </main>
   </div>
 
@@ -4527,14 +4519,11 @@
   <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-const USERS_DB = {
-  admin: { password: "admin123", role: "admin", name: "Administrador", activo: true },
-  editor: { password: "editor123", role: "editor", name: "Editor", activo: true }
-};
+const USERS_DB = {};  // Ya no se usa — los usuarios vienen del backend
 
 const ROLES_PERMS = {
   admin: { canDelete: true, canManageUsers: true },
-  editor: { canDelete: false, canManageUsers: false }
+  operador: { canDelete: false, canManageUsers: false }
 };
 
 const DEMO_DATA = {
@@ -4819,7 +4808,7 @@ const els = {
     conversations: document.getElementById("view-conversations"),
     "tariff-conversations": document.getElementById("view-tariff-conversations"),
     users: document.getElementById("view-users"),
-    "sin-respuesta": document.getElementById("view-sin-respuesta")
+    "sin-respuesta": document.getElementById("view-sin-respuesta"),
   }
 };
 
@@ -4986,7 +4975,7 @@ const viewConfig = {
     title: "Preguntas sin respuesta",
     description: "Preguntas donde el bot no encontró información. Úsalas para mejorar el contenido.",
     showSkillButton: false
-  }
+  },
 };
 
 function escapeHtml(value) {
@@ -5018,13 +5007,8 @@ async function fetchJson(url, options = {}) {
   return payload;
 }
 
-function getUsersFromStorage() {
-  return JSON.parse(localStorage.getItem("chatbotbo_users_db")) || { ...USERS_DB };
-}
-
-function saveUsersToStorage(users) {
-  localStorage.setItem("chatbotbo_users_db", JSON.stringify(users));
-}
+function getUsersFromStorage() { return {}; }  // backend handles users
+function saveUsersToStorage() {}                // backend handles users
 
 function demoNotice(message) {
   openModal("detail", {
@@ -5597,128 +5581,198 @@ function renderCache() {
   setupAnyDataTable("#cache-responses-table", "cacheResponsesDataTable", { order: [[5, "desc"]] });
 }
 
-function renderTariffs() {
-  const statsPayload = state.tariffsStatsPayload || {};
-  const ratesPayload = state.tariffsRatesPayload || {};
-  const allItems = ratesPayload.items || [];
-  const supported = statsPayload.supported_scopes || [];
-  const normalizedSupported = supported
-    .map((entry) => {
-      const scope = String(entry?.scope || "").trim().toLowerCase();
-      return scope ? { ...entry, scope } : null;
-    })
-    .filter(Boolean);
+// ─── TARIFAS POSTAR API ──────────────────────────────────────────
+// Opciones cargadas via API desde postar_options_grouped.json
+let postarData = null;  // { nacional: { categories, destinations }, internacional: {} }
 
-  if (els.tariffsScopeFilter) {
-    const current = String(els.tariffsScopeFilter.value || "").trim().toLowerCase();
-    els.tariffsScopeFilter.innerHTML = ['<option value="">Scope (todos)</option>', ...normalizedSupported.map((item) => `<option value="${escapeHtml(item.scope)}">${escapeHtml(item.scope)} · ${escapeHtml(item.label || "")}</option>`)].join("");
-    els.tariffsScopeFilter.value = normalizedSupported.some((s) => s.scope === current) ? current : "";
+async function loadPostarOptions() {
+  try {
+    const data = await fetchJson("/api/capabilities/options");
+    postarData = data;
+    renderTariffs();
+    showToast("Opciones POSTAR cargadas.");
+  } catch (e) {
+    showToast("Error cargando opciones POSTAR: " + (e.message || "Error"));
   }
-
-  const selectedScope = String(els.tariffsScopeFilter?.value || state.selectedTariffScope || "").trim().toLowerCase();
-  const availableServices = getTariffServicesCatalog(selectedScope);
-  if (els.tariffsColumnFilter) {
-    const currentColumn = String(els.tariffsColumnFilter.value || "").trim().toUpperCase();
-    if (availableServices.length) {
-      els.tariffsColumnFilter.innerHTML = ['<option value="">Servicio (todos)</option>', ...availableServices.map((service) => `<option value="${escapeHtml(service.columnCode)}">${escapeHtml(service.serviceLabel)} (${escapeHtml(service.columnCode)})</option>`)].join("");
-      els.tariffsColumnFilter.disabled = false;
-      els.tariffsColumnFilter.value = availableServices.some((service) => service.columnCode === currentColumn) ? currentColumn : "";
-    } else {
-      els.tariffsColumnFilter.innerHTML = '<option value="">Sin servicios disponibles</option>';
-      els.tariffsColumnFilter.disabled = true;
-      els.tariffsColumnFilter.value = "";
-    }
-  }
-
-  const selectedCol = (els.tariffsColumnFilter?.value || "").trim().toUpperCase();
-  const filtered = allItems.filter((item) => !selectedCol || String(item.column_code || "").toUpperCase() === selectedCol);
-  const grouped = {};
-  for (const item of filtered) {
-    const scope = String(item.scope || "").trim().toLowerCase() || "sin_scope";
-    if (!grouped[scope]) grouped[scope] = [];
-    grouped[scope].push(item);
-  }
-
-  const orderedScopes = [];
-  normalizedSupported.forEach((entry) => {
-    const scope = String(entry.scope || "").trim().toLowerCase();
-    if (scope && !orderedScopes.includes(scope)) orderedScopes.push(scope);
-  });
-  allItems.forEach((entry) => {
-    const scope = String(entry.scope || "").trim().toLowerCase();
-    if (scope && !orderedScopes.includes(scope)) orderedScopes.push(scope);
-  });
-  orderedScopes.sort();
-  if (!state.selectedTariffScope || !orderedScopes.includes(state.selectedTariffScope)) state.selectedTariffScope = orderedScopes[0] || "";
-
-  renderSummaryCards(els.tariffsSummary, [
-    { label: "Engine", value: statsPayload.engine || "sqlite", note: "Motor activo para cálculo tarifario." },
-    { label: "Tarifas activas", value: statsPayload.total_rates ?? allItems.length, note: "Filas disponibles en SQLite." },
-    { label: "Scopes soportados", value: (statsPayload.supported_scopes || []).length, note: "Catálogo de hojas/servicios." },
-    { label: "Última actualización", value: statsPayload.last_updated || "—", note: "Última modificación de catálogo." }
-  ]);
-
-  els.tariffsEngine.innerHTML = `
-    <article class="resource-card">
-      <h4>Base Tarifaria</h4>
-      <div class="resource-line"><span>DB</span><strong>${escapeHtml(statsPayload.db_path || "—")}</strong></div>
-      <div class="resource-line"><span>Total filas</span><strong>${escapeHtml(String(statsPayload.total_rates ?? 0))}</strong></div>
-      <div class="resource-line"><span>Engine</span><strong>${escapeHtml(statsPayload.engine || "sqlite")}</strong></div>
-    </article>
-    <article class="resource-card">
-      <h4>Distribución por Scope</h4>
-      ${(statsPayload.scopes || []).slice(0, 8).map((item) => `<div class="resource-line"><span>${escapeHtml(item.scope)}</span><strong>${escapeHtml(String(item.total || 0))}</strong></div>`).join("") || '<div class="resource-line"><span>Sin datos</span><strong>0</strong></div>'}
-    </article>
-  `;
-
-  els.tariffsScopeButtons.innerHTML = orderedScopes.map((scope) => {
-    const info = normalizedSupported.find((s) => String(s.scope || "").trim().toLowerCase() === scope) || {};
-    const active = scope === state.selectedTariffScope;
-    const cls = active ? "mini-run" : "mini-soft";
-    return `<button class="mini-btn ${cls} tariff-scope-btn" type="button" data-scope="${escapeHtml(scope)}">${escapeHtml(info.label || scope)} (${(grouped[scope] || []).length || 0})</button>`;
-  }).join("");
-  if (els.tariffsScopeButtons) {
-    els.tariffsScopeButtons.querySelectorAll(".tariff-scope-btn").forEach((button) => {
-      button.addEventListener("click", () => {
-        const scope = String(button.getAttribute("data-scope") || "").trim().toLowerCase();
-        selectTariffScope(scope);
-      });
-    });
-  }
-
-  const rows = grouped[state.selectedTariffScope] || [];
-  if (state.tariffsDataTable) {
-    try {
-      state.tariffsDataTable.destroy();
-    } catch (_) {}
-    state.tariffsDataTable = null;
-  } else if (window.jQuery?.fn?.DataTable?.isDataTable("#tariffs-table")) {
-    try {
-      window.jQuery("#tariffs-table").DataTable().destroy();
-    } catch (_) {}
-  }
-
-  els.tariffsBody.innerHTML = rows.map((item) => `
-    <tr>
-      <td>${escapeHtml(String(item.id || ""))}</td>
-      <td>${escapeHtml(item.column_code || "—")}</td>
-      <td>${escapeHtml(item.service_label || "—")}</td>
-      <td>${escapeHtml(String(item.min_g ?? "—"))}</td>
-      <td>${escapeHtml(String(item.max_g ?? "—"))}</td>
-      <td>${escapeHtml(String(item.price_bs ?? "—"))}</td>
-      <td>${escapeHtml(item.source_sheet || "manual")}</td>
-      <td>
-        <div class="table-actions">
-          <button class="mini-btn mini-soft" type="button" onclick="editTariffRate(${Number(item.id || 0)})">Editar</button>
-          <button class="mini-btn mini-danger" type="button" onclick="deleteTariffRate(${Number(item.id || 0)})">Quitar</button>
-        </div>
-      </td>
-    </tr>
-  `).join("");
-  els.tariffsCount.textContent = `${rows.length} registros en ${state.selectedTariffScope || "sin scope"} (de ${filtered.length} filtrados)`;
-  setupAnyDataTable("#tariffs-table", "tariffsDataTable", { order: [[0, "asc"]] });
-  applyPermissions();
 }
+
+function renderTariffs() {
+  const summary = document.getElementById("tariffs-summary");
+  const grid = document.getElementById("tariffs-options-grid");
+  
+  if (!postarData) {
+    if (summary) summary.innerHTML = '<div class="empty-state"><strong>Sin datos</strong><span>Presiona "Recargar opciones" para cargar las opciones de POSTAR.</span></div>';
+    return;
+  }
+  
+  const nacCats = (postarData.nacional?.categories || []).length;
+  const intCats = (postarData.internacional?.categories || []).length;
+  const nacDests = (postarData.nacional?.destinations || []).length;
+  const intDests = (postarData.internacional?.destinations || []).length;
+  
+  if (summary) {
+    renderSummaryCards(summary, [
+      { label: "Servicios Nacional", value: nacCats, note: "Categorías disponibles" },
+      { label: "Servicios Internacional", value: intCats, note: "Categorías disponibles" },
+      { label: "Destinos Nacional", value: nacDests, note: "Departamentos y zonas" },
+      { label: "Destinos Internacional", value: intDests, note: "Países agrupados por zona" },
+    ]);
+  }
+  
+  if (grid) {
+    const nacCatLabels = (postarData.nacional?.categories || []).map(c => c.label).join(", ");
+    const intCatLabels = (postarData.internacional?.categories || []).map(c => c.label).join(", ");
+    grid.innerHTML = `
+      <article class="resource-card">
+        <h4>🇧🇴 Nacional</h4>
+        <div class="resource-line"><span>Servicios</span><strong>${escapeHtml(nacCatLabels)}</strong></div>
+        <div class="resource-line"><span>Destinos</span><strong>${nacDests} opciones</strong></div>
+      </article>
+      <article class="resource-card">
+        <h4>🌎 Internacional</h4>
+        <div class="resource-line"><span>Servicios</span><strong>${escapeHtml(intCatLabels)}</strong></div>
+        <div class="resource-line"><span>Destinos</span><strong>${intDests} países en 5 zonas</strong></div>
+      </article>
+    `;
+  }
+  
+  // Populate the scope dropdown if on tariffs view
+  onScopeChange();
+}
+
+function onScopeChange() {
+  const scope = document.getElementById("tariffs-scope")?.value;
+  const servSel = document.getElementById("tariffs-service");
+  const destSel = document.getElementById("tariffs-destination");
+  const weightInp = document.getElementById("tariffs-weight");
+  const calcBtn = document.getElementById("tariffs-calc-btn");
+  
+  if (!scope || !postarData) {
+    if (servSel) { servSel.disabled = true; servSel.innerHTML = '<option value="">2. Servicio</option>'; }
+    if (destSel) { destSel.disabled = true; destSel.innerHTML = '<option value="">3. Destino</option>'; }
+    if (weightInp) weightInp.disabled = true;
+    if (calcBtn) calcBtn.disabled = true;
+    return;
+  }
+  
+  const cats = postarData[scope]?.categories || [];
+  servSel.innerHTML = '<option value="">2. Servicio</option>' + cats.map(c => `<option value="${escapeHtml(c.value)}">${escapeHtml(c.label)}</option>`).join("");
+  servSel.disabled = false;
+  destSel.disabled = true;
+  destSel.innerHTML = '<option value="">3. Destino</option>';
+  weightInp.disabled = true;
+  calcBtn.disabled = true;
+}
+
+function onServiceChange() {
+  const scope = document.getElementById("tariffs-scope")?.value;
+  const service = document.getElementById("tariffs-service")?.value;
+  const destSel = document.getElementById("tariffs-destination");
+  const weightInp = document.getElementById("tariffs-weight");
+  const calcBtn = document.getElementById("tariffs-calc-btn");
+  
+  if (!scope || !service || !postarData) {
+    destSel.innerHTML = '<option value="">3. Destino</option>';
+    destSel.disabled = true;
+    weightInp.disabled = true;
+    calcBtn.disabled = true;
+    return;
+  }
+  
+  // Filtrar destinos por servicio
+  const cat = (postarData[scope]?.categories || []).find(c => c.value === service);
+  const allDests = postarData[scope]?.destinations || [];
+  let filtered = allDests;
+  if (cat?.destinations_filter) {
+    const filterSet = new Set(cat.destinations_filter);
+    filtered = allDests.filter(d => filterSet.has(d.value));
+  }
+  
+  // Para internacional: agrupar por zona
+  if (scope === "internacional") {
+    const zonas = {"a":"América del Sur","b":"América Central y Caribe","c":"América del Norte","d":"Europa y Medio Oriente","e":"África, Asia y Oceanía"};
+    const porZona = {};
+    filtered.forEach(d => {
+      const m = d.value.match(/^dest_([a-e])_/);
+      if (m) {
+        const z = m[1];
+        if (!porZona[z]) porZona[z] = [];
+        porZona[z].push(d);
+      }
+    });
+    destSel.innerHTML = '<option value="">3. Destino</option>' + 
+      Object.entries(porZona).map(([z, paises]) => 
+        `<optgroup label="🌎 ${zonas[z] || z.toUpperCase()}">${paises.map(d => `<option value="${escapeHtml(d.value)}">${escapeHtml(d.label)}</option>`).join("")}</optgroup>`
+      ).join("");
+  } else {
+    destSel.innerHTML = '<option value="">3. Destino</option>' + filtered.map(d => `<option value="${escapeHtml(d.value)}">${escapeHtml(d.label)}</option>`).join("");
+  }
+  
+  destSel.disabled = false;
+  onDestChange();
+}
+
+function onDestChange() {
+  const dest = document.getElementById("tariffs-destination")?.value;
+  const weightInp = document.getElementById("tariffs-weight");
+  const calcBtn = document.getElementById("tariffs-calc-btn");
+  
+  if (dest) {
+    if (weightInp) weightInp.disabled = false;
+    if (calcBtn) calcBtn.disabled = false;
+  } else {
+    if (weightInp) weightInp.disabled = true;
+    if (calcBtn) calcBtn.disabled = true;
+  }
+}
+
+async function calculateTariffFromPanel() {
+  const service = document.getElementById("tariffs-service")?.value;
+  const destino = document.getElementById("tariffs-destination")?.value;
+  const pesoRaw = document.getElementById("tariffs-weight")?.value.trim();
+  const resultEl = document.getElementById("tariffs-calc-result");
+  
+  if (!service || !destino || !pesoRaw) {
+    resultEl.textContent = "Completa todos los campos.";
+    return;
+  }
+  
+  // Parse peso
+  const match = pesoRaw.match(/^(\d+\.?\d*)\s*(g|gr|gramos?|kg|kilos?)?$/i);
+  if (!match) {
+    resultEl.textContent = "Peso inválido. Ej: 500g, 2kg, 1.5";
+    return;
+  }
+  let peso = parseFloat(match[1]);
+  if (match[2] && match[2].toLowerCase().startsWith("g")) peso = peso / 1000;
+  
+  resultEl.textContent = "Calculando...";
+  
+  try {
+    const res = await fetchJson("/api/tarifas/calculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categoria: service, destino, peso })
+    });
+    if (res.ok) {
+      resultEl.textContent = `Tarifa: ${res.tarifa} Bs | Servicio: ${service} | Destino: ${destino} | Peso: ${peso} kg`;
+    } else {
+      resultEl.textContent = "Error: " + (res.error || res.message || "API no disponible");
+    }
+  } catch (e) {
+    resultEl.textContent = "Error: " + (e.message || "No se pudo calcular");
+  }
+}
+
+// Funciones viejas de tarifas SQLite — reemplazadas por stubs
+function reloadTariffCatalog() { showToast("El catálogo SQLite ya no se usa. Las tarifas se calculan vía POSTAR API."); }
+function createTariffRate() { showToast("Gestión manual de tarifas no disponible. Usa POSTAR API."); }
+function editTariffRate() { showToast("No disponible."); }
+function deleteTariffRate() { showToast("No disponible."); }
+function openTariffRateModal() { showToast("No disponible."); }
+function loadTariffScopeButtons() {}
+function selectTariffScope() {}
+function getTariffServicesCatalog() { return []; }
 
 function renderConversations() {
   const payload = state.conversationsPayload || {};
@@ -6036,12 +6090,13 @@ function showMainPanel() {
 
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("main-panel").style.display = "grid";
-  document.getElementById("user-name").textContent = currentUser.name;
+  document.getElementById("user-name").textContent = currentUser.nombre || currentUser.name || currentUser.username;
 
   const badge = document.getElementById("user-role-badge");
-  const isAdmin = currentUser.role === "admin";
-  badge.textContent = isAdmin ? "ADMIN" : "EDITOR";
-  badge.title = isAdmin ? "Administrador" : "Editor";
+  const rol = currentUser.rol || currentUser.role || "operador";
+  const isAdmin = rol === "admin";
+  badge.textContent = isAdmin ? "ADMIN" : "OPERADOR";
+  badge.title = isAdmin ? "Administrador" : "Operador";
   badge.style.background = isAdmin ? "rgba(139,111,255,.16)" : "rgba(59,167,255,.14)";
   badge.style.color = isAdmin ? "#b7a5ff" : "#3ba7ff";
   badge.style.border = isAdmin ? "1px solid rgba(139,111,255,.34)" : "1px solid rgba(59,167,255,.32)";
@@ -6051,7 +6106,8 @@ function showMainPanel() {
 }
 
 function applyPermissions() {
-  const perms = ROLES_PERMS[currentUser?.role] || ROLES_PERMS.editor;
+  const rol = currentUser?.rol || currentUser?.role || "operador";
+  const perms = ROLES_PERMS[rol] || ROLES_PERMS.operador;
   document.querySelectorAll(".btn-danger, .mini-danger").forEach((btn) => {
     btn.style.display = perms.canDelete ? "" : "none";
   });
@@ -6065,24 +6121,38 @@ function doLogin() {
   const user = document.getElementById("login-user").value.trim().toLowerCase();
   const pass = document.getElementById("login-pass").value;
   const errorEl = document.getElementById("login-error");
-  const users = getUsersFromStorage();
-  const userData = users[user] || USERS_DB[user];
+  const btnEl = document.getElementById("btn-login");
 
-  if (userData && userData.password === pass && userData.activo !== false) {
-    currentUser = { username: user, ...userData };
+  btnEl.disabled = true;
+  btnEl.innerHTML = 'Autenticando...';
+
+  fetch("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: user, password: pass })
+  })
+  .then(res => res.json().then(data => ({ ok: res.ok, data })))
+  .then(({ ok, data }) => {
+    if (!ok || !data.token) throw new Error(data.detail || "Credenciales incorrectas");
+    localStorage.setItem("auth_token", data.token);
+    currentUser = data.user;
     sessionStorage.setItem("chatbotbo_auth", JSON.stringify(currentUser));
     showMainPanel();
-    return;
-  }
-
-  errorEl.textContent = "Usuario o contraseña incorrectos";
-  errorEl.style.display = "block";
-  document.getElementById("login-pass").value = "";
+  })
+  .catch(err => {
+    errorEl.textContent = err.message || "Error de conexión";
+    errorEl.style.display = "block";
+    document.getElementById("login-pass").value = "";
+    btnEl.disabled = false;
+    btnEl.innerHTML = 'Iniciar sesión<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>';
+  });
 }
 
 function doLogout() {
   currentUser = null;
+  localStorage.removeItem("auth_token");
   sessionStorage.removeItem("chatbotbo_auth");
+  fetch("/auth/logout", { method: "POST" }).catch(() => {});
   document.getElementById("login-screen").style.display = "flex";
   document.getElementById("main-panel").style.display = "none";
   document.getElementById("login-user").value = "";
@@ -6092,7 +6162,23 @@ function doLogout() {
 
 function checkAuth() {
   const saved = sessionStorage.getItem("chatbotbo_auth");
-  if (!saved) return;
+  if (!saved) {
+    // Intentar restaurar desde localStorage
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      fetch("/auth/me", { headers: { "Authorization": "Bearer " + token } })
+        .then(r => r.json())
+        .then(data => {
+          if (data.user) {
+            currentUser = { username: data.user.sub, nombre: data.user.nombre, rol: data.user.rol };
+            sessionStorage.setItem("chatbotbo_auth", JSON.stringify(currentUser));
+            showMainPanel();
+          }
+        })
+        .catch(() => {});
+    }
+    return;
+  }
 
   try {
     currentUser = JSON.parse(saved);
@@ -6108,29 +6194,36 @@ function loadUsers() {
   const usersCount = document.getElementById("users-count");
   if (!usersSummary || !usersBody || !usersCount) return;
 
-  const users = getUsersFromStorage();
-  const entries = Object.entries(users);
-  const showInactive = document.getElementById("show-inactive-users")?.checked;
+  const token = localStorage.getItem("auth_token");
+  fetch("/users", { headers: { "Authorization": "Bearer " + token } })
+    .then(r => r.json())
+    .then(data => {
+      const users = data.users || [];
+      const showInactive = document.getElementById("show-inactive-users")?.checked;
 
-  renderSummaryCards(document.getElementById("users-summary"), [
-    { label: "Usuarios", value: entries.length, note: "Perfiles para la maqueta." },
-    { label: "Activos", value: entries.filter(([, user]) => user.activo !== false).length, note: "Acceso habilitado a la demo." },
-    { label: "Admins", value: entries.filter(([, user]) => user.role === "admin").length, note: "Roles con vista completa." }
-  ]);
+      renderSummaryCards(usersSummary, [
+        { label: "Usuarios", value: users.length, note: "Perfiles registrados." },
+        { label: "Activos", value: users.filter(u => u.activo).length, note: "Acceso habilitado." },
+        { label: "Admins", value: users.filter(u => u.rol === "admin").length, note: "Roles con vista completa." }
+      ]);
 
-  document.getElementById("users-count").textContent = `${entries.length} usuarios`;
-  document.getElementById("users-body").innerHTML = entries.filter(([, user]) => showInactive || user.activo !== false).map(([username, user]) => `
-    <tr>
-      <td><span class="cell-strong">${escapeHtml(username)}</span></td>
-      <td>${escapeHtml(user.name)}</td>
-      <td><span class="pill ${user.role === "admin" ? "ok" : "info"}">${escapeHtml(user.role)}</span></td>
-      <td>${user.role === "admin" ? "Control visual completo" : "Edición demostrativa"}</td>
-      <td><div class="table-actions"><button class="mini-btn mini-soft" type="button" onclick="editUser('${escapeHtml(username)}')">Editar</button></div></td>
-    </tr>
-  `).join("");
-  if (els.viewSections?.users?.classList.contains("active")) {
-    setupAnyDataTable("#users-table", "usersDataTable", { order: [[0, "asc"]] });
-  }
+      document.getElementById("users-count").textContent = `${users.length} usuarios`;
+      document.getElementById("users-body").innerHTML = users.filter(u => showInactive || u.activo).map(u => `
+        <tr>
+          <td><span class="cell-strong">${escapeHtml(u.username)}</span></td>
+          <td>${escapeHtml(u.nombre)}</td>
+          <td><span class="pill ${u.rol === "admin" ? "ok" : "info"}">${escapeHtml(u.rol)}</span></td>
+          <td>${u.rol === "admin" ? "Control visual completo" : "Atención de chats"}</td>
+          <td><div class="table-actions"><button class="mini-btn mini-soft" type="button" onclick="editUser('${escapeHtml(u.username)}')">Editar</button></div></td>
+        </tr>
+      `).join("");
+      if (els.viewSections?.users?.classList.contains("active")) {
+        setupAnyDataTable("#users-table", "usersDataTable", { order: [[0, "asc"]] });
+      }
+    })
+    .catch(err => {
+      usersBody.innerHTML = `<tr><td colspan="5" style="color:#b44231">Error cargando usuarios: ${escapeHtml(err.message)}</td></tr>`;
+    });
 }
 
 function toggleInactiveUsers() {
@@ -6144,7 +6237,7 @@ function showUserForm() {
   document.getElementById("new-user-username").value = "";
   document.getElementById("new-user-name").value = "";
   document.getElementById("new-user-password").value = "";
-  document.getElementById("new-user-role").value = "editor";
+  document.getElementById("new-user-role").value = "operador";
   document.getElementById("btn-delete-user").style.display = "none";
   document.getElementById("btn-reactivate-user").style.display = "none";
   document.getElementById("user-form-msg").style.display = "none";
@@ -6152,20 +6245,25 @@ function showUserForm() {
 }
 
 function editUser(username) {
-  const users = getUsersFromStorage();
-  const user = users[username];
-  if (!user) return;
+  const token = localStorage.getItem("auth_token");
+  fetch("/users", { headers: { "Authorization": "Bearer " + token } })
+    .then(r => r.json())
+    .then(data => {
+      const user = (data.users || []).find(u => u.username === username);
+      if (!user) return;
 
-  editingUser = username;
-  document.getElementById("user-form-title").textContent = `Editar: ${username}`;
-  document.getElementById("new-user-username").disabled = true;
-  document.getElementById("new-user-username").value = username;
-  document.getElementById("new-user-name").value = user.name;
-  document.getElementById("new-user-password").value = "";
-  document.getElementById("new-user-role").value = user.role;
-  document.getElementById("btn-delete-user").style.display = username === "admin" ? "none" : "inline-flex";
-  document.getElementById("btn-reactivate-user").style.display = "none";
-  document.getElementById("user-form-container").style.display = "block";
+      editingUser = username;
+      document.getElementById("user-form-title").textContent = `Editar: ${username}`;
+      document.getElementById("new-user-username").disabled = true;
+      document.getElementById("new-user-username").value = username;
+      document.getElementById("new-user-name").value = user.nombre;
+      document.getElementById("new-user-password").value = "";
+      document.getElementById("new-user-role").value = user.rol;
+      document.getElementById("btn-delete-user").style.display = username === "admin" ? "none" : "inline-flex";
+      document.getElementById("btn-reactivate-user").style.display = user.activo ? "none" : "inline-flex";
+      document.getElementById("user-form-msg").style.display = "none";
+      document.getElementById("user-form-container").style.display = "block";
+    });
 }
 
 function showFormMsg(text, type) {
@@ -6178,48 +6276,63 @@ function showFormMsg(text, type) {
 
 function saveUser() {
   const username = document.getElementById("new-user-username").value.trim().toLowerCase();
-  const name = document.getElementById("new-user-name").value.trim();
-  const password = document.getElementById("new-user-password").value || "demo123";
-  const role = document.getElementById("new-user-role").value;
+  const nombre = document.getElementById("new-user-name").value.trim();
+  const password = document.getElementById("new-user-password").value;
+  const rol = document.getElementById("new-user-role").value;
 
-  if (!username || !name) {
-    showFormMsg("Completa los campos principales para la demostración.", "error");
+  if (!username || !nombre) {
+    showFormMsg("Completa usuario y nombre.", "error");
+    return;
+  }
+  if (!editingUser && (!password || password.length < 4)) {
+    showFormMsg("Contraseña debe tener al menos 4 caracteres.", "error");
     return;
   }
 
-  const users = getUsersFromStorage();
-  users[username] = { name, password, role, activo: true };
-  saveUsersToStorage(users);
-  showFormMsg("Usuario guardado dentro de la vista previa.", "success");
-  loadUsers();
-}
+  const token = localStorage.getItem("auth_token");
+  const isEdit = !!editingUser;
+  const url = isEdit ? `/users/${editingUser}` : "/users";
+  const method = isEdit ? "PUT" : "POST";
+  const body = { nombre, rol };
+  if (password) body.password = password;
 
-function deleteUser(username) {
-  if (username === "admin") return;
-  const users = getUsersFromStorage();
-  if (users[username]) {
-    users[username].activo = false;
-    saveUsersToStorage(users);
-  }
-  loadUsers();
-  cancelUserForm();
+  fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+    body: JSON.stringify(body)
+  })
+  .then(r => r.json().then(data => ({ ok: r.ok, data })))
+  .then(({ ok, data }) => {
+    if (!ok) throw new Error(data.detail || "Error al guardar");
+    showFormMsg("Usuario guardado.", "success");
+    loadUsers();
+  })
+  .catch(err => showFormMsg(err.message, "error"));
 }
 
 function deleteCurrentUser() {
-  if (editingUser) deleteUser(editingUser);
-}
-
-function reactivateUser(username) {
-  const users = getUsersFromStorage();
-  if (users[username]) {
-    users[username].activo = true;
-    saveUsersToStorage(users);
-  }
-  loadUsers();
+  if (!editingUser || editingUser === "admin") return;
+  if (!confirm(`¿Desactivar al usuario "${editingUser}"?`)) return;
+  const token = localStorage.getItem("auth_token");
+  fetch(`/users/${editingUser}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+    body: JSON.stringify({ activo: false })
+  })
+  .then(r => { if (r.ok) { loadUsers(); cancelUserForm(); } })
+  .catch(err => showFormMsg(err.message, "error"));
 }
 
 function reactivateCurrentUser() {
-  if (editingUser) reactivateUser(editingUser);
+  if (!editingUser) return;
+  const token = localStorage.getItem("auth_token");
+  fetch(`/users/${editingUser}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+    body: JSON.stringify({ activo: true })
+  })
+  .then(r => { if (r.ok) { loadUsers(); cancelUserForm(); } })
+  .catch(err => showFormMsg(err.message, "error"));
 }
 
 function cancelUserForm() {
@@ -6281,9 +6394,7 @@ async function loadAll() {
     fetchJson("/api/cache/stats"),
     fetchJson("/api/cache/responses?limit=250"),
     fetchJson("/api/conversations?limit=500"),
-    fetchJson("/api/conversations/tarifas?limit=500"),
-    fetchJson("/api/tarifas/stats"),
-    fetchJson("/api/tarifas/rates?limit=5000")
+    fetchJson("/api/conversations/tarifas?limit=500")
   ]);
 
   const map = (index, key, errKey) => {
@@ -6304,9 +6415,6 @@ async function loadAll() {
   map(5, "responseCachePayload", "responseCacheError");
   map(6, "conversationsPayload", "conversationsError");
   map(7, "tariffConversationsPayload", "tariffConversationsError");
-  map(8, "tariffsStatsPayload", "tariffsError");
-  if (requests[9].status === "fulfilled") state.tariffsRatesPayload = requests[9].value;
-  else state.tariffsRatesPayload = null;
 
   updateTopStrip();
   updateHero();
@@ -7354,6 +7462,7 @@ if (document.readyState === "loading") {
     document.body.appendChild(toast);
     setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.3s'; setTimeout(() => toast.remove(), 320); }, 3200);
   }
-  </script>
+
+</script>
 </body>
 </html>
