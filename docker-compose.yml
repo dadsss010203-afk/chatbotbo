@@ -147,6 +147,9 @@ services:
       # En Docker: usa el nombre del servicio o container_name de chatbotbo
       # Si esta en otro puerto/host, cambia esta URL
       - TARIFF_API_URL=http://chatbotbo_app:5000
+      - POSTAR_API_URL=https://postar.correos.gob.bo:8104/api/calcular
+      - POSTAR_API_TIMEOUT=20
+      - POSTAR_API_VERIFY_SSL=false
     command: sh -c "uvicorn main:app --host 0.0.0.0 --port 5000 --workers $${UVICORN_WORKERS:-1}"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/api/status || exit 1"]

@@ -1530,19 +1530,16 @@ async def chat(request: Request):
             skip_general_log=True,
         )
 
-    # ── Tarifa mode → proxy a API externa
+    # ── Tarifa mode → arbol deterministico
     if tarifa_mode:
-        tariff_payload = _proxy_tariff_request("chat", {
-            "message": pregunta,
-            "lang": lang,
-            "sid": sid,
-            "tarifa_mode": True,
-        })
-        tariff_payload["lang"] = lang
-        return _finalizar_chat_response(
-            sid=sid, request_id=request_id, pregunta=pregunta,
-            payload=tariff_payload, started_at=started_at, skip_general_log=True,
-        )
+        flow = _get_tarifa_flow(sid)
+        result = _handle_tarifa_step(flow, pregunta, lang)
+        response = result.get("response", "")
+        quick_replies = result.get("quick_replies", [])
+        session.agregar_turno(sid, pregunta, response or "Procesando...")
+        return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
+            "response": response, "lang": lang, "quick_replies": quick_replies,
+        }, started_at=started_at)
 
     # ── Consulta de tarifas 100% determinista (sin LLM)
     # tarifa_req removed (external API)
@@ -1955,16 +1952,14 @@ async def chat_stream(request: Request):
                 yield line
             return
 
-        # ── Tarifa mode → proxy a API externa (stream)
+        # ── Tarifa mode → arbol deterministico (stream)
         if tarifa_mode:
-            tariff_payload = _proxy_tariff_request("chat", {
-                "message": pregunta_actual,
-                "lang": lang,
-                "sid": sid,
-                "tarifa_mode": True,
-            })
-            tariff_payload["lang"] = lang
-            async for line in instant_end(tariff_payload, skip_general_log=True):
+            flow = _get_tarifa_flow(sid)
+            result = _handle_tarifa_step(flow, pregunta_actual, lang)
+            response = result.get("response", "")
+            qr = result.get("quick_replies", [])
+            session.agregar_turno(sid, pregunta_actual, response or "...")
+            async for line in instant_end({"response": response, "lang": lang, "quick_replies": qr}):
                 yield line
             return
 
@@ -2834,86 +2829,165 @@ def actualizar():
 
 
 # ─────────────────────────────────────────────
-#  PROXY DE TARIFAS → API EXTERNA (chatbotbo)
+#  TARIFAS VIA POSTAR API — ARBOL DETERMINISTICO
 # ─────────────────────────────────────────────
 
-TARIFF_API_URL = os.environ.get("TARIFF_API_URL", "http://localhost:5001")
+from chatbots.general.services.postar_api import (
+    POSTAR_API_URL, POSTAR_API_TIMEOUT,
+    quick_replies_scope, quick_replies_services, quick_replies_destino_grupos,
+    quick_replies_destino_zona,
+    find_category_by_label, find_destination_by_label, find_zona_by_label,
+    parse_peso, calcular, estado_requiere,
+    get_category_label, get_destination_label,
+)
 
-# Circuit breaker para el proxy de tarifas
-_tariff_failures = 0
-_tariff_open_until = 0.0
-TARIFF_CB_THRESHOLD = 3
-TARIFF_CB_TIMEOUT = 30
+_tarifa_flows: dict[str, dict] = {}
 
 
-def _proxy_tariff_request(endpoint: str, data: dict | None = None) -> dict:
-    """Reenvia peticion de tarifa a la API externa con circuit breaker."""
-    global _tariff_failures, _tariff_open_until
+def _weight_examples() -> list[dict]:
+    """Botones de peso rapido para el usuario."""
+    return [
+        {"value": "500g", "label": "500g"},
+        {"value": "1kg", "label": "1 kg"},
+        {"value": "2kg", "label": "2 kg"},
+        {"value": "5kg", "label": "5 kg"},
+    ]
 
-    # Circuit breaker abierto?
-    now = __import__("time").time()
-    if _tariff_failures >= TARIFF_CB_THRESHOLD and now < _tariff_open_until:
-        raise HTTPException(status_code=503,
-                            detail="API de tarifas temporalmente no disponible. Intenta en unos segundos.")
 
-    import requests as _requests
-    url = f"{TARIFF_API_URL.rstrip('/')}/api/{endpoint.lstrip('/')}"
-    try:
-        resp = _requests.post(url, json=data or {}, timeout=8)
-        resp.raise_for_status()
-        _tariff_failures = 0  # reset al exito
-        return resp.json()
-    except _requests.exceptions.Timeout:
-        _tariff_failures += 1
-        if _tariff_failures >= TARIFF_CB_THRESHOLD:
-            _tariff_open_until = now + TARIFF_CB_TIMEOUT
-        raise HTTPException(status_code=504, detail="La API de tarifas no responde a tiempo.")
-    except _requests.exceptions.ConnectionError:
-        _tariff_failures += 1
-        if _tariff_failures >= TARIFF_CB_THRESHOLD:
-            _tariff_open_until = now + TARIFF_CB_TIMEOUT
-        raise HTTPException(status_code=502, detail="No se puede conectar a la API de tarifas.")
-    except _requests.exceptions.HTTPError as e:
-        _tariff_failures += 1
-        if _tariff_failures >= TARIFF_CB_THRESHOLD:
-            _tariff_open_until = now + TARIFF_CB_TIMEOUT
-        try:
-            return e.response.json()
-        except Exception:
-            raise HTTPException(status_code=e.response.status_code if e.response else 502,
-                                detail=f"Error en API de tarifas: {e}")
+def _get_tarifa_flow(sid: str) -> dict:
+    if sid not in _tarifa_flows:
+        _tarifa_flows[sid] = {"scope": None, "service": None, "destination": None, "weight": None}
+    return _tarifa_flows[sid]
+
+
+def _handle_tarifa_step(flow: dict, msg: str, lang: str) -> dict:
+    """
+    Arbol deterministico puro. Sin IA, sin ambiguedad.
+    Retorna dict con: response, quick_replies, tarifa_calculated (opcional)
+    """
+    msg_lower = msg.lower().strip()
+    faltante = estado_requiere(flow)
+
+    # ── NIVEL 1: ALCANCE ────────────────────────────────────────────
+    if faltante == "scope":
+        scope = "nacional" if "nacional" in msg_lower or "🇧🇴" in msg else \
+                "internacional" if "internacional" in msg_lower or "🌎" in msg else None
+        if not scope:
+            return {"response": "El envio es nacional o internacional?", "quick_replies": quick_replies_scope()}
+        flow["scope"] = scope
+        return {"response": "Que tipo de servicio quieres usar?", "quick_replies": quick_replies_services(scope)}
+
+    # ── NIVEL 2: SERVICIO ───────────────────────────────────────────
+    if faltante == "service":
+        cat = find_category_by_label(msg, flow["scope"])
+        if not cat:
+            return {"response": "No reconozco ese servicio. Elige uno:", "quick_replies": quick_replies_services(flow["scope"])}
+        flow["service"] = cat
+        if flow["scope"] == "nacional":
+            return {"response": "A que departamento o ciudad envias?", "quick_replies": quick_replies_destino_grupos("nacional", cat)}
+        else:
+            return {"response": "A que region del mundo envias?", "quick_replies": quick_replies_destino_grupos("internacional", cat)}
+
+    # ── NIVEL 3: DESTINO ────────────────────────────────────────────
+    if faltante == "destination":
+        service_val = flow.get("service")
+        # Internacional: primero zona, luego pais
+        if flow["scope"] == "internacional":
+            zona = find_zona_by_label(msg)
+            if zona:
+                flow["_zona"] = zona
+                return {"response": "Selecciona el pais de destino:", "quick_replies": quick_replies_destino_zona(msg, service_val)}
+            # Intentar pais directo
+            dest = find_destination_by_label(msg, "internacional")
+            if dest:
+                flow["destination"] = dest
+                return {"response": "Cual es el peso del envio? (ej: 500g, 1kg, 2kg, 5kg)", "quick_replies": _weight_examples()}
+            return {"response": "No pude identificar el destino. Selecciona la region:", "quick_replies": quick_replies_destino_grupos("internacional", service_val)}
+        else:
+            dest = find_destination_by_label(msg, flow["scope"])
+            if dest:
+                flow["destination"] = dest
+                return {"response": "Cual es el peso del envio? (ej: 500g, 1kg, 2kg, 5kg)", "quick_replies": _weight_examples()}
+            return {"response": "Selecciona el destino:", "quick_replies": quick_replies_destino_grupos("nacional", service_val)}
+
+    # ── NIVEL 4: PESO → CALCULAR ────────────────────────────────────
+    if faltante == "weight":
+        peso = parse_peso(msg)
+        if peso is None or peso <= 0:
+            return {"response": "Escribe el peso en gramos o kilos (ej: 500g, 1kg, 2kg):", "quick_replies": _weight_examples()}
+        flow["weight"] = peso
+        result = calcular(flow["service"], flow["destination"], peso)
+        _tarifa_flows.pop(list(_tarifa_flows.keys())[list(_tarifa_flows.values()).index(flow)] if flow in _tarifa_flows.values() else "", None)
+        # Cleanup via sid lookup
+        for k, v in list(_tarifa_flows.items()):
+            if v is flow:
+                del _tarifa_flows[k]
+                break
+        if result["ok"]:
+            # Obtener labels descriptivos (formato igual a proyecto chatbotbo)
+            serv_label = get_category_label(flow["service"]) or flow["service"]
+            dest_label = get_destination_label(flow["destination"]) or flow["destination"]
+            precio = result["tarifa"]
+            try:
+                precio_int = int(precio) if float(precio).is_integer() else round(float(precio), 2)
+            except (ValueError, TypeError):
+                precio_int = precio
+            return {
+                "response": (
+                    f"{serv_label}\n"
+                    f"Precio final: {precio_int} Bs\n"
+                    f"Categoría: {flow['service']}\n"
+                    f"Destino: {dest_label}\n"
+                    f"Peso consultado: {peso} kg"
+                ),
+                "tarifa_calculated": True,
+            }
+        elif result.get("error") == "peso_fuera_rango":
+            return {"response": "El peso esta fuera del rango permitido para este servicio. Intenta con otro peso.", "quick_replies": _weight_examples()}
+        return {"response": "No se pudo calcular la tarifa. Intenta de nuevo.", "quick_replies": _weight_examples()}
+
+    return {"response": "Error en el flujo de tarifas. Reinicia con el boton Tarifas."}
 
 
 @router.post("/tarifa/start")
-async def tarifa_start_proxy(request: Request):
-    """Proxy: inicia flujo de tarifas en la API externa."""
+async def tarifa_start(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
-    data["sid"] = sid
-    return _proxy_tariff_request("tarifa/start", data)
+    lang = (data or {}).get("lang", "es")
+    _tarifa_flows[sid] = {"scope": None, "service": None, "destination": None, "weight": None}
+    return {"response": "El envio es nacional o internacional?", "lang": lang, "quick_replies": quick_replies_scope(), "sid": sid}
 
 
 @router.post("/tarifa/cancel")
-async def tarifa_cancel_proxy(request: Request):
-    """Proxy: cancela flujo de tarifas en la API externa."""
+async def tarifa_cancel(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
-    data["sid"] = sid
-    return _proxy_tariff_request("tarifa/cancel", data)
+    _tarifa_flows.pop(sid, None)
+    return {"ok": True, "sid": sid}
 
 
-@router.post("/tarifa")
-async def tarifa_calculate_proxy(request: Request):
-    """Proxy: calcula tarifa directamente via API externa."""
+@router.post("/tarifa/chat")
+async def tarifa_chat(request: Request):
     data = await request.json()
-    return _proxy_tariff_request("tarifa", data)
+    sid = _resolve_sid_from_request(request, data)
+    lang = data.get("lang", "es")
+    msg = (data.get("message") or "").strip()
+    flow = _get_tarifa_flow(sid)
+    result = _handle_tarifa_step(flow, msg, lang)
+    result["lang"] = lang
+    result["sid"] = sid
+    return result
 
 
 @router.post("/tarifas/calculate")
-async def tarifas_calculate_proxy(request: Request):
-    """Proxy: calcula tarifa via API externa (endpoint alternativo)."""
+async def tarifas_calculate_direct(request: Request):
     data = await request.json()
-    return _proxy_tariff_request("tarifas/calculate", data)
+    categoria = data.get("categoria", "")
+    destino = data.get("destino", "")
+    peso = data.get("peso")
+    if not categoria or not destino or peso is None:
+        raise HTTPException(status_code=400, detail="Faltan categoria, destino o peso")
+    return calcular(categoria, destino, float(peso))
 
 
 # ─────────────────────────────────────────────
