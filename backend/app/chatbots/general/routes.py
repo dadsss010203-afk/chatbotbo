@@ -2044,7 +2044,12 @@ async def chat_stream(request: Request):
             response = result.get("response", "")
             qr = result.get("quick_replies", [])
             session.agregar_turno(sid, pregunta_actual, response or "...")
-            async for line in instant_end({"response": response, "lang": lang, "quick_replies": qr}):
+            payload = {"response": response, "lang": lang, "quick_replies": qr}
+            if "tarifa_card" in result:
+                payload["tarifa_card"] = result["tarifa_card"]
+            if result.get("tarifa_calculated"):
+                payload["tarifa_calculated"] = True
+            async for line in instant_end(payload):
                 yield line
             return
 
@@ -3060,6 +3065,16 @@ def _handle_tarifa_step(flow: dict, msg: str, lang: str) -> dict:
                 precio_int = int(precio) if float(precio).is_integer() else round(float(precio), 2)
             except (ValueError, TypeError):
                 precio_int = precio
+            
+            tarifa_card = {
+                "tipo": "tarifa",
+                "precio": str(precio_int),
+                "servicio": serv_label,
+                "scope": flow["scope"],
+                "peso_g": str(int(peso * 1000)) if isinstance(peso, (int, float)) else str(peso),
+                "destino": dest_label,
+            }
+            
             return {
                 "response": (
                     f"{serv_label}\n"
@@ -3069,6 +3084,7 @@ def _handle_tarifa_step(flow: dict, msg: str, lang: str) -> dict:
                     f"Peso consultado: {peso} kg"
                 ),
                 "tarifa_calculated": True,
+                "tarifa_card": tarifa_card,
             }
         elif result.get("error") == "peso_fuera_rango":
             return {"response": "El peso esta fuera del rango permitido para este servicio. Intenta con otro peso.", "quick_replies": _weight_examples()}

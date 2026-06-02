@@ -1,4 +1,4 @@
-FROM llama3.2:1b
+FROM qwen2.5:1.5b
 parameter temperature 0.1
 parameter num_predict 600
 parameter num_ctx 8192

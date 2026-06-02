@@ -590,30 +590,37 @@ function addTarifaCard(card) {
   }[card.scope] || (card.scope || 'Servicio Postal');
 
   const cardEl = document.createElement('div');
-  cardEl.className = 'scard no-translate';
+  cardEl.className = 'no-translate';
   cardEl.innerHTML = `
-    <div class="sc-head" style="background:linear-gradient(135deg,#163A80,#2255B8)">
-      <div class="sc-ico">
-        <svg viewBox="0 0 24 24"><path d="M12 2v20M6 7c0-1.7 2.7-3 6-3s6 1.3 6 3-2.7 3-6 3-6 1.3-6 3 2.7 3 6 3 6 1.3 6 3"/></svg>
+    <div class="tarifa-premium-card">
+      <div class="tp-head">
+        <div class="tp-icon-wrapper">
+          <svg viewBox="0 0 24 24"><path d="M12 2v20M6 7c0-1.7 2.7-3 6-3s6 1.3 6 3-2.7 3-6 3-6 1.3-6 3 2.7 3 6 3 6 1.3 6 3"/></svg>
+        </div>
+        <div class="tp-title">
+          <span class="tp-badge">${scopeLabel}</span>
+          <h4>Costo Estimado</h4>
+        </div>
       </div>
-      <div class="sc-htxt">
-        <strong>Tarifa calculada</strong>
-        <span>${scopeLabel}</span>
+      <div class="tp-body">
+        <div class="tp-price-row">
+          <span class="tp-currency">Bs.</span>
+          <span class="tp-amount">${card.precio}</span>
+        </div>
+        <div class="tp-details">
+          ${card.destino ? `<div class="tp-detail-item"><div class="tp-dot"></div><span><strong>Destino:</strong> ${card.destino}</span></div>` : ''}
+          ${card.servicio ? `<div class="tp-detail-item"><div class="tp-dot"></div><span><strong>Servicio:</strong> ${card.servicio}</span></div>` : ''}
+          ${card.peso_g ? `<div class="tp-detail-item"><div class="tp-dot"></div><span><strong>Peso:</strong> ${card.peso_g} g</span></div>` : ''}
+          ${(card.rango_min && card.rango_max) ? `<div class="tp-detail-item"><div class="tp-dot"></div><span><strong>Rango:</strong> ${card.rango_min}–${card.rango_max} g</span></div>` : ''}
+        </div>
+      </div>
+      <div class="tp-footer">
+        <a href="https://correos.gob.bo" target="_blank" class="tp-cta-btn">
+          Continuar con el envío
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
       </div>
     </div>
-    <div class="sc-body">
-      <div class="sc-row">
-        <svg viewBox="0 0 24 24"><path d="M12 2v20M6 7c0-1.7 2.7-3 6-3s6 1.3 6 3-2.7 3-6 3-6 1.3-6 3 2.7 3 6 3 6 1.3 6 3"/></svg>
-        <span><strong style="font-size:1.1rem;color:var(--y700)">${card.precio} Bs</strong></span>
-      </div>
-      ${card.servicio ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg><span>Servicio: ${card.servicio}</span></div>` : ''}
-      ${card.peso_g ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 1 5 5H7a5 5 0 0 1 5-5zM3 9h18l-2 13H5L3 9z"/></svg><span>Peso: ${card.peso_g} g</span></div>` : ''}
-      ${card.rango_min && card.rango_max ? `<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" fill="none"/><path d="M8 12h8M12 8v8"/></svg><span>Rango: ${card.rango_min}–${card.rango_max} g</span></div>` : ''}
-    </div>
-    <a class="sc-cta" href="https://correos.gob.bo" target="_blank" rel="noopener noreferrer">
-      <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-      Ver más en correos.gob.bo
-    </a>
   `;
 
   wrap.appendChild(mkAv('b'));
@@ -1298,7 +1305,7 @@ async function sendMsg(msg) {
             );
           }
 
-          if (data?.tarifa?.requires_mode) {
+          if (data?.tarifa?.requires_mode || data?.tarifa_calculated) {
             tarifaMode = false;
             setTarifaModeUI();
           }
@@ -1309,6 +1316,10 @@ async function sendMsg(msg) {
           const trackingCode = data?.tracking?.codigo || data?.tracking_code || data?.codigo || data?.tracking?.code || null;
           if (data?.tracking?.found) {
             addTrackingCard(data.tracking);
+          }
+          if (data?.tracking && data.tracking.pending === false) {
+            trackingMode = false;
+            setTrackingModeUI();
           }
           // QR eliminado — el botón de la tarjeta lleva directo al link
           addQuickReplies((Array.isArray(data.quick_replies) && data.quick_replies.length > 0) ? data.quick_replies : quickRepliesFromTarifa(data));

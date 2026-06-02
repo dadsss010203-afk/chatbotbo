@@ -1582,3 +1582,163 @@ header::after {
   background: #fce8e6;
   border-color: #ea4335;
 }
+
+/* ─── Premium Tarifa Card ──────────────────────── */
+@keyframes slideUpFade {
+  0% { opacity: 0; transform: translateY(20px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.tarifa-premium-card {
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(22, 58, 128, 0.1);
+  border: 1px solid rgba(22, 58, 128, 0.05);
+  margin-top: 8px;
+  animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  font-family: 'DM Sans', sans-serif;
+  width: 100%;
+}
+
+.tp-head {
+  background: linear-gradient(135deg, #0b1f4e, #163A80);
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: white;
+}
+
+.tp-icon-wrapper {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  padding: 10px;
+  border-radius: 12px;
+  display: flex;
+}
+
+.tp-icon-wrapper svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
+}
+
+.tp-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.tp-badge {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: #FFC145;
+  color: #1A0E00;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  align-self: flex-start;
+  margin-bottom: 4px;
+}
+
+.tp-title h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.tp-body {
+  padding: 20px 16px;
+  background: #f8fafc;
+}
+
+.tp-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: #0b1f4e;
+}
+
+.tp-currency {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-right: 4px;
+  color: #64748b;
+}
+
+.tp-amount {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+.tp-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.tp-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: #334155;
+  word-break: break-word;
+}
+
+.tp-dot {
+  width: 6px;
+  height: 6px;
+  background: #163A80;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tp-footer {
+  padding: 0 16px 16px 16px;
+  background: #f8fafc;
+}
+
+.tp-cta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  background: #163A80;
+  color: white !important;
+  text-decoration: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.tp-cta-btn:hover {
+  background: #0b1f4e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(11, 31, 78, 0.2);
+}
+
+.tp-cta-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
+  transition: transform 0.2s;
+}
+
+.tp-cta-btn:hover svg {
+  transform: translateX(4px);
+}

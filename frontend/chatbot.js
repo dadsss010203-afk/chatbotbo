@@ -982,6 +982,7 @@ function addTarifaCard(card){
         <svg viewBox="0 0 24 24"><path d="M12 2v20M6 7c0-1.7 2.7-3 6-3s6 1.3 6 3-2.7 3-6 3-6 1.3-6 3 2.7 3 6 3 6 1.3 6 3"/></svg>
         <span><strong style="font-size:1.1rem;color:var(--y700)">${card.precio} Bs</strong></span>
       </div>
+      ${card.destino?`<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg><span>Destino: ${card.destino}</span></div>`:''}
       ${card.servicio?`<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg><span>Servicio: ${card.servicio}</span></div>`:''}
       ${card.peso_g?`<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M12 2a5 5 0 0 1 5 5H7a5 5 0 0 1 5-5zM3 9h18l-2 13H5L3 9z"/></svg><span>Peso: ${card.peso_g} g</span></div>`:''}
       ${card.rango_min&&card.rango_max?`<div class="sc-row"><svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" fill="none"/><path d="M8 12h8M12 8v8"/></svg><span>Rango: ${card.rango_min}–${card.rango_max} g</span></div>`:''}
@@ -1229,8 +1230,8 @@ async function sendMsg(msg){
             );
           }
 
-          if(data?.tarifa?.requires_mode){
-            tarifaMode=false;
+          if (data?.tarifa?.requires_mode || data?.tarifa_calculated) {
+            tarifaMode = false;
             setTarifaModeUI();
           }
           // Mostrar tarjeta visual de tarifa si el backend la devuelve
@@ -1238,8 +1239,12 @@ async function sendMsg(msg){
             addTarifaCard(data.tarifa_card);
           }
           // Si hay tracking con URL, mostrar QR
-          if(data?.tracking?.found){
+          if (data?.tracking?.found) {
             addTrackingCard(data.tracking);
+          }
+          if (data?.tracking && data.tracking.pending === false) {
+            trackingMode = false;
+            setTrackingModeUI();
           }
           // QR eliminado — el botón de la tarjeta lleva directo al link
           // Si es lista de sucursales, mostrar diseño mejorado
