@@ -23,6 +23,7 @@ backend/app/data/pdfs_descargados/
 ollama_data/
 chroma_data/
 
+chatbotbo_bak
 .idea/
 .vscode/
 
