@@ -1189,6 +1189,90 @@ def _programar_reindex_debounced(origen: str, mode: str = "full") -> bool:
 #  REINDEXADO
 # ─────────────────────────────────────────────
 
+def _json_a_texto_natural(payload: dict, filename: str) -> str:
+    """Convierte un JSON a texto natural para que el LLM entienda mejor.
+    Cada tipo de archivo tiene su formato optimizado."""
+    name = filename.replace(".json", "")
+
+    # ── institucion.json ──
+    if "institucion" in name and isinstance(payload.get("institucion"), dict):
+        inst = payload["institucion"]
+        contacto = payload.get("contacto", {})
+        horario = payload.get("horario", {})
+        servicios = payload.get("servicios", [])
+        enlaces = payload.get("enlaces", [])
+        resp = payload.get("respuestas_fijas", {})
+        tracking = payload.get("tracking", {})
+
+        parts = []
+        parts.append(f"Correos de Bolivia es la institucion postal nacional. "
+                     f"Antes se llamaba {inst.get('nombre_anterior','AGBC')}. "
+                     f"Fue creada en {inst.get('anio_creacion',2018)} mediante decreto {inst.get('decreto_creacion','3495')}. "
+                     f"En {inst.get('anio_nombre_actual',2026)} adopto su nombre actual.")
+
+        parts.append(f"Contacto: telefono {contacto.get('telefono','+591 22152423')}, "
+                     f"email {contacto.get('email','agbc@correos.gob.bo')}, "
+                     f"web {contacto.get('web_url','https://correos.gob.bo')}")
+
+        parts.append(f"Horario de atencion: {horario.get('semana','')}. "
+                     f"Sabados: {horario.get('sabado','')}. Domingos cerrado.")
+
+        parts.append(f"Para rastrear envios usa el codigo de tracking en {tracking.get('url','https://trackingbo.correos.gob.bo:8100')}. "
+                     f"Ejemplo de codigo: {tracking.get('ejemplo_codigo','')}.")
+
+        if servicios:
+            svc_lines = ["Servicios disponibles:"]
+            for s in servicios:
+                svc_lines.append(f"- {s.get('nombre','')}: {s.get('descripcion','')}")
+            parts.append("\n".join(svc_lines))
+
+        if enlaces:
+            lnk_lines = ["Enlaces utiles de Correos Bolivia:"]
+            for e in enlaces:
+                lnk_lines.append(f"- {e.get('nombre','')}: {e.get('url','')}")
+            parts.append("\n".join(lnk_lines))
+
+        return "\n\n".join(parts)
+
+    # ── enlaces_interes.json ──
+    if "enlaces" in name:
+        parts = ["Enlaces de interes de Correos Bolivia:"]
+        items = payload if isinstance(payload, list) else payload.get("enlaces", [])
+        for e in items:
+            parts.append(f"- {e.get('nombre','')}: {e.get('url','')}. {e.get('descripcion','')}")
+        return "\n".join(parts)
+
+    # ── contacto_institucional.json ──
+    if "contacto" in name:
+        parts = ["Informacion de contacto institucional de Correos Bolivia:"]
+        if isinstance(payload, dict):
+            for k, v in payload.items():
+                if isinstance(v, str):
+                    parts.append(f"{k}: {v}")
+                elif isinstance(v, list):
+                    parts.append(f"{k}: {', '.join(str(x) for x in v)}")
+        return "\n".join(parts)
+
+    # ── Generico: convertir dict a texto narrativo ──
+    if isinstance(payload, dict):
+        lines = []
+        for k, v in payload.items():
+            if k.startswith("_"):
+                continue
+            if isinstance(v, list):
+                items = [str(x) for x in v[:20]]
+                lines.append(f"{k}: {', '.join(items)}")
+            elif isinstance(v, dict):
+                lines.append(f"{k}:")
+                for sk, sv in v.items():
+                    lines.append(f"  {sk}: {sv}")
+            elif isinstance(v, str) and len(v) > 10:
+                lines.append(f"{k}: {v}")
+        return "\n".join(lines) if lines else json.dumps(payload, ensure_ascii=False)
+
+    return str(payload)
+
+
 def reindexar() -> bool:
     """Indexa en Qdrant los datos de data/ (JSONs, PDFs, texto web).
 
@@ -1275,6 +1359,7 @@ def reindexar() -> bool:
         "skills.json",
         "estadisticas.json",
         "correos_bolivia.json",  # Ya se indexa como web_main
+        "aplicativos_detalle.json",  # Datos de apps internas, no relevantes para usuarios
     }
     managed_items = capabilities.listar_data_jsons()
     for item in managed_items:
@@ -1295,7 +1380,7 @@ def reindexar() -> bool:
             json_skill_id = ""
             if isinstance(payload, dict):
                 json_skill_id = str(payload.get("_skill_id", "")).strip()
-            serialized = json.dumps(payload, ensure_ascii=False, indent=2)
+            serialized = _json_a_texto_natural(payload, filename)
             jc, ji, jm = rag.documento_a_chunks(
                 serialized,
                 prefijo=f"json_{filename.replace('.json', '')}",
@@ -2452,7 +2537,7 @@ def status():
     rag_info = {"chunks": _rag_chunks_seguro(), "vector_store": os.environ.get("RAG_VECTOR_STORE", "qdrant")}
     model_name = os.environ.get("LLM_MODEL", "correos-bot")
     # Detectar modelo base desde el Modelfile o variable
-    model_base = "qwen2.5:1.5b"  # default, se lee del Modelfile
+    model_base = "llama3.2:1b"  # default, se lee del Modelfile
     try:
         import re
         mf_path = os.path.join(os.path.dirname(__file__), "..", "core", "Modelfile")
@@ -2728,6 +2813,49 @@ async def actualizar_data_json(request: Request, nombre_archivo: str = Path(...,
         raise HTTPException(status_code=400, detail=f"JSON inválido: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error actualizando JSON: {e}")
+
+
+@router.get("/data-jsons/preview-text/{nombre_archivo:path}")
+def preview_texto_natural(nombre_archivo: str = Path(...)):
+    """Devuelve como se veria el JSON convertido a texto natural para el LLM."""
+    try:
+        item = capabilities.obtener_data_json(nombre_archivo)
+        content = item.get("content")
+        if not content:
+            raise HTTPException(status_code=400, detail="Archivo vacio")
+        texto = _json_a_texto_natural(content, os.path.basename(nombre_archivo))
+        return {"texto": texto, "chars": len(texto), "archivo": nombre_archivo}
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando preview: {e}")
+
+
+@router.post("/sin-respuesta/agregar-fija")
+async def agregar_respuesta_fija(request: Request):
+    """Añade una respuesta fija a institucion.json desde una pregunta sin respuesta."""
+    data = await request.json()
+    pregunta = (data.get("pregunta") or "").strip()
+    respuesta = (data.get("respuesta") or "").strip()
+    if not pregunta or not respuesta:
+        raise HTTPException(status_code=400, detail="pregunta y respuesta requeridos")
+    
+    inst_path = os.path.join(os.path.dirname(DATA_FILE), "institucion.json")
+    if not os.path.exists(inst_path):
+        raise HTTPException(status_code=404, detail="institucion.json no encontrado")
+    
+    with open(inst_path, "r", encoding="utf-8") as f:
+        institucion = json.load(f)
+    
+    respuestas = institucion.setdefault("respuestas_fijas", {})
+    clave = pregunta.lower().replace(" ", "_")[:30]
+    respuestas[clave] = respuesta
+    
+    with open(inst_path, "w", encoding="utf-8") as f:
+        json.dump(institucion, f, ensure_ascii=False, indent=2)
+    
+    _programar_reindex_debounced("respuesta_fija_add", mode="full")
+    return {"ok": True, "clave": clave, "mensaje": "Respuesta fija añadida y reindexado programado"}
 
 
 @router.get("/scraping")

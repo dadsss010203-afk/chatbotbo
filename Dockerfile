@@ -4,14 +4,16 @@
 #  Las variables de entorno se configuran en docker-compose.yml
 #  Los valores aqui son solo fallback para desarrollo local sin compose.
 # ─────────────────────────────────────────────
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-# Dependencias del sistema
-RUN apt-get update --fix-missing && \
+# Usar HTTPS para repositorios Debian para evitar bloqueos HTTP 403
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || true; \
+    sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list 2>/dev/null || true; \
+    apt-get update --fix-missing && \
     apt-get install -y --no-install-recommends --fix-missing \
         build-essential \
         curl \

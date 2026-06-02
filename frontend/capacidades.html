@@ -6,6 +6,8 @@
   <title>Capacidades | ChatbotBO</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
   <style>
     :root{
       --primary: #3BA7FF; /* Vibrant Blue */
@@ -3940,6 +3942,20 @@
         border-radius: 14px !important;
       }
     }
+    .view-section { animation: fadeSlideIn .35s ease; }
+    @keyframes fadeSlideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+    .btn { transition: all .2s ease, transform .15s ease; }
+    .btn:active { transform: scale(.96); }
+    .btn-soft { background:#f0f4ff; border:1px solid rgba(59,167,255,.15); color:var(--primary); }
+    .btn-soft:hover { background:#e3edff; }
+    .mini-btn { transition: all .15s ease; }
+    .mini-btn:hover { filter: brightness(.92); transform: translateY(-1px); }
+    .detail-card { transition: box-shadow .2s ease, border-color .2s ease; }
+    .detail-card:hover { box-shadow: 0 4px 20px rgba(16,35,67,.08); border-color: rgba(59,167,255,.2); }
+    .modal-card { animation: modalIn .25s ease; }
+    @keyframes modalIn { from { opacity:0; transform:scale(.96) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+    .toast { animation: toastIn .3s ease; }
+    @keyframes toastIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
   </style>
 </head>
 <body>
@@ -4394,10 +4410,11 @@
                 <th>Idioma</th>
                 <th>Skill</th>
                 <th>Fecha</th>
+                <th>Accion</th>
               </tr>
             </thead>
             <tbody id="sin-respuesta-body">
-              <tr><td colspan="4" style="text-align:center;color:var(--muted)">Cargando...</td></tr>
+              <tr><td colspan="5" style="text-align:center;color:var(--muted)">Cargando...</td></tr>
             </tbody>
           </table>
           <div class="table-footer"><span id="sin-respuesta-count">0 preguntas</span></div>
@@ -4518,6 +4535,8 @@
   <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
   <script>
 const USERS_DB = {};  // Ya no se usa — los usuarios vienen del backend
 
@@ -5138,6 +5157,7 @@ function updateTopStrip() {
 function renderStats() {
   const cap = state.capabilities || {};
   const rag = cap.rag || {};
+  const runtime = cap.runtime || {};
   const ai = cap.ai_resources || {};
   const pdfs = state.pdfsPayload?.resumen || {};
   const vectorStore = ai.storage?.chroma_path?.exists ? "chroma (activo)" : "chroma";
@@ -6349,7 +6369,7 @@ async function loadSinRespuesta() {
   const count = document.getElementById("sin-respuesta-count");
   const summary = document.getElementById("sin-respuesta-summary");
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">Cargando...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">Cargando...</td></tr>';
   try {
     const data = await fetchJson("/api/sin-respuesta?limit=200");
     const items = Array.isArray(data.items) ? data.items : [];
@@ -6357,21 +6377,39 @@ async function loadSinRespuesta() {
       summary.innerHTML = `<div class="summary-pill">${items.length} preguntas sin respuesta registradas</div>`;
     }
     if (!items.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted)">No hay preguntas sin respuesta registradas.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted)">No hay preguntas sin respuesta registradas.</td></tr>';
       if (count) count.textContent = "0 preguntas";
       return;
     }
     tbody.innerHTML = items.map(item => `
       <tr>
-        <td style="max-width:400px;word-break:break-word">${escapeHtml(item.pregunta || "—")}</td>
+        <td style="max-width:350px;word-break:break-word">${escapeHtml(item.pregunta || "—")}</td>
         <td>${escapeHtml(item.lang || "—")}</td>
         <td>${escapeHtml(item.skill_id || "—")}</td>
         <td style="white-space:nowrap">${escapeHtml(item.ts || "—")}</td>
+        <td>
+          <button class="mini-btn mini-run" onclick="agregarRespuestaFija('${escapeHtml(item.pregunta || '').replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Añadir como respuesta fija">+ Añadir</button>
+        </td>
       </tr>
     `).join("");
     if (count) count.textContent = `${items.length} preguntas`;
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="4" style="color:#b44231">Error cargando datos: ${escapeHtml(e.message || String(e))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="color:#b44231">Error cargando datos: ${escapeHtml(e.message || String(e))}</td></tr>`;
+  }
+}
+
+async function agregarRespuestaFija(pregunta) {
+  const resp = prompt("Escribe la respuesta para: " + pregunta.substring(0, 60) + "...");
+  if (!resp || !resp.trim()) return;
+  try {
+    await fetchJson("/api/sin-respuesta/agregar-fija", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({pregunta, respuesta: resp.trim()})
+    });
+    showToast("Respuesta añadida a institucion.json. Rebuild programado.");
+  } catch (e) {
+    showToast("Error: " + (e.message || "No se pudo guardar"));
   }
 }
 
@@ -6659,16 +6697,14 @@ async function previewDataJson(name) {
 async function editDataJson(name) {
   // Archivos que se pueden editar desde el panel
 const EDITABLES = [
+    "institucion.json",
     "contacto_institucional.json",
-    "aplicativos_detalle.json",
     "enlaces_interes.json",
     "estadisticas.json",
     "historia_institucional.json",
     "correos_bolivia.json",
     "sucursales_contacto.json",
     "secciones_home.json",
-    "secciones_home.json",
-    "sucursales_contacto.json",
   ];
   if (!EDITABLES.includes(name)) {
     demoNotice(`La edición de "${name}" no está habilitada desde el panel. Edita el archivo directamente en data/.`);
@@ -6701,50 +6737,103 @@ const prettyContent = item?.content_pretty || JSON.stringify(item?.content ?? {}
 
   openModal("detail", {
     title: `Editar: ${name}`,
-    subtitle: "Edita el JSON y guarda. Los cambios se aplican de inmediato sin reiniciar.",
+    subtitle: "Edita el JSON. CodeMirror con resaltado de sintaxis. Cambios se aplican con rebuild automatico.",
+    wide: true,
     html: `
-      <div style="margin-bottom:10px;padding:10px 12px;background:#f8f9fa;border-radius:10px;border:1px solid #e0e0e0">
-        <label style="font-weight:600;font-size:0.82rem;display:block;margin-bottom:4px">
+      <div style="margin-bottom:10px;padding:10px 12px;background:#f8f9fa;border-radius:10px;border:1px solid #e0e0e0;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <label style="font-weight:600;font-size:0.82rem">
           Vincular a Skill <span style="color:#999;font-weight:400;font-size:0.7rem">(opcional)</span>
         </label>
-        <select id="json-edit-skill-id" style="width:100%;padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:0.82rem">
+        <select id="json-edit-skill-id" style="padding:6px 10px;border-radius:6px;border:1px solid #ccc;font-size:0.82rem;flex:1;min-width:200px">
           <option value="">— Sin vincular (general) —</option>
           ${skillOptions}
         </select>
-        <small style="color:#888;font-size:0.7rem;display:block;margin-top:3px">
-          💡 Vincular mejora la precision cuando el usuario pregunta sobre este tema
-        </small>
+        <button class="btn btn-soft" type="button" onclick="previewTextoNatural('${escapeHtml(name)}')" style="flex-shrink:0" title="Ver como texto natural para el LLM">
+          👁️ Preview LLM
+        </button>
       </div>
-      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="btn btn-primary" type="button" onclick="saveDataJson('${escapeHtml(name)}','${editorId}','${msgId}')">
-          Guardar cambios
+          💾 Guardar cambios
         </button>
         <button class="btn btn-secondary" type="button" onclick="formatDataJsonEditor('${editorId}','${msgId}')">
-          Formatear JSON
+          🔧 Formatear
         </button>
-        <span id="${msgId}" style="font-size:0.85rem;"></span>
+        <button class="btn btn-soft" type="button" onclick="validarDataJson('${editorId}','${msgId}')">
+          ✅ Validar JSON
+        </button>
+        <span id="${msgId}" style="font-size:0.85rem;margin-left:auto"></span>
       </div>
-      <textarea
-        id="${editorId}"
-        spellcheck="false"
-        style="width:100%;min-height:420px;font-family:monospace;font-size:0.82rem;
-               padding:10px;border:1px solid #ccc;border-radius:6px;resize:vertical;
-               background:#1e1e2e;color:#cdd6f4;line-height:1.5;"
-      >${escapeHtml(prettyContent)}</textarea>
+      <textarea id="${editorId}" style="display:none">${escapeHtml(prettyContent)}</textarea>
+      <div id="${editorId}-cm" style="border:1px solid #444;border-radius:8px;overflow:hidden"></div>
     `
   });
+
+  // Inicializar CodeMirror despues de que el modal se renderice
+  setTimeout(() => {
+    const ta = document.getElementById(editorId);
+    const container = document.getElementById(editorId + '-cm');
+    if (!ta || !container || !window.CodeMirror) return;
+    const cm = window.CodeMirror(container, {
+      value: ta.value,
+      mode: {name: 'javascript', json: true},
+      theme: 'dracula',
+      lineNumbers: true,
+      indentUnit: 2,
+      tabSize: 2,
+      lineWrapping: true,
+      viewportMargin: Infinity,
+    });
+    cm.setSize(null, 420);
+    cm.on('changes', () => { ta.value = cm.getValue(); });
+    container._cm = cm;
+  }, 150);
 }
 
 function formatDataJsonEditor(editorId, msgId) {
   const ta  = document.getElementById(editorId);
+  const container = document.getElementById(editorId + '-cm');
+  const cm = container?._cm;
   const msg = document.getElementById(msgId);
-  if (!ta) return;
+  const value = cm ? cm.getValue() : (ta ? ta.value : '');
   try {
-    const parsed = JSON.parse(ta.value);
-    ta.value = JSON.stringify(parsed, null, 2);
-    if (msg) { msg.style.color = "#40a02b"; msg.textContent = "JSON formateado."; }
+    const parsed = JSON.parse(value);
+    const formatted = JSON.stringify(parsed, null, 2);
+    if (cm) cm.setValue(formatted);
+    else if (ta) ta.value = formatted;
+    if (msg) { msg.style.color = "#40a02b"; msg.textContent = "✓ JSON formateado"; }
   } catch (e) {
     if (msg) { msg.style.color = "#d20f39"; msg.textContent = `JSON inválido: ${e.message}`; }
+  }
+}
+
+function validarDataJson(editorId, msgId) {
+  const container = document.getElementById(editorId + '-cm');
+  const ta = document.getElementById(editorId);
+  const cm = container?._cm;
+  const msg = document.getElementById(msgId);
+  const value = cm ? cm.getValue() : (ta ? ta.value : '');
+  try {
+    JSON.parse(value);
+    if (msg) { msg.style.color = "#40a02b"; msg.textContent = "✓ JSON valido"; }
+    showToast("JSON valido");
+  } catch (e) {
+    if (msg) { msg.style.color = "#d20f39"; msg.textContent = `✗ ${e.message}`; }
+    showToast("JSON invalido: " + e.message);
+  }
+}
+
+async function previewTextoNatural(name) {
+  try {
+    const data = await fetchJson(`/api/data-jsons/preview-text/${encodeURIComponent(name)}`);
+    openModal("detail", {
+      title: `Preview: ${name} → Texto LLM`,
+      subtitle: `Asi es como el modelo ve este archivo (${data.chars} caracteres).`,
+      wide: true,
+      html: `<pre style="white-space:pre-wrap;font-family:system-ui;font-size:0.85rem;line-height:1.7;padding:16px;background:#f8f9fa;border-radius:10px;max-height:500px;overflow-y:auto">${escapeHtml(data.texto)}</pre>`
+    });
+  } catch (e) {
+    showToast("Error: " + (e.message || "No se pudo generar preview"));
   }
 }
 

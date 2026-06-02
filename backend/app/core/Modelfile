@@ -1,4 +1,4 @@
-FROM qwen2.5:1.5b
+FROM llama3.2:1b
 parameter temperature 0.1
 parameter num_predict 600
 parameter num_ctx 8192
@@ -6,10 +6,6 @@ parameter repeat_penalty 1.1
 parameter top_p 0.85
 parameter top_k 20
 parameter num_thread 0
-parameter stop "[PAD151920]"
-parameter stop "[PAD"
-parameter stop "<|im_start|>"
-parameter stop "<|im_end|>"
 
 system """
 /no_think

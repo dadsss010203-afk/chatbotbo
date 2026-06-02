@@ -6,7 +6,9 @@
     "nombre_anterior": "AGBC - Agencia Boliviana de Correos",
     "decreto_creacion": "3495",
     "anio_creacion": 2018,
-    "anio_nombre_actual": 2026
+    "anio_nombre_actual": 2026,
+    "mision": "Brindar servicios postales y de logistica accesibles, eficientes y de calidad para toda la poblacion boliviana.",
+    "vision": "Ser la empresa lider en servicios postales y logistica integral en Bolivia, reconocida por su innovacion y compromiso social."
   },
 
   "contacto": {
@@ -14,13 +16,19 @@
     "telefono_corto": "22152423",
     "email": "agbc@correos.gob.bo",
     "web": "correos.gob.bo",
-    "web_url": "https://correos.gob.bo"
+    "web_url": "https://correos.gob.bo",
+    "direccion_central": "Calle Ayacucho esq. Mercado, Edificio Central, La Paz, Bolivia",
+    "redes_sociales": {
+      "facebook": "https://www.facebook.com/CorreosdeBolivia",
+      "twitter": "https://twitter.com/CorreosBolivia"
+    }
   },
 
   "horario": {
     "semana": "Lunes a viernes 8:30 a 16:30",
     "sabado": "Sabados 9:00 a 13:00",
     "domingo": "Domingos cerrado",
+    "feriados": "Cerrado en feriados nacionales",
     "apertura_semana": "8:30",
     "cierre_semana": "16:30",
     "apertura_sabado": "9:00",
@@ -30,42 +38,159 @@
   "tracking": {
     "url": "https://trackingbo.correos.gob.bo:8100",
     "api_url": "https://trackingbo.correos.gob.bo:8100/api/public/tracking/eventos",
-    "ejemplo_codigo": "C0028A03441BO"
+    "ejemplo_codigo": "C0028A03441BO",
+    "descripcion": "El rastreo permite seguir el recorrido de tu envio en tiempo real. Solo necesitas el codigo de tracking que te dieron al enviar tu paquete. Los codigos de tracking tienen letras y numeros, por ejemplo C0028A03441BO."
   },
 
   "tarifas": {
-    "calculadora_url": "https://postar.correos.gob.bo"
+    "calculadora_url": "https://postar.correos.gob.bo",
+    "descripcion": "Para cotizar el costo de un envio necesitas saber: el tipo de servicio (EMS, Encomienda, etc.), el origen y destino, y el peso del paquete. Puedes usar la calculadora en linea o el modo Tarifas del chatbot."
   },
 
-  "enlaces": [
-    {"nombre": "TrackingBO - Rastreo",      "url": "https://trackingbo.correos.gob.bo:8100/"},
-    {"nombre": "SIRECO - Reclamos",         "url": "https://sireco.correos.gob.bo:8102/"},
-    {"nombre": "UNIENVIO - ECA",            "url": "https://unienvio.correos.gob.bo:8103/"},
-    {"nombre": "GESDO - Carteros",          "url": "https://gesdo.correos.gob.bo:8106/"},
-    {"nombre": "SIREN - Encomiendas",       "url": "https://siren.correos.gob.bo:8107/"},
-    {"nombre": "ULTRAPOST - EMS",           "url": "https://ultrapost.correos.gob.bo:8108/login"},
-    {"nombre": "Filatelia",                 "url": "https://correos.gob.bo/filatelia/"},
-    {"nombre": "Servicio Postal SP",        "url": "https://correos.gob.bo/sp/"},
-    {"nombre": "Encomienda Postal",         "url": "https://correos.gob.bo/servicio-encomienda-postal/"},
-    {"nombre": "ECA - Correspondencia",     "url": "https://correos.gob.bo/eca/"},
-    {"nombre": "EMS Internacional",         "url": "https://correos.gob.bo/ems/"}
+  "servicios": [
+    {
+      "nombre": "EMS (Servicio Expreso Postal)",
+      "descripcion": "Envio urgente de documentos y paquetes. Nacional: entrega en 24 a 48 horas. Internacional: entrega en 5 a 8 dias habiles. Peso maximo 20 kg. Incluye seguimiento en tiempo real y notificacion de entrega.",
+      "nacional": true,
+      "internacional": true,
+      "peso_maximo": "20 kg",
+      "cobertura": "Todo el territorio nacional y mas de 190 paises",
+      "requisitos": "Documento de identidad del remitente, declaracion de contenido",
+      "precio_referencia": "Desde 25 Bs (nacional, sobre hasta 500g). Consulta precio exacto en la calculadora."
+    },
+    {
+      "nombre": "Encomienda Postal (SEP)",
+      "descripcion": "Servicio de paqueteria internacional economico. Envios a 192 paises con entrega en 8 a 14 dias habiles. Peso maximo 20 kg. Incluye rastreo basico. Ideal para envios no urgentes.",
+      "nacional": false,
+      "internacional": true,
+      "peso_maximo": "20 kg",
+      "cobertura": "192 paises",
+      "requisitos": "Documento de identidad, formulario de aduana CN22 o CN23 segun valor declarado",
+      "precio_referencia": "Desde 45 Bs (documentos hasta 500g). Consulta precio exacto en la calculadora."
+    },
+    {
+      "nombre": "Correo Prioritario",
+      "descripcion": "Servicio de cartas y pequenos paquetes hasta 2 kg. Nacional: entrega en 24 a 48 horas. Internacional: 7 a 14 dias. Economico y confiable para correspondencia simple.",
+      "nacional": true,
+      "internacional": true,
+      "peso_maximo": "2 kg",
+      "cobertura": "Todo el territorio nacional y paises de la Union Postal Universal",
+      "requisitos": "Sobre o empaque adecuado. No requiere formularios especiales para documentos.",
+      "precio_referencia": "Desde 5 Bs (carta simple nacional). Consulta precio exacto."
+    },
+    {
+      "nombre": "Mi Encomienda",
+      "descripcion": "Paqueteria nacional economica para envios dentro de Bolivia. Entrega en 24 a 48 horas. Peso maximo 20 kg. Incluye rastreo y acuse de recibo. Ideal para envios entre ciudades.",
+      "nacional": true,
+      "internacional": false,
+      "peso_maximo": "20 kg",
+      "cobertura": "Todo el territorio nacional",
+      "requisitos": "Documento de identidad, empaque seguro",
+      "precio_referencia": "Desde 20 Bs (sobre hasta 500g). Consulta precio exacto en la calculadora."
+    },
+    {
+      "nombre": "ECA (Correspondencia Agrupada)",
+      "descripcion": "Envio masivo de correspondencia para empresas e instituciones. Minimo 40 envios por entrega. Entrega nacional en 24 a 72 horas. Ideal para facturas, estados de cuenta, notificaciones.",
+      "nacional": true,
+      "internacional": false,
+      "peso_maximo": "Variable segun contrato",
+      "cobertura": "Ciudades principales de Bolivia",
+      "requisitos": "Contrato corporativo, base de datos de destinatarios, formato estandarizado",
+      "precio_referencia": "Precio por convenio corporativo. Contactar para cotizacion."
+    },
+    {
+      "nombre": "Chasqui Express",
+      "descripcion": "Servicio de entrega a domicilio para empresas y emprendedores. Ideal para e-commerce y entregas locales. Rapido y con confirmacion de entrega.",
+      "nacional": true,
+      "internacional": false,
+      "peso_maximo": "Variable segun contrato",
+      "cobertura": "Ciudades principales con expansion progresiva",
+      "requisitos": "Registro como empresa o emprendedor, direccion de entrega verificada",
+      "precio_referencia": "Desde 15 Bs por entrega local. Contactar para contrato."
+    },
+    {
+      "nombre": "Casillas Postales",
+      "descripcion": "Alquiler de casillas postales para recepcion segura de correspondencia. Disponible en sucursales principales. Ideal para empresas y profesionales que reciben correspondencia frecuente.",
+      "nacional": true,
+      "internacional": false,
+      "cobertura": "Sucursales principales a nivel nacional",
+      "requisitos": "Documento de identidad, formulario de solicitud, pago de alquiler",
+      "precio_referencia": "Desde 200 Bs por ano. Consultar disponibilidad en tu sucursal."
+    },
+    {
+      "nombre": "Filatelia",
+      "descripcion": "Venta de sellos postales de coleccion. Correos Bolivia emite sellos conmemorativos de la cultura, historia y biodiversidad boliviana. Tambien organiza exposiciones filatelicas.",
+      "nacional": true,
+      "internacional": true,
+      "requisitos": "Compra directa en sucursales designadas o en linea",
+      "precio_referencia": "Variable segun emision y rareza del sello"
+    },
+    {
+      "nombre": "LC/AO (Cartas y Pequenos Paquetes)",
+      "descripcion": "Servicio internacional de cartas y aerogramas. Para correspondencia simple internacional. Tiempo de entrega variable segun destino (7 a 21 dias).",
+      "nacional": false,
+      "internacional": true,
+      "peso_maximo": "2 kg",
+      "cobertura": "Paises de la Union Postal Universal",
+      "requisitos": "Sobre o empaque adecuado, direccion completa del destinatario",
+      "precio_referencia": "Desde 10 Bs. Consulta precio exacto."
+    },
+    {
+      "nombre": "Sacas M",
+      "descripcion": "Servicio especializado para envio de sacas postales internacionales. Usado para envios masivos de correspondencia entre operadores postales.",
+      "nacional": false,
+      "internacional": true,
+      "peso_maximo": "30 kg por saca",
+      "cobertura": "Paises con convenio bilateral",
+      "requisitos": "Contrato con operador postal, documentacion aduanera",
+      "precio_referencia": "Segun convenio internacional. Contactar para cotizacion."
+    },
+    {
+      "nombre": "Pliegos Oficiales",
+      "descripcion": "Envio de documentacion oficial entre instituciones publicas. Servicio exclusivo para entidades gubernamentales.",
+      "nacional": true,
+      "internacional": true,
+      "requisitos": "Ser entidad publica registrada, sello oficial",
+      "precio_referencia": "Segun convenio interinstitucional."
+    },
+    {
+      "nombre": "Super Express",
+      "descripcion": "Servicio nacional ultra rapido para envios urgentes dentro de la misma ciudad. Entrega el mismo dia para documentacion critica.",
+      "nacional": true,
+      "internacional": false,
+      "peso_maximo": "5 kg",
+      "cobertura": "Ciudades principales (La Paz, Cochabamba, Santa Cruz)",
+      "requisitos": "Documento de identidad, entrega en sucursal designada",
+      "precio_referencia": "Desde 35 Bs. Consulta en sucursal."
+    }
   ],
 
-  "servicios": [
-    {"nombre": "EMS", "descripcion": "Envio urgente nacional (24-48 h) e internacional (5-8 dias), hasta 20 kg, seguimiento en tiempo real."},
-    {"nombre": "Encomienda Postal (SEP)", "descripcion": "Paquetes internacionales a 192 paises (8-14 dias), hasta 20 kg, con rastreo."},
-    {"nombre": "Correo Prioritario", "descripcion": "Cartas y paquetes hasta 2 kg, nacional 24-48 h, internacional 7-14 dias."},
-    {"nombre": "Mi Encomienda", "descripcion": "Paqueteria nacional economica (24-48 h), hasta 20 kg, con rastreo y acuse de recibo."},
-    {"nombre": "ECA (Correspondencia Agrupada)", "descripcion": "Envios masivos para empresas, minimo 40 envios, entrega nacional 24-72 h."},
-    {"nombre": "Chasqui Express", "descripcion": "Entrega a domicilio para empresas y emprendedores."},
-    {"nombre": "Casillas Postales", "descripcion": "Alquiler de casillas para recepcion segura, disponible en sucursales principales."},
-    {"nombre": "Filatelia", "descripcion": "Venta de sellos de coleccion y organizacion de exposiciones filatelicas."}
+  "enlaces": [
+    {"nombre": "TrackingBO - Rastreo de envios",   "url": "https://trackingbo.correos.gob.bo:8100/", "descripcion": "Consulta el estado de tu envio en tiempo real"},
+    {"nombre": "SIRECO - Reclamos y sugerencias",   "url": "https://sireco.correos.gob.bo:8102/", "descripcion": "Presenta un reclamo o sugerencia sobre nuestros servicios"},
+    {"nombre": "UNIENVIO - ECA empresarial",        "url": "https://unienvio.correos.gob.bo:8103/", "descripcion": "Plataforma para envios masivos empresariales"},
+    {"nombre": "GESDO - Carteros y distribucion",   "url": "https://gesdo.correos.gob.bo:8106/", "descripcion": "Sistema de gestion de distribucion y carteros"},
+    {"nombre": "SIREN - Encomiendas nacionales",    "url": "https://siren.correos.gob.bo:8107/", "descripcion": "Sistema de registro de encomiendas nacionales"},
+    {"nombre": "ULTRAPOST - EMS internacional",     "url": "https://ultrapost.correos.gob.bo:8108/login", "descripcion": "Plataforma para envios EMS internacionales"},
+    {"nombre": "Filatelia",                         "url": "https://correos.gob.bo/filatelia/", "descripcion": "Catalogo de sellos postales y exposiciones filatelicas"},
+    {"nombre": "Servicio Postal SP",                "url": "https://correos.gob.bo/sp/", "descripcion": "Informacion sobre el servicio postal universal"},
+    {"nombre": "Encomienda Postal",                 "url": "https://correos.gob.bo/servicio-encomienda-postal/", "descripcion": "Detalles del servicio de encomienda postal internacional"},
+    {"nombre": "ECA - Correspondencia Agrupada",    "url": "https://correos.gob.bo/eca/", "descripcion": "Servicio de correspondencia para empresas"},
+    {"nombre": "EMS Internacional",                 "url": "https://correos.gob.bo/ems/", "descripcion": "Servicio express postal internacional"}
   ],
+
+  "sucursales_info": {
+    "cantidad": 9,
+    "regionales": ["La Paz (Oficina Central)", "Cochabamba", "Santa Cruz", "Sucre", "Potosi", "Oruro", "Tarija", "Beni", "Pando"],
+    "servicios_comunes": ["Venta de estampillas", "Recepcion de envios nacionales e internacionales", "Rastreo", "Apartados postales", "Filatelia (en sucursales principales)"]
+  },
 
   "respuestas_fijas": {
     "sin_info": "No tengo esa informacion. Visita {web} o llama al {telefono}.",
     "fuera_dominio": "Solo puedo ayudarte con temas de Correos Bolivia. ¿Tienes alguna consulta sobre envios, rastreo o servicios postales?",
     "rastreo_prompt": "Enviame tu codigo de rastreo completo, por ejemplo: {ejemplo_codigo}",
-    "tarifa_prompt": "Para cotizar sin ambiguedad, activa el modo Tarifas con el boton 'Tarifas'."
+    "tarifa_prompt": "Para cotizar sin ambiguedad, activa el modo Tarifas con el boton 'Tarifas'. Necesito saber: tipo de servicio, origen, destino y peso.",
+    "que_servicios": "Correos Bolivia ofrece estos servicios: EMS (envio urgente nacional e internacional), Encomienda Postal (paqueteria internacional), Mi Encomienda (paqueteria nacional), Correo Prioritario (cartas), ECA (envios masivos empresariales), Chasqui Express (entrega a domicilio), Casillas Postales, Filatelia, LC/AO, Sacas M, Pliegos Oficiales y Super Express. Cual te interesa?",
+    "como_enviar": "Para enviar un paquete necesitas: 1) Elegir el servicio (EMS, Encomienda, etc.), 2) Tener tu documento de identidad, 3) Empacar bien el contenido, 4) Llenar la declaracion de contenido si es internacional, 5) Ir a una sucursal de Correos Bolivia. El horario de atencion es lunes a viernes 8:30-16:30 y sabados 9:00-13:00."
   }
 }

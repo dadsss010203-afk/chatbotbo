@@ -47,8 +47,8 @@ services:
           echo 'Ollama no responde todavía. Reintentando en 3s...'
           sleep 3
         done
-        echo 'Descargando modelo qwen2.5:1.5b...'
-        until ollama pull qwen2.5:1.5b ; do
+        echo 'Descargando modelo llama3.2:1b...'
+        until ollama pull llama3.2:1b ; do
           echo 'Fallo de red durante el pull. Reintentando en 20s...'
           sleep 20
         done
