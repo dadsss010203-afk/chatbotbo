@@ -24,6 +24,8 @@ ollama_data/
 chroma_data/
 
 chatbotbo_bak
+data
+
 .idea/
 .vscode/
 
