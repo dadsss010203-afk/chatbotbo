@@ -22,16 +22,30 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 REDIS_CACHE_TTL = int(os.environ.get("REDIS_CACHE_TTL", "3600"))
 REDIS_EMBEDDING_CACHE = os.environ.get("REDIS_EMBEDDING_CACHE", "true").lower() in ("1", "true", "yes")
 REDIS_RESPONSE_CACHE = os.environ.get("REDIS_RESPONSE_CACHE", "true").lower() in ("1", "true", "yes")
+REDIS_TARIFF_CACHE = os.environ.get("REDIS_TARIFF_CACHE", "false").lower() in ("1", "true", "yes")
 REDIS_RESPONSE_CACHE_TTL = int(os.environ.get("REDIS_RESPONSE_CACHE_TTL", "900"))
 
-try:
-    _redis = redis.from_url(REDIS_URL, decode_responses=False)
-    _redis.ping()
-    _redis_available = True
-except Exception as e:
-    logger.warning("Redis no disponible. Cache deshabilitada.", extra={"error": str(e)})
-    _redis = None
-    _redis_available = False
+_redis = None
+_redis_available = False
+
+
+def _ensure_redis() -> bool:
+    """Verifica Redis y reintenta conectar si no estaba disponible al arrancar."""
+    global _redis, _redis_available
+    if _redis is None:
+        _redis = redis.from_url(REDIS_URL, decode_responses=False)
+    try:
+        _redis.ping()
+        _redis_available = True
+        return True
+    except Exception as e:
+        if _redis_available:
+            logger.warning("Redis no disponible. Cache deshabilitada.", extra={"error": str(e)})
+        _redis_available = False
+        return False
+
+
+_ensure_redis()
 
 # ─────────────────────────────────────────────
 #  FUNCIONES HELPER
@@ -52,7 +66,7 @@ def _normalize_question(text: str) -> str:
 
 def get(key: str) -> Optional[Any]:
     """Obtiene valor del cache (bytes o None)."""
-    if not _redis_available:
+    if not _ensure_redis():
         return None
     try:
         return _redis.get(key)
@@ -63,7 +77,7 @@ def get(key: str) -> Optional[Any]:
 
 def set(key: str, value: Any, ttl: int = REDIS_CACHE_TTL) -> bool:
     """Guarda valor en caché."""
-    if not _redis_available:
+    if not _ensure_redis():
         return False
     try:
         _redis.setex(key, ttl, value)
@@ -113,7 +127,7 @@ def set_pickle(key: str, data: Any, ttl: int = REDIS_CACHE_TTL) -> bool:
 
 def delete(key: str) -> bool:
     """Elimina una clave del caché."""
-    if not _redis_available:
+    if not _ensure_redis():
         return False
     try:
         _redis.delete(key)
@@ -124,7 +138,7 @@ def delete(key: str) -> bool:
 
 def clear_pattern(pattern: str) -> int:
     """Elimina todas las claves matching un pattern usando SCAN."""
-    if not _redis_available:
+    if not _ensure_redis():
         return 0
     try:
         keys = []
@@ -262,7 +276,7 @@ def set_response(
 
 
 def _ttl_seconds(key: str) -> int:
-    if not _redis_available:
+    if not _ensure_redis():
         return -1
     try:
         return int(_redis.ttl(key))
@@ -272,7 +286,7 @@ def _ttl_seconds(key: str) -> int:
 
 def list_response_cache(limit: int = 200, q: str = "") -> list[dict]:
     """Lista respuestas cacheadas para auditoría en panel."""
-    if not _redis_available:
+    if not _ensure_redis():
         return []
     items: list[dict] = []
     query = _normalize_question(q)
@@ -333,7 +347,7 @@ def clear_response_cache() -> int:
 
 def get_stats() -> dict:
     """Obtiene estadísticas del caché Redis."""
-    if not _redis_available:
+    if not _ensure_redis():
         return {"available": False}
     
     try:
@@ -351,7 +365,7 @@ def get_stats() -> dict:
 
 def count_pattern(pattern: str) -> int:
     """Cuenta claves por patrón sin eliminarlas."""
-    if not _redis_available:
+    if not _ensure_redis():
         return 0
     try:
         total = 0
@@ -391,6 +405,8 @@ def get_namespace_stats() -> dict:
         "features": {
             "embedding_cache_enabled": REDIS_EMBEDDING_CACHE,
             "response_cache_enabled": REDIS_RESPONSE_CACHE,
+            "tariff_cache_enabled": REDIS_TARIFF_CACHE,
+            "rag_cache_enabled": True,
             "response_cache_ttl_seconds": REDIS_RESPONSE_CACHE_TTL,
             "default_ttl_seconds": REDIS_CACHE_TTL,
         },
@@ -399,10 +415,4 @@ def get_namespace_stats() -> dict:
 
 def health_check() -> bool:
     """Verifica si Redis está disponible."""
-    if not _redis_available:
-        return False
-    try:
-        _redis.ping()
-        return True
-    except Exception:
-        return False
+    return _ensure_redis()

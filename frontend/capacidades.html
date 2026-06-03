@@ -5581,7 +5581,8 @@ function renderCache() {
     ]},
     { title: "Flags", lines: [
       { label: "Embedding cache", value: features.embedding_cache_enabled ? "Activado" : "Desactivado" },
-      { label: "Tariff cache", value: features.tariff_cache_enabled ? "Activado" : "Desactivado" },
+      { label: "Cache respuestas", value: features.response_cache_enabled ? "Activado" : "Desactivado" },
+      { label: "Cache tarifas", value: features.tariff_cache_enabled ? "Activado" : "Desactivado" },
       { label: "TTL respuestas", value: `${Number(features.response_cache_ttl_seconds || 0)} s` }
     ]}
   ]);
