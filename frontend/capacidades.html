@@ -5086,7 +5086,7 @@ function applyView() {
     }
   }
 
-  if (currentView === "users" && currentUser?.role === "admin") {
+  if (currentView === "users" && (currentUser?.rol === "admin" || currentUser?.role === "admin")) {
     loadUsers();
   }
 
@@ -6458,7 +6458,7 @@ async function loadAll() {
   updateTopStrip();
   updateHero();
   renderStats();
-  if (currentUser?.role === "admin") loadUsers();
+  if (currentUser?.rol === "admin" || currentUser?.role === "admin") loadUsers();
   applyView();
 }
 

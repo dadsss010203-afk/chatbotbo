@@ -126,13 +126,15 @@ def _default_options() -> dict:
     lo cual reduce alucinaciones.
     """
     seed = os.environ.get("OLLAMA_SEED")
+    default_threads = max(1, (os.cpu_count() or 8) // 2)
     options = {
         "num_predict":   _env_int("OLLAMA_NUM_PREDICT",   600),
         "temperature":   _env_float("OLLAMA_TEMPERATURE", 0.2),
-        "num_ctx":       _env_int("OLLAMA_NUM_CTX",       2048),
+        "num_ctx":       _env_int("OLLAMA_NUM_CTX",       4096),
         "repeat_penalty":_env_float("OLLAMA_REPEAT_PENALTY", 1.1),
         "top_p":         _env_float("OLLAMA_TOP_P",       0.9),
         "top_k":         _env_int("OLLAMA_TOP_K",         40),
+        "num_thread":    _env_int("OLLAMA_NUM_THREADS",   default_threads),
     }
     if seed is not None and seed != "":
         try:

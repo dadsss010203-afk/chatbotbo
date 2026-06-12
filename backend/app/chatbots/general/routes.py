@@ -1618,10 +1618,21 @@ async def chat(request: Request):
     # ── Tarifa mode → arbol deterministico
     if tarifa_mode:
         flow = _get_tarifa_flow(sid)
+        is_start = all(v is None for v in flow.values())
+        if is_start and not session.tarifa_flow_active(sid):
+            session.start_tarifa_flow(sid)
+            session.append_tarifa_flow_turn(sid, user_text="", assistant_text="El envio es nacional o internacional?")
+            
         result = _handle_tarifa_step(flow, pregunta, lang)
         response = result.get("response", "")
         quick_replies = result.get("quick_replies", [])
         session.agregar_turno(sid, pregunta, response or "Procesando...")
+        
+        session.append_tarifa_flow_turn(sid, user_text=pregunta, assistant_text=response)
+        
+        if result.get("tarifa_calculated"):
+            _persistir_flujo_tarifa(sid, "completed")
+            
         return _finalizar_chat_response(sid=sid, request_id=request_id, pregunta=pregunta, payload={
             "response": response, "lang": lang, "quick_replies": quick_replies,
         }, started_at=started_at)
@@ -2040,10 +2051,21 @@ async def chat_stream(request: Request):
         # ── Tarifa mode → arbol deterministico (stream)
         if tarifa_mode:
             flow = _get_tarifa_flow(sid)
+            is_start = all(v is None for v in flow.values())
+            if is_start and not session.tarifa_flow_active(sid):
+                session.start_tarifa_flow(sid)
+                session.append_tarifa_flow_turn(sid, user_text="", assistant_text="El envio es nacional o internacional?")
+                
             result = _handle_tarifa_step(flow, pregunta_actual, lang)
             response = result.get("response", "")
             qr = result.get("quick_replies", [])
             session.agregar_turno(sid, pregunta_actual, response or "...")
+            
+            session.append_tarifa_flow_turn(sid, user_text=pregunta_actual, assistant_text=response)
+            
+            if result.get("tarifa_calculated"):
+                _persistir_flujo_tarifa(sid, "completed")
+                
             payload = {"response": response, "lang": lang, "quick_replies": qr}
             if "tarifa_card" in result:
                 payload["tarifa_card"] = result["tarifa_card"]
@@ -2358,7 +2380,15 @@ async def chat_stream(request: Request):
             return
 
         hora = session.get_hora_bolivia()
-        sistema = construir_prompt(t["instruccion"], _limpiar_contexto_rag(contexto), hora, t["sin_info"])
+        sistema = construir_prompt(
+            t["instruccion"],
+            _limpiar_contexto_rag(contexto),
+            hora,
+            t["sin_info"],
+            skill_name=primary_skill.get("nombre", ""),
+            skill_description=primary_skill.get("descripcion", ""),
+            skill_triggers=primary_skill.get("trigger", ""),
+        )
         mensajes = [{"role": "system", "content": sistema}, *session.historial_reciente(sid), {"role": "user", "content": pregunta_actual_llm}]
         mensajes = _trim_messages_to_token_budget(mensajes, ollama.OLLAMA_PROMPT_MAX_TOKENS)
 
@@ -2377,9 +2407,31 @@ async def chat_stream(request: Request):
             respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
             respuesta = _normalize_response_text(respuesta)
             session.agregar_turno(sid, pregunta_actual, respuesta)
+
+            _es_sin_info = respuesta == t["sin_info"]
+            valid_sources = [s for s in sources if s.get("source_type") and s.get("source_type") != "unknown"]
+            should_cache = (not _es_sin_info and bool(valid_sources) and len(respuesta) >= 40)
+            if should_cache:
+                cache.set_response(
+                    pregunta=pregunta_actual,
+                    lang=lang,
+                    skill_id=primary_skill_id,
+                    model=os.environ.get("LLM_MODEL", "correos-bot"),
+                    require_evidence=REQUIRE_EVIDENCE,
+                    payload={
+                        "response": respuesta,
+                        "sources": rag_result.get("sources", []),
+                        "primary_source_type": rag_result.get("primary_source_type")
+                    }
+                )
+
             async for line in instant_end({
                 "response": respuesta, "lang": lang,
-                "skill_resolution": {"in_scope": True, "primary_skill": "", "matched_skills": []},
+                "skill_resolution": {
+                    "in_scope": skill_resolution.get("in_scope", True),
+                    "primary_skill": primary_skill_id,
+                    "matched_skills": skill_resolution.get("skill_ids", []),
+                },
                 "sources": rag_result.get("sources", []),
                 "primary_source_type": rag_result.get("primary_source_type"),
             }):
@@ -2746,6 +2798,24 @@ def conversations_clear():
     return {"ok": True, "deleted": deleted}
 
 
+@router.get("/conversations/tarifas")
+def tariff_conversations_list(limit: int = 500, offset: int = 0, q: str = ""):
+    return conversation_logs.list_tariff_conversations(limit=limit, offset=offset, q=q)
+
+
+@router.delete("/conversations/tarifas/{log_id}")
+def tariff_conversations_delete(log_id: int):
+    if not conversation_logs.delete_tariff_conversation(log_id):
+        raise HTTPException(status_code=404, detail="Log de tarifas no encontrado")
+    return {"ok": True, "id": log_id}
+
+
+@router.post("/conversations/tarifas/clear")
+def tariff_conversations_clear():
+    deleted = conversation_logs.clear_tariff_conversations()
+    return {"ok": True, "deleted": deleted}
+
+
 @router.get("/pdfs")
 def listar_pdfs():
     pdfs = capabilities.listar_pdfs()
@@ -3093,19 +3163,45 @@ def _handle_tarifa_step(flow: dict, msg: str, lang: str) -> dict:
     return {"response": "Error en el flujo de tarifas. Reinicia con el boton Tarifas."}
 
 
+def _persistir_flujo_tarifa(sid: str, status: str):
+    flow = session.pop_tarifa_flow(sid)
+    if flow and flow.get("messages"):
+        lines = []
+        for m in flow["messages"]:
+            role = "Usuario" if m.get("role") == "user" else "Bot"
+            lines.append(f"{role}: {m.get('content')}")
+        if status == "cancelled":
+            lines.append("Bot: [Flujo cancelado por el usuario]")
+        flow_text = "\n".join(lines)
+        conversation_logs.log_tariff_conversation(
+            session_id=sid,
+            status=status,
+            flow_text=flow_text
+        )
+
+
 @router.post("/tarifa/start")
 async def tarifa_start(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
     lang = (data or {}).get("lang", "es")
     _tarifa_flows[sid] = {"scope": None, "service": None, "destination": None, "weight": None}
-    return {"response": "El envio es nacional o internacional?", "lang": lang, "quick_replies": quick_replies_scope(), "sid": sid}
+    
+    session.start_tarifa_flow(sid)
+    response_msg = "El envio es nacional o internacional?"
+    session.append_tarifa_flow_turn(sid, user_text="", assistant_text=response_msg)
+    
+    return {"response": response_msg, "lang": lang, "quick_replies": quick_replies_scope(), "sid": sid}
 
 
 @router.post("/tarifa/cancel")
 async def tarifa_cancel(request: Request):
     data = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     sid = _resolve_sid_from_request(request, data if isinstance(data, dict) else {})
+    
+    if session.tarifa_flow_active(sid):
+        _persistir_flujo_tarifa(sid, "cancelled")
+        
     _tarifa_flows.pop(sid, None)
     return {"ok": True, "sid": sid}
 
@@ -3117,7 +3213,20 @@ async def tarifa_chat(request: Request):
     lang = data.get("lang", "es")
     msg = (data.get("message") or "").strip()
     flow = _get_tarifa_flow(sid)
+    
+    is_start = all(v is None for v in flow.values())
+    if is_start and not session.tarifa_flow_active(sid):
+        session.start_tarifa_flow(sid)
+        session.append_tarifa_flow_turn(sid, user_text="", assistant_text="El envio es nacional o internacional?")
+        
     result = _handle_tarifa_step(flow, msg, lang)
+    response = result.get("response", "")
+    
+    session.append_tarifa_flow_turn(sid, user_text=msg, assistant_text=response)
+    
+    if result.get("tarifa_calculated"):
+        _persistir_flujo_tarifa(sid, "completed")
+        
     result["lang"] = lang
     result["sid"] = sid
     return result

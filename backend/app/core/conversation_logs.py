@@ -46,7 +46,24 @@ def init_db() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_conversation_logs_session_id ON conversation_logs(session_id)"
         )
-        # Migración simple para bases existentes sin columna rating.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tariff_conversation_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                flow_text TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tariff_conversation_logs_created_at ON tariff_conversation_logs(created_at DESC)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tariff_conversation_logs_session_id ON tariff_conversation_logs(session_id)"
+        )
+        # Migración simple para bases existentes sin columna rating o request_id.
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(conversation_logs)").fetchall()}
         if "rating" not in columns:
             conn.execute("ALTER TABLE conversation_logs ADD COLUMN rating INTEGER NOT NULL DEFAULT 0")
@@ -199,6 +216,107 @@ def stats() -> dict:
         "dislikes": int(row["dislikes"] or 0),
         "avg_latency_ms": round(float(row["avg_latency_ms"] or 0), 1),
     }
+
+
+def log_tariff_conversation(
+    *,
+    session_id: str,
+    status: str,
+    flow_text: str,
+) -> int | None:
+    sid = (session_id or "").strip()
+    stat = (status or "").strip()
+    ft = (flow_text or "").strip()
+    if not sid or not stat or not ft:
+        return None
+
+    created_at = datetime.now(timezone.utc).isoformat()
+    with _connect() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO tariff_conversation_logs (
+                created_at, session_id, status, flow_text
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (created_at, sid, stat, ft),
+        )
+        conn.commit()
+        return cur.lastrowid
+
+
+def list_tariff_conversations(limit: int = 300, offset: int = 0, q: str = "") -> dict:
+    lim = max(1, min(int(limit or 300), 2000))
+    off = max(int(offset or 0), 0)
+    query = (q or "").strip()
+
+    where = ""
+    params: list = []
+    if query:
+        where = "WHERE session_id LIKE ? OR status LIKE ? OR flow_text LIKE ?"
+        like = f"%{query}%"
+        params.extend([like, like, like])
+
+    with _connect() as conn:
+        total_row = conn.execute(
+            f"SELECT COUNT(*) AS total FROM tariff_conversation_logs {where}",
+            params,
+        ).fetchone()
+        rows = conn.execute(
+            f"""
+            SELECT id, created_at, session_id, status, flow_text
+            FROM tariff_conversation_logs
+            {where}
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+            """,
+            [*params, lim, off],
+        ).fetchall()
+
+    items = []
+    for row in rows:
+        items.append(
+            {
+                "id": int(row["id"]),
+                "created_at": row["created_at"],
+                "session_id": row["session_id"],
+                "status": row["status"],
+                "flow_text": row["flow_text"],
+            }
+        )
+    
+    # Calculate stats for tariff summaries
+    with _connect() as conn:
+        stats_row = conn.execute(
+            """
+            SELECT
+              COUNT(*) AS total,
+              SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+              SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+            FROM tariff_conversation_logs
+            """
+        ).fetchone()
+        stats_data = {
+            "total": int(stats_row["total"] or 0),
+            "completed": int(stats_row["completed"] or 0),
+            "cancelled": int(stats_row["cancelled"] or 0),
+        }
+
+    return {"items": items, "total": int(total_row["total"] or 0), "stats": stats_data}
+
+
+def delete_tariff_conversation(log_id: int) -> bool:
+    lid = int(log_id)
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM tariff_conversation_logs WHERE id = ?", (lid,))
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def clear_tariff_conversations() -> int:
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM tariff_conversation_logs")
+        conn.commit()
+        return int(cur.rowcount or 0)
 
 
 # Inicializa esquema al importar módulo.

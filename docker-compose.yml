@@ -12,7 +12,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_NUM_PARALLEL=1
       - OLLAMA_MAX_LOADED_MODELS=1
       - OLLAMA_FLASH_ATTENTION=1
       - OLLAMA_NUM_THREADS=0
@@ -47,8 +47,8 @@ services:
           echo 'Ollama no responde todavía. Reintentando en 3s...'
           sleep 3
         done
-        echo 'Descargando modelo qwen2.5:1.5b...'
-        until ollama pull qwen2.5:1.5b ; do
+        echo 'Descargando modelo qwen2.5:7b...'
+        until ollama pull qwen2.5:7b ; do
           echo 'Fallo de red durante el pull. Reintentando en 20s...'
           sleep 20
         done
@@ -124,8 +124,9 @@ services:
       - REDIS_RESPONSE_CACHE_TTL=86400
       - LLM_MODEL=correos-bot
       - EMBEDDING_MODEL=intfloat/multilingual-e5-small
-      - RERANKER_ENABLED=true
+      - RERANKER_ENABLED=false         # Desactivado para ahorrar latencia crítica en CPU (15-30s)
       - RERANKER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+      - OLLAMA_NUM_CTX=4096            # Mayor contexto para evitar pérdida de reglas de negocio
       - RAG_VECTOR_STORE=qdrant
       - QDRANT_URL=http://qdrant:6333
       - TRITON_URL=http://triton:8000
