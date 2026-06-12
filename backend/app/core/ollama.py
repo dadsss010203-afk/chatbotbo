@@ -390,12 +390,9 @@ def limpiar_respuesta(texto: str) -> str:
     texto = re.sub(r'[^\x20-\xFF\u0100-\u024F\u2013\u2014\u2026\n]', '', texto)
 # Colapsar espacios dobles que hayan quedado al remover caracteres extranjeros
     texto = re.sub(r"[ \t]{2,}", " ", texto)
-    # Reconstruir saltos de linea entre items de listas que el LLM genero
-    # en lineas separadas pero fueron colapsados a un solo parrafo.
-    # Patron 1: ". ItemCapitalizado:" → separa items de lista
-    # Patron 2: ": ItemCapitalizado:" → separa primer item tras intro
-    # Sistemico: funciona con cualquier lista, no solo servicios.
-    texto = re.sub(r'(?<=[.:])(\s+)(?=[A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ]+(?:\s+[a-zA-ZáéíóúñÁÉÍÓÚÑ]+)*\s*:)', r'<br>', texto)
+    # Separar items de lista que el LLM generó en una sola línea.
+    # Inserta salto de línea (no <br>) cuando detecta un nuevo item tras punto/dos puntos.
+    texto = re.sub(r'(?<=[.:])([ \t]+)(?=[A-ZÁÉÍÓÚÑ][a-zA-ZáéíóúñÁÉÍÓÚÑ]+(?:\s+[a-zA-ZáéíóúñÁÉÍÓÚÑ]+)*\s*:)', r'\n', texto)
     return texto.strip()
 
 

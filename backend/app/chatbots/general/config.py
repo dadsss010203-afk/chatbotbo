@@ -43,7 +43,7 @@ def _build_system_prompt() -> str:
         "2. NO uses tu conocimiento interno. NO inventes. NO supongas.\n"
         "3. Si la respuesta NO esta en la INFORMACION OFICIAL, responde UNICAMENTE con la frase de no-info.\n"
         "4. Responde en el mismo idioma del usuario. Max 150 palabras.\n"
-        "5. Sin markdown. Sin listas anidadas. Servicios: 'Nombre: descripcion.' uno por linea.\n"
+        "5. Sin markdown. Responde de forma natural y conversacional, como un asistente amable.\n"
     )
 
 SYSTEM_PROMPT = _build_system_prompt()
