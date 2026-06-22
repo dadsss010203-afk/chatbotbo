@@ -313,7 +313,7 @@ body.widget-shell {
 /* ─── Chat Window ──────────────────────────────── */
 #chat-window {
   position: fixed;
-  bottom: 94px;
+  bottom: 105px;
   right: 22px;
   width: 340px;
   max-width: calc(100vw - 44px);
@@ -374,14 +374,14 @@ header::after {
 .h-inner {
   position: relative;
   z-index: 1;
-  padding: 7px 12px 5px;
+  padding: 3px 12px 2px;
 }
 
 .h-row1 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: 1px;
 }
 
 .h-brand {
@@ -393,8 +393,8 @@ header::after {
 .h-avatar {
   position: relative;
   flex-shrink: 0;
-  width: 90px;
-  height: 52px;
+  width: 112px;
+  height: 60px;
   border-radius: 10px;
   background: transparent;
   display: flex;
@@ -404,8 +404,8 @@ header::after {
 }
 
 .h-avatar img {
-  width: 90px;
-  height: 52px;
+  width: 112px;
+  height: 60px;
   object-fit: contain;
   border-radius: 8px;
 }
