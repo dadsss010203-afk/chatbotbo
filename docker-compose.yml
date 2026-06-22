@@ -1,14 +1,14 @@
 services:
 
   ollama:
-    image: ollama/ollama:0.5.7
+    image: ollama/ollama:latest
     container_name: chatbotbo_ollama
     restart: unless-stopped
     dns:
       - 8.8.8.8
       - 1.1.1.1
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
@@ -24,7 +24,7 @@ services:
       start_period: 30s
 
   ollama-setup:
-    image: ollama/ollama:0.5.7
+    image: ollama/ollama:latest
     container_name: chatbotbo_setup
     dns:
       - 8.8.8.8
@@ -47,8 +47,8 @@ services:
           echo 'Ollama no responde todavía. Reintentando en 3s...'
           sleep 3
         done
-        echo 'Descargando modelo qwen2.5:7b...'
-        until ollama pull qwen2.5:7b ; do
+        echo 'Descargando modelo qwen3:1.7b...'
+        until ollama pull qwen3:1.7b ; do
           echo 'Fallo de red durante el pull. Reintentando en 20s...'
           sleep 20
         done
@@ -114,29 +114,31 @@ services:
     environment:
       - OLLAMA_URL=http://ollama:11434/api/chat
       - OLLAMA_TIMEOUT=600
-      - OLLAMA_NUM_PREDICT=300
+      - OLLAMA_NUM_PREDICT=1000
       - OLLAMA_RETRIES=1
       - LLM_RESPONSE_TIMEOUT=600
       - REDIS_URL=redis://redis:6379/0
       - REDIS_CACHE_TTL=3600
       - REDIS_EMBEDDING_CACHE=true
       - REDIS_RESPONSE_CACHE=true
-      - REDIS_RESPONSE_CACHE_TTL=86400
+      - REDIS_RESPONSE_CACHE_TTL=600
       - LLM_MODEL=correos-bot
       - EMBEDDING_MODEL=intfloat/multilingual-e5-small
-      - RERANKER_ENABLED=false         # Desactivado para ahorrar latencia crítica en CPU (15-30s)
+      - RERANKER_ENABLED=true          # Activado para reordenar chunks por relevancia real
       - RERANKER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
-      - OLLAMA_NUM_CTX=4096            # Mayor contexto para evitar pérdida de reglas de negocio
+      - OLLAMA_NUM_CTX=8192            # Ventana completa para recibir todo el contexto RAG
       - RAG_VECTOR_STORE=qdrant
       - QDRANT_URL=http://qdrant:6333
       - TRITON_URL=http://triton:8000
       - USE_TRITON=false
       - CHROMA_PATH=/app/chroma_db
-      - CHUNK_SIZE=400
+      - CHUNK_SIZE=250
+      - CHUNK_OVERLAP=80
       - BATCH_SIZE=500
-      - N_RESULTADOS=5
-      - MAX_CONTEXT_CHARS=1500
-      - MAX_CONTEXT_TOKENS=700
+      - N_RESULTADOS=7
+      - MAX_CONTEXT_CHARS=2800
+      - MAX_CONTEXT_TOKENS=1400
+      - OLLAMA_PROMPT_MAX_TOKENS=2800
       - PYTHONUNBUFFERED=1
       - UVICORN_WORKERS=1
       - PYTHONPATH=/app

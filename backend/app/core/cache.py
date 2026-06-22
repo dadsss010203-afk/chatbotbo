@@ -9,6 +9,7 @@ import hashlib
 import pickle
 import re
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Optional
 import redis
@@ -246,7 +247,39 @@ def get_response(
     data = get_json(key)
     if not isinstance(data, dict):
         return None
+
+    expires_at = data.get("expires_at")
+    if isinstance(expires_at, (int, float)) and int(expires_at) <= int(time.time()):
+        delete(key)
+        return None
+
     return data
+
+
+def _cache_age_seconds(payload: dict) -> int:
+    """Devuelve la edad de una entrada cacheada en segundos, no el TTL restante."""
+    ttl_seconds = payload.get("ttl_seconds")
+    if isinstance(ttl_seconds, (int, float)):
+        ttl_seconds = int(ttl_seconds)
+    else:
+        ttl_seconds = None
+
+    expires_at = payload.get("expires_at")
+    if isinstance(expires_at, (int, float)) and ttl_seconds is not None:
+        remaining = max(0, int(expires_at) - int(time.time()))
+        return max(0, ttl_seconds - remaining)
+
+    created_at = payload.get("created_at")
+    if isinstance(created_at, str):
+        try:
+            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            if created_dt.tzinfo is None:
+                created_dt = created_dt.replace(tzinfo=timezone.utc)
+            return max(0, int(time.time()) - int(created_dt.timestamp()))
+        except Exception:
+            pass
+
+    return 0
 
 
 def set_response(
@@ -272,7 +305,10 @@ def set_response(
     record["model"] = (model or "").strip()
     record["require_evidence"] = bool(require_evidence)
     record["created_at"] = datetime.now(timezone.utc).isoformat()
-    return set_json(key, record, ttl=max(int(ttl or 0), 60))
+    ttl_seconds = max(int(ttl or 0), 60)
+    record["ttl_seconds"] = ttl_seconds
+    record["expires_at"] = int(time.time()) + ttl_seconds
+    return set_json(key, record, ttl=ttl_seconds)
 
 
 def _ttl_seconds(key: str) -> int:
@@ -314,7 +350,7 @@ def list_response_cache(limit: int = 200, q: str = "") -> list[dict]:
                     "skill_id": payload.get("skill_id") or "",
                     "primary_source_type": payload.get("primary_source_type") or "",
                     "created_at": payload.get("created_at") or "",
-                    "ttl_seconds": _ttl_seconds(key),
+                    "ttl_seconds": _cache_age_seconds(payload),
                 }
                 items.append(item)
                 if len(items) >= max_items:

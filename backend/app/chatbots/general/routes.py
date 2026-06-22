@@ -38,6 +38,7 @@ from chatbots.general.chat_helpers import (
     log_sin_info,
 )
 from chatbots.general.translation_service import translate_texts
+from chatbots.general.services.tracking import should_use_tracking_flow
 from chatbots.general.config import (
     NOMBRE, CHROMA_PATH, DATA_FILE, SUCURSALES_FILE, SECCIONES_FILE, HISTORIA_FILE,
     construir_prompt, REQUIRE_EVIDENCE,
@@ -56,7 +57,7 @@ REINDEX_DEBOUNCE_SECONDS = int(os.environ.get("REINDEX_DEBOUNCE_SECONDS", "30"))
 CHAT_RESPONSE_MAX_CHARS = int(os.environ.get("CHAT_RESPONSE_MAX_CHARS", "0"))
 INPUT_TEXT_NORMALIZATION = os.environ.get("INPUT_TEXT_NORMALIZATION", "true").strip().lower() in ("1", "true", "yes")
 INPUT_MAX_CHARS = int(os.environ.get("INPUT_MAX_CHARS", "420"))
-LOCATION_USE_LLM_ONLY = True
+LOCATION_USE_LLM_ONLY = False
 TRACKING_API_URL = os.environ.get(
     "TRACKING_API_URL",
     contacto.tracking_api_url(),
@@ -439,7 +440,10 @@ def _filtrar_sucursales_por_scope(sucursales: list[dict], scope: str | None) -> 
     if scope == "regionales":
         return [s for s in sucursales if _es_regional(s)]
     if scope == "sucursales":
-        return [s for s in sucursales if not _es_regional(s)]
+        res = [s for s in sucursales if not _es_regional(s)]
+        if not res:
+            return list(sucursales)
+        return res
     return list(sucursales)
 
 
@@ -1591,8 +1595,8 @@ async def chat(request: Request):
     # pregunta_llm se recalcula después de posibles rewrites de follow-up.
     pregunta_llm = pregunta
 
-    # ── Consulta de rastreo 100% determinista (API externa)
-    if tracking_mode:
+    # ── Consulta de rastreo 100% determinista (API externa) solo para inputs explícitos
+    if tracking_mode and should_use_tracking_flow(pregunta):
         try:
             tracking_payload = _resolver_tracking_deterministico(pregunta)
         except ValueError as e:
@@ -2034,7 +2038,7 @@ async def chat_stream(request: Request):
         pregunta_actual_llm = pregunta_actual
         yield _stream_line({"type": "start", "sid": sid, "request_id": request_id, "lang": lang})
 
-        if tracking_mode:
+        if tracking_mode and should_use_tracking_flow(pregunta_actual):
             try:
                 tracking_payload = _resolver_tracking_deterministico(pregunta_actual)
             except ValueError as e:
@@ -2133,6 +2137,15 @@ async def chat_stream(request: Request):
                 respuesta = ollama.limpiar_respuesta("".join(partes))
                 respuesta = _postprocess_llm_response(respuesta, respuesta_chat_vacio(lang, pregunta_actual))
                 respuesta = _normalize_response_text(respuesta)
+
+                if respuesta and respuesta != respuesta_chat_vacio(lang, pregunta_actual) and _respuesta_incompleta(respuesta):
+                    logger.info("RESPUESTA_INCOMPLETA detectada en general_only stream, completando...")
+                    respuesta_completa = await _completar_respuesta_incompleta(
+                        request, request_id, respuesta, pregunta_actual, lang
+                    )
+                    respuesta = ollama.limpiar_respuesta(respuesta_completa)
+                    respuesta = _normalize_response_text(respuesta)
+
                 session.agregar_turno(sid, pregunta_actual, respuesta)
                 async for line in instant_end(
                     {
@@ -2406,6 +2419,15 @@ async def chat_stream(request: Request):
             respuesta = ollama.limpiar_respuesta("".join(partes))
             respuesta = _postprocess_llm_response(respuesta, t["sin_info"])
             respuesta = _normalize_response_text(respuesta)
+
+            if respuesta and respuesta != t["sin_info"] and _respuesta_incompleta(respuesta):
+                logger.info("RESPUESTA_INCOMPLETA detectada en stream, completando...")
+                respuesta_completa = await _completar_respuesta_incompleta(
+                    request, request_id, respuesta, pregunta_actual, lang
+                )
+                respuesta = ollama.limpiar_respuesta(respuesta_completa)
+                respuesta = _normalize_response_text(respuesta)
+
             session.agregar_turno(sid, pregunta_actual, respuesta)
 
             _es_sin_info = respuesta == t["sin_info"]
@@ -2594,7 +2616,7 @@ def status():
     rag_info = {"chunks": _rag_chunks_seguro(), "vector_store": os.environ.get("RAG_VECTOR_STORE", "qdrant")}
     model_name = os.environ.get("LLM_MODEL", "correos-bot")
     # Detectar modelo base desde el Modelfile o variable
-    model_base = "llama3.2:1b"  # default, se lee del Modelfile
+    model_base = "qwen3:1.7b"  # default, se lee del Modelfile
     try:
         import re
         mf_path = os.path.join(os.path.dirname(__file__), "..", "core", "Modelfile")

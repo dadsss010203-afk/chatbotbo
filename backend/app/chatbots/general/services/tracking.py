@@ -6,6 +6,7 @@ Servicio de rastreo de envios postales via API externa.
 from __future__ import annotations
 
 import os
+import re
 import requests
 from core import contacto, capabilities
 
@@ -104,6 +105,21 @@ def _tracking_prompt_message(lang: str = "es") -> str:
     if lang == "en":
         return "Send me your complete tracking code, for example: C0028A03441BO"
     return "Enviame tu codigo de rastreo completo, por ejemplo: C0028A03441BO"
+
+
+TRACKING_INTENT_PATTERN = re.compile(
+    r"\b(rastreo|seguimiento|tracking|rastrear|consultar seguimiento|consultar rastreo|codigo de seguimiento|codigo de rastreo)\b",
+    re.IGNORECASE,
+)
+
+
+def should_use_tracking_flow(pregunta: str) -> bool:
+    texto = (pregunta or "").strip()
+    if not texto:
+        return False
+    if capabilities.detectar_codigo_seguimiento(texto):
+        return True
+    return bool(TRACKING_INTENT_PATTERN.search(texto))
 
 
 def _resolver_tracking_deterministico(pregunta: str) -> dict:

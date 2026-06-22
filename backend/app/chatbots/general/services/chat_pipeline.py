@@ -27,6 +27,7 @@ from chatbots.general.services.response_utils import (
     _limpiar_contexto_rag, _sin_info_payload, _truncate_response_safely,
     _mensaje_fuera_dominio, _respuesta_en_portugues,
 )
+from chatbots.general.services.tracking import should_use_tracking_flow
 
 logger = logging.getLogger("chatbotbo.pipeline")
 
@@ -46,8 +47,8 @@ async def run_pre_checks(
     pregunta = ctx["pregunta"]
     tracking_mode = ctx.get("tracking_mode", False)
 
-    # ── Tracking mode
-    if tracking_mode:
+    # ── Tracking mode solo para inputs explícitos de rastreo
+    if tracking_mode and should_use_tracking_flow(pregunta):
         from chatbots.general.services.tracking import _resolver_tracking_deterministico
         try:
             return _resolver_tracking_deterministico(pregunta)

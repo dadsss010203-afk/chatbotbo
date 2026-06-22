@@ -209,9 +209,9 @@ _PALABRAS_CLARAMENTE_AJENAS = {
     "chisme", "chismes", "gossip", "rumor", "rumores", "historia potente",
     # Tecnología ajena
     "facebook", "instagram", "twitter", "tiktok", "whatsapp",
-    "computadora", "celular", "telefono", "internet",
+    "computadora", "celular", "internet",
     # Geografía/política
-    "presidente", "gobierno", "pais", "país", "capital", "ciudad",
+    "presidente", "gobierno", "pais", "país", "capital",
     "clima", "temperatura", "lluvia",
     # Animales
     "perro", "gato", "animal", "mascota", "veterinario",
@@ -260,7 +260,8 @@ def es_pregunta_fuera_dominio(texto: str) -> bool:
         # ej: "donde puedo enviar a mi amigo" tiene "amigo" pero es postal
         tiene_intencion_postal = bool(palabras.intersection(
             {"enviar", "envio", "envío", "mandar", "paquete", "correo",
-             "rastrear", "tarifa", "sucursal", "oficina"}
+             "rastrear", "tarifa", "sucursal", "oficina", "direccion", "dirección",
+             "ubicacion", "ubicación", "telefono", "teléfono", "mapa", "contacto"}
         ))
         if not tiene_intencion_postal:
             return True

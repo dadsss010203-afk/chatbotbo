@@ -104,11 +104,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);min-height:100vh}
 header{background:linear-gradient(135deg,var(--y400) 0%,var(--y500) 50%,var(--y700) 100%);flex-shrink:0;position:relative;overflow:hidden}
 header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 50% 80% at 95% 50%,rgba(255,255,255,0.15) 0%,transparent 60%);pointer-events:none}
 header::after{content:'';position:absolute;bottom:-25px;right:-25px;width:100px;height:100px;border-radius:50%;background:rgba(11,31,78,0.05);pointer-events:none}
-.h-inner{position:relative;z-index:1;padding:7px 12px 5px}
-.h-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.h-inner{position:relative;z-index:1;padding:3px 12px 2px}
+.h-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:1px}
 .h-brand{display:flex;align-items:center;gap:10px}
-.h-avatar{position:relative;flex-shrink:0;width:90px;height:52px;border-radius:10px;background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.h-avatar img{width:90px;height:52px;object-fit:contain;border-radius:8px}
+.h-avatar{position:relative;flex-shrink:0;width:112px;height:60px;border-radius:10px;background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.h-avatar img{width:112px;height:60px;object-fit:contain;border-radius:8px}
 .h-name{font-family:'Playfair Display',serif;font-size:0.92rem;font-weight:700;color:var(--b900);line-height:1.2}
 .h-sub{font-size:0.58rem;color:var(--b700);font-weight:600;margin-top:2px;display:flex;align-items:center;gap:4px}
 .h-sub::before{content:'';width:5px;height:5px;background:#2ecc71;border-radius:50%;display:inline-block;flex-shrink:0;animation:onlinePulse 2s ease-in-out infinite}
@@ -395,12 +395,8 @@ header::after{content:'';position:absolute;bottom:-25px;right:-25px;width:100px;
     <div class="h-inner">
       <div class="h-row1">
         <div class="h-brand">
-          <div class="h-avatar">
-            <img src="./logocorreos.jpg" alt="Correos de Bolivia">
-          </div>
-          <div>
-            <div class="h-name">Correos de Bolivia</div>
-            <div class="h-sub">Asistente virtual</div>
+          <div class="h-avatar" aria-hidden="true">
+            <img src="./logocorreos.jpg" alt="">
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
