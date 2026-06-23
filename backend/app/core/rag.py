@@ -51,7 +51,7 @@ except Exception:
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────
-EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2")
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "intfloat/multilingual-e5-small")
 
 # Los modelos de la familia e5 (intfloat/multilingual-e5-*) requieren prefijos
 # "query: " para búsquedas y "passage: " para documentos indexados.

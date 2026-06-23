@@ -25,8 +25,8 @@
     height: Number(script?.dataset.closedHeight || 124),
   };
   const openSize = {
-    width: Number(script?.dataset.openWidth || 430),
-    height: Number(script?.dataset.openHeight || 660),
+    width: Number(script?.dataset.openWidth || 520),
+    height: Number(script?.dataset.openHeight || 760),
   };
 
   if (!baseUrl) {

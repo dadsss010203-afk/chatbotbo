@@ -991,7 +991,7 @@ def _rag_chunks_seguro() -> int:
 def _estado_capacidades() -> dict:
     return capabilities.get_runtime_capabilities(
         chunks=_rag_chunks_seguro(),
-        embedding_model=os.environ.get("EMBEDDING_MODEL", "paraphrase-multilingual-MiniLM-L12-v2"),
+        embedding_model=os.environ.get("EMBEDDING_MODEL", "intfloat/multilingual-e5-small"),
         chroma_path=CHROMA_PATH,
         ollama_ok=ollama.ollama_disponible(),
         modelo=os.environ.get("LLM_MODEL", "correos-bot"),

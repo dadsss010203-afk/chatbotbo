@@ -460,7 +460,7 @@ docker compose up --build
 | `OLLAMA_TIMEOUT` | Timeout para llamadas Ollama | `240` |
 | `OLLAMA_NUM_PREDICT` | Tokens de salida máximo | `120` |
 | `OLLAMA_RETRIES` | Reintentos Ollama | `1` |
-| `EMBEDDING_MODEL` | Modelo sentence-transformers | `paraphrase-multilingual-MiniLM-L12-v2` |
+| `EMBEDDING_MODEL` | Modelo sentence-transformers | `intfloat/multilingual-e5-small` |
 | `RAG_VECTOR_STORE` | `qdrant` o `chroma` | `qdrant` |
 | `QDRANT_URL` | URL de Qdrant | `http://qdrant:6333` |
 | `REDIS_URL` | URL de Redis | `redis://redis:6379/0` |
