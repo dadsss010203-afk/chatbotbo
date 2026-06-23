@@ -412,7 +412,7 @@ function toggleChat() {
   }
   if (chatOpen) {
     document.getElementById('badge').style.display = 'none';
-    if (isMobile && bubble) bubble.style.display = 'none';
+    if (isMobile && bubble && !embedMode) bubble.style.display = 'none';
     if (!welcomeLoaded) {
       welcomeLoaded = true;
       loadWelcome();

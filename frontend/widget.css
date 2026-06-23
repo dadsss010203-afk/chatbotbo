@@ -51,6 +51,15 @@ body.widget-shell {
   overflow: hidden;
 }
 
+body.widget-shell #chat-bubble {
+  display: flex !important;
+  z-index: 3000;
+}
+
+body.widget-shell #chat-window {
+  z-index: 2000;
+}
+
 
 /* ─── Page & Hero ──────────────────────────────── */
 .page {
@@ -1338,6 +1347,9 @@ header::after {
   #chat-window.open ~ #chat-bubble,
   body:has(#chat-window.open) #chat-bubble {
     display: none !important;
+  }
+  body.widget-shell:has(#chat-window.open) #chat-bubble {
+    display: flex !important;
   }
 }
 
