@@ -1201,11 +1201,14 @@ async function sendMsg(msg){
           }
           removeTyping();
           const bye=data.despedida===true;
+          const hasTarifaCard = data?.tarifa_card && data.tarifa_card.precio;
+          const hasTrackingCard = data?.tracking?.found;
+          const shouldShowOnlyCard = hasTarifaCard || hasTrackingCard;
 
           if(streamMsg){
             const streamedText = streamMsg._fullText || streamMsg.bubble.textContent || '';
             const isBranchesList = data?.response_type === 'branches_list' && Array.isArray(data?.branches);
-            if(isBranchesList){
+            if(isBranchesList || shouldShowOnlyCard){
               streamMsg.wrap.remove();
               streamMsg = null;
             }
@@ -1219,7 +1222,7 @@ async function sendMsg(msg){
                 autoTranslateBubble(streamMsg.bubble, finalText);
               }
             }
-          }else{
+          }else if(!shouldShowOnlyCard){
             addMsg(
               data.response||data.error||'Sin respuesta disponible',
               'b',
@@ -1235,11 +1238,11 @@ async function sendMsg(msg){
             setTarifaModeUI();
           }
           // Mostrar tarjeta visual de tarifa si el backend la devuelve
-          if(data?.tarifa_card && data.tarifa_card.precio){
+          if(hasTarifaCard){
             addTarifaCard(data.tarifa_card);
           }
           // Si hay tracking con URL, mostrar QR
-          if (data?.tracking?.found) {
+          if (hasTrackingCard) {
             addTrackingCard(data.tracking);
           }
           if (data?.tracking && data.tracking.pending === false) {

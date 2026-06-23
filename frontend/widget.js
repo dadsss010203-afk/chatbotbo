@@ -1261,10 +1261,16 @@ async function sendMsg(msg) {
 
           const bye = data.despedida === true;
           const isBranchesList = data?.response_type === 'branches_list' && Array.isArray(data?.branches);
+          const hasTarifaCard = data?.tarifa_card && data.tarifa_card.precio;
+          const hasTrackingCard = data?.tracking?.found;
+          const shouldShowOnlyCard = hasTarifaCard || hasTrackingCard;
           if (isBranchesList) {
             if (streamMsg) streamMsg.wrap.remove();
             streamMsg = null;
             addBranchesList(data.branches, data.message || '');
+          } else if (shouldShowOnlyCard) {
+            if (streamMsg) streamMsg.wrap.remove();
+            streamMsg = null;
           } else if (streamMsg) {
             const finalText = formatBotText(data.response || streamMsg._fullText || 'Sin respuesta disponible');
             // Remover cursor y mostrar texto final
@@ -1310,11 +1316,10 @@ async function sendMsg(msg) {
             setTarifaModeUI();
           }
           // Mostrar tarjeta visual de tarifa si el backend la devuelve
-          if (data?.tarifa_card && data.tarifa_card.precio) {
+          if (hasTarifaCard) {
             addTarifaCard(data.tarifa_card);
           }
-          const trackingCode = data?.tracking?.codigo || data?.tracking_code || data?.codigo || data?.tracking?.code || null;
-          if (data?.tracking?.found) {
+          if (hasTrackingCard) {
             addTrackingCard(data.tracking);
           }
           if (data?.tracking && data.tracking.pending === false) {
